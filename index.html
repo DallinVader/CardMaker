@@ -217,7 +217,7 @@
 
             }
             
-            ctx.font = TypeFontSize.value + "px Medieval"
+            ctx.font = TitleSize.value + "px Medieval"
             ctx.fillText(CardTitle.value, canvas.width - (canvas.width / 2), canvas.height / 12.5)
 
             ctx.font = TypeFontSize.value + "px Medieval"
@@ -238,7 +238,7 @@
             i = 0;
             WrapText(Discription.value).forEach(lin => {
                 i++;
-                ctx.fillText(lin, (canvas.width / 10), (canvas.height / 1.75) + (100 * i))
+                ctx.fillText(lin, (canvas.width / 10), (canvas.height / 1.6) + (100 * i))
             });
 
 
@@ -247,7 +247,7 @@
             i = 0;
             WrapText(SubDisciption.value).forEach(lin => {
                 i++;
-                ctx.fillText(lin, (canvas.width / 2), (canvas.height / 1.75) + (100 * i))
+                ctx.fillText(lin, (canvas.width / 2), (canvas.height / 1.9) + (100 * i))
             });
         }
 
