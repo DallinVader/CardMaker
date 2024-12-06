@@ -18,12 +18,12 @@
         <button onclick="redrawCanvas()">Draw</button>
     </div>
     <h1>
-        <input value="0" type="text" placeholder="Hight Pos Y" id="ArtHightPos" oninput="ImagePos()">
-        <input value="0" type="text" placeholder="Width Pos X" id="ArtWidthPos" oninput="ImagePos()">
+        <input value="0" type="range" min="-5000" max="5000" placeholder="Hight Pos Y" id="ArtHightPos" oninput="ImagePos()">
+        <input value="0" type="range" min="-5000" max="5000" placeholder="Width Pos X" id="ArtWidthPos" oninput="ImagePos()">
     </h1>
     <h1>
-        <input value="100" type="text" placeholder="Art Hight" id="ArtHight" oninput="ImageSize()">
-        <input value="100" type="text" placeholder="Art Width" id="ArtWidth" oninput="ImageSize()">
+        <input value="100" type="text" min="1" max="500" placeholder="Art Hight" id="ArtHight" oninput="ImageSize()">
+        <input value="100" type="text" min="1" max="500" placeholder="Art Width" id="ArtWidth" oninput="ImageSize()">
     </h1>
     <canvas id="cardCanvas" width="2500" height="3500"></canvas>
 
