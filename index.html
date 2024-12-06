@@ -15,7 +15,6 @@
 
         <button onclick="downloadCard()">Download Card</button>
 
-        <button onclick="redrawCanvas()">Draw</button>
     </div>
     <h1>
         <input value="0" type="range" min="-5000" max="5000" placeholder="Hight Pos Y" id="ArtHightPos" oninput="ImagePos()">
@@ -25,6 +24,12 @@
         <input value="100" type="text" min="1" max="500" placeholder="Art Hight" id="ArtHight" oninput="ImageSize()">
         <input value="100" type="text" min="1" max="500" placeholder="Art Width" id="ArtWidth" oninput="ImageSize()">
     </h1>
+    <h1 style="font-size: 125%;">
+        Damage Stats
+        <input type="checkbox" onclick="ToggelSwitch()">
+        <input type="text" placeholder="Damage">
+        <input type="text" placeholder="Defense">
+    </h1>
     <canvas id="cardCanvas" width="2500" height="3500"></canvas>
 
     <h1>yo</h1>
@@ -33,15 +38,28 @@
     <script>
         const canvas = document.getElementById('cardCanvas');
         const ctx = canvas.getContext('2d');
+
+        let IsSwitchedOn = false;
+
         const images = [];
         let MainImage = new Image();
         MainImage.src = "CardFrame.png"
         MainImage.hy = 0;
         MainImage.wx = 0;
+        DamageImg = new Image();
+        DamageImg.src = "Damage.png"
+        DamageImg.hy = 0;
+        DamageImg.wx = 0;
         ArtImage = new Image();
         ArtImage.hy = 0;
         ArtImage.wx = 0;
         MainImage.onload = function () {
+            redrawCanvas();
+        }
+
+        function ToggelSwitch() {
+            IsSwitchedOn = !IsSwitchedOn;
+            console.log("Switched " + IsSwitchedOn)
             redrawCanvas();
         }
 
@@ -102,6 +120,7 @@
             const ExtraHightP = parseInt(document.getElementById("ArtHightPos").value) || 0;
             const ExtraWidthP = parseInt(document.getElementById("ArtWidthPos").value) || 0;
             
+            //Draw art image
             const spectRatio = MainImage.width / MainImage.height;
             let mgWidth = ArtImage.width * (ArtImage.h / 100);
             let mgHeight = ArtImage.height * (ArtImage.w / 100);
@@ -111,6 +130,7 @@
 
             ctx.drawImage(ArtImage, (canvas.width - mgWidth - ExtraWidthP) / 2, (canvas.height - mgHeight - ExtraHightP) / 8, mgWidth, mgHeight);
 
+            //Draw frame
             const aspectRatio = MainImage.width / MainImage.height;
             let imgWidth = canvas.width;
             let imgHeight = imgWidth / aspectRatio;
@@ -121,6 +141,18 @@
             }
             ctx.drawImage(MainImage, (canvas.width - imgWidth) / 2, (canvas.height - imgHeight) / 8, imgWidth, imgHeight);
 
+            //Draw damage stats
+            if (IsSwitchedOn) {
+                const aspectRatios = MainImage.width / MainImage.height;
+                let DimgWidth = canvas.width;
+                let DimgHeight = imgWidth / aspectRatios;
+    
+                if (DimgHeight > canvas.height) {
+                    DimgHeight = canvas.height;
+                    DimgWidth = DimgHeight * aspectRatios;
+                }
+                ctx.drawImage(DamageImg, (canvas.width - DimgWidth) / 2, (canvas.height - DimgHeight) / 8, DimgWidth, DimgHeight);
+            }
 
 
             console.log("Drawn " + images.length + " images");
