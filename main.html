@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<link rel="stylesheet" href="style.css">
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Maker</title>
+</head>
+<body>
+
+    <h1 style="text-align: center;">Card Maker</h1>
+
+    <canvas id="cardCanvas" width="2500" height="3500"></canvas>
+
+    <div class="controls">
+        <input type="file" id="Art" accept="image/*" multiple>
+
+        <button onclick="downloadCard()">Download Card</button>
+
+        <button onclick="redrawCanvas()">Draw</button>
+    </div>
+    <h1>
+        <input value="0" type="text" placeholder="Hight Pos Y" id="ArtHightPos" oninput="ImagePos()">
+        <input value="0" type="text" placeholder="Width Pos X" id="ArtWidthPos" oninput="ImagePos()">
+    </h1>
+    <h1>
+        <input value="0" type="text" placeholder="Art Hight" id="ArtHight" oninput="ImageSize()">
+        <input value="0" type="text" placeholder="Art Width" id="ArtWidth" oninput="ImageSize()">
+    </h1>
+
+
+    <script>
+        const canvas = document.getElementById('cardCanvas');
+        const ctx = canvas.getContext('2d');
+        const images = [];
+        let imga = new Image();
+        imga.src = "CardFrame.png"
+        imga.hy = 0;
+        imga.wx = 0;
+        imga.onload = function () {
+            images.push(imga)
+            redrawCanvas();
+        }
+
+        function ImagePos() {
+            const ExtraHightPos = parseInt(document.getElementById("ArtHightPos").value) || 0;
+            const ExtraWidthPos = parseInt(document.getElementById("ArtWidthPos").value) || 0;
+            
+            images[0].hy = ExtraHightPos;
+            images[0].wx = ExtraWidthPos;
+            redrawCanvas()
+        }
+
+        function ImageSize() {
+            const ExtraHight = parseInt(document.getElementById("ArtHight").value) || 0;
+            const ExtraWidth = parseInt(document.getElementById("ArtWidth").value) || 0;
+            
+            images[0].height = ExtraHight;
+            images[0].width = ExtraWidth;
+            redrawCanvas()
+        }
+
+        document.getElementById("Art").addEventListener("change", function (event) {
+            let file = event.target.files;
+            let img = new Image();
+            let reader = new FileReader();
+            
+            reader.onload = function(e) {
+                img.src = e.target.result; // Set image source to uploaded file as data URL
+            };
+
+            const ExtraHight = parseInt(document.getElementById("ArtHightPos").value) || 0;
+            
+            reader.onloadend = function() {
+                img.onload = function() {
+                    img.hy = ExtraHight;
+                    images.push(img); // Add image to array after it has fully loaded
+                    images.reverse();
+                    redrawCanvas();   // Redraw the canvas
+                };
+            };
+
+            reader.readAsDataURL(file[0]); // Read the first file as data URL
+        });
+
+        // Redraw the canvas with all images and text
+        function redrawCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+            // Get the value of ExtraHight (add a check if it is set, to avoid NaN issues)
+            const ExtraHightP = parseInt(document.getElementById("ArtHightPos").value) || 0;
+            const ExtraWidthP = parseInt(document.getElementById("ArtWidthPos").value) || 0;
+
+            for (let index = 0; index < images.length; index++) {
+                const aspectRatio = images[index].width / images[index].height;
+                let imgWidth = canvas.width;
+                let imgHeight = imgWidth / aspectRatio;
+
+                if (imgHeight > canvas.height) {
+                    imgHeight = canvas.height;
+                    imgWidth = imgHeight * aspectRatio;
+                }
+
+                if (index === 0) {
+                    ctx.drawImage(images[index], (canvas.width - imgWidth - ExtraWidthP) / 2, (canvas.height - imgHeight - ExtraHightP) / 8, imgWidth, imgHeight);
+                } else {
+                    ctx.drawImage(images[index], (canvas.width - imgWidth) / 2, (canvas.height - imgHeight) / 2, imgWidth, imgHeight);
+                }
+                console.log(images[index].hy)
+            }
+
+            console.log("Drawn " + images.length + " images");
+        }
+
+
+
+        // Download the final card
+        function downloadCard() {
+            const link = document.createElement('a');
+            link.download = 'card.png';
+            link.href = canvas.toDataURL('image/png', 1.0); // High-resolution export
+            link.click();
+        }
+
+
+    </script>
+</body>
+</html>

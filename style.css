@@ -1,0 +1,21 @@
+Card{
+    position: fixed;
+    background-color: red;
+    font-family: Medieval;
+}
+@font-face {
+    font-family: Medieval;
+    src: url(Medieval.ttf);
+}
+
+#cardCanvas {
+    border: 1px solid black;
+    display: block;
+    margin: 0 auto;
+    max-width: 50%;
+    max-height: 50%;
+}
+.controls {
+    text-align: center;
+    margin-top: 10px;
+}
