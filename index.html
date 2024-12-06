@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <link rel="stylesheet" href="style.css">
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Card Maker</title>
-</head>
-<body>
-
-    <h1 style="text-align: center;">Card Maker</h1>
-
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Card Maker</title>
+    </head>
+    <body>
+        
+        <h1 style="text-align: center;">Card Maker</h1>
+        <canvas id="cardCanvas" width="2500" height="3500"></canvas>
+        
     <div class="controls">
         <input type="file" id="Art" accept="image/*" multiple>
 
@@ -56,10 +57,11 @@
         <input type="text" id="SubDisciption" placeholder="Sub Disciption" oninput="redrawCanvas()">
         <input type="range" id="SubDisciptionFontSize" min="0" max="300" oninput="redrawCanvas()">
     </h1>
-    <canvas id="cardCanvas" width="2500" height="3500"></canvas>
-
-    <h1>yo</h1>
-
+    <h1 style="font-size: 125%;">
+        Quote
+        <input type="text" id="QoteDiscription" placeholder="Quote" oninput="redrawCanvas()">
+        <input type="range" id="QoteDiscriptionFontSize" min="0" max="300" oninput="redrawCanvas()">
+    </h1>
 
     <script>
         const canvas = document.getElementById('cardCanvas');
@@ -80,6 +82,14 @@
         TreasureCost = document.getElementById("TreasureCost");
         TreasureFontSize = document.getElementById("TreasureFontSize");
 
+        Discription = document.getElementById("MainDisciption");
+        DiscriptionFontSize = document.getElementById("MainDisciptionFontSize");
+
+        SubDisciption = document.getElementById("SubDisciption");
+        SubFontSize = document.getElementById("SubDisciptionFontSize");
+
+        Quote = document.getElementById("QoteDiscription");
+        QuoteFontSize = document.getElementById("QoteDiscriptionFontSize");
 
         const images = [];
         let MainImage = new Image();
@@ -200,6 +210,7 @@
 
                 document.fonts.load('10px Medieval').then(() => {
                     ctx.font = "175px Medieval"
+                    ctx.textAlign = 'center';
                     ctx.fillText(Dam.value, canvas.width / 12.5, canvas.height / 12.5)
                     ctx.fillText(Def.value, canvas.width - (canvas.width / 12.5), canvas.height / 12.5)
                 })
@@ -217,7 +228,57 @@
             ctx.font = TreasureFontSize.value + "px Medieval"
             ctx.fillText(TreasureCost.value, canvas.width - (canvas.width / 6.9), canvas.height / 1.99)
 
-            console.log("Drawn " + images.length + " images");
+
+            ctx.font = QuoteFontSize.value + "px Medieval"
+            ctx.fillText(Quote.value, (canvas.width / 2), canvas.height - (canvas.height / 13))
+
+
+            ctx.font = DiscriptionFontSize.value + "px Medieval"
+            ctx.textAlign = 'left';
+            i = 0;
+            WrapText(Discription.value).forEach(lin => {
+                i++;
+                ctx.fillText(lin, (canvas.width / 10), (canvas.height / 1.75) + (100 * i))
+            });
+
+
+            ctx.font = SubFontSize.value + "px Medieval"
+            ctx.textAlign = 'center';
+            i = 0;
+            WrapText(SubDisciption.value).forEach(lin => {
+                i++;
+                ctx.fillText(lin, (canvas.width / 2), (canvas.height / 1.75) + (100 * i))
+            });
+        }
+
+        function WrapText(Text) {
+            const words = Text.split(' ');
+            let line = '';
+            const lines = [];
+            const maxWidth = canvas.width - (canvas.width / 4.75); // Set max width for text wrapping (adjust as necessary)
+
+            // Loop through words and wrap text
+            for (let index = 0; index < words.length; index++) {
+                const word = words[index];
+                const testLine = line + word + ' '; // Add the word to the current line
+
+                // Check the width of the text to determine if it exceeds maxWidth
+                if (ctx.measureText(testLine).width > maxWidth) {
+                    if (line.length > 0) {
+                        lines.push(line.trim()); // Push the current line to the lines array
+                    }
+                    line = word + ' '; // Start a new line with the current word
+                } else {
+                    line = testLine; // Continue adding to the current line
+                }
+            }
+
+            // Add the remaining text as a line
+            if (line.length > 0) {
+                lines.push(line.trim());
+            }
+
+            return lines;
         }
 
 
