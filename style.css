@@ -1,6 +1,4 @@
-Card{
-    position: fixed;
-    background-color: red;
+h1{
     font-family: Medieval;
 }
 @font-face {

@@ -10,8 +10,6 @@
 
     <h1 style="text-align: center;">Card Maker</h1>
 
-    <canvas id="cardCanvas" width="2500" height="3500"></canvas>
-
     <div class="controls">
         <input type="file" id="Art" accept="image/*" multiple>
 
@@ -24,21 +22,26 @@
         <input value="0" type="text" placeholder="Width Pos X" id="ArtWidthPos" oninput="ImagePos()">
     </h1>
     <h1>
-        <input value="0" type="text" placeholder="Art Hight" id="ArtHight" oninput="ImageSize()">
-        <input value="0" type="text" placeholder="Art Width" id="ArtWidth" oninput="ImageSize()">
+        <input value="100" type="text" placeholder="Art Hight" id="ArtHight" oninput="ImageSize()">
+        <input value="100" type="text" placeholder="Art Width" id="ArtWidth" oninput="ImageSize()">
     </h1>
+    <canvas id="cardCanvas" width="2500" height="3500"></canvas>
+
+    <h1>yo</h1>
 
 
     <script>
         const canvas = document.getElementById('cardCanvas');
         const ctx = canvas.getContext('2d');
         const images = [];
-        let imga = new Image();
-        imga.src = "CardFrame.png"
-        imga.hy = 0;
-        imga.wx = 0;
-        imga.onload = function () {
-            images.push(imga)
+        let MainImage = new Image();
+        MainImage.src = "CardFrame.png"
+        MainImage.hy = 0;
+        MainImage.wx = 0;
+        ArtImage = new Image();
+        ArtImage.hy = 0;
+        ArtImage.wx = 0;
+        MainImage.onload = function () {
             redrawCanvas();
         }
 
@@ -46,18 +49,26 @@
             const ExtraHightPos = parseInt(document.getElementById("ArtHightPos").value) || 0;
             const ExtraWidthPos = parseInt(document.getElementById("ArtWidthPos").value) || 0;
             
-            images[0].hy = ExtraHightPos;
-            images[0].wx = ExtraWidthPos;
+            ArtImage.hy = ExtraHightPos;
+            ArtImage.wx = ExtraWidthPos;
             redrawCanvas()
         }
 
         function ImageSize() {
-            const ExtraHight = parseInt(document.getElementById("ArtHight").value) || 0;
-            const ExtraWidth = parseInt(document.getElementById("ArtWidth").value) || 0;
+            const ExtraHight = parseInt(document.getElementById("ArtHight").value) || 100;
+            const ExtraWidth = parseInt(document.getElementById("ArtWidth").value) || 100;
             
-            images[0].height = ExtraHight;
-            images[0].width = ExtraWidth;
+            ArtImage.h = ExtraHight;
+            ArtImage.w = ExtraWidth;
             redrawCanvas()
+        }
+
+        function ImageSizeNoRedraw() {
+            const ExtraHight = parseInt(document.getElementById("ArtHight").value) || 100;
+            const ExtraWidth = parseInt(document.getElementById("ArtWidth").value) || 100;
+            
+            ArtImage.h = ExtraHight;
+            ArtImage.w = ExtraWidth;
         }
 
         document.getElementById("Art").addEventListener("change", function (event) {
@@ -72,10 +83,10 @@
             const ExtraHight = parseInt(document.getElementById("ArtHightPos").value) || 0;
             
             reader.onloadend = function() {
-                img.onload = function() {
-                    img.hy = ExtraHight;
-                    images.push(img); // Add image to array after it has fully loaded
-                    images.reverse();
+                ArtImage.hy = ExtraHight;
+                ArtImage = img;
+                ArtImage.onload = function() {
+                    ImageSizeNoRedraw();
                     redrawCanvas();   // Redraw the canvas
                 };
             };
@@ -90,24 +101,27 @@
             // Get the value of ExtraHight (add a check if it is set, to avoid NaN issues)
             const ExtraHightP = parseInt(document.getElementById("ArtHightPos").value) || 0;
             const ExtraWidthP = parseInt(document.getElementById("ArtWidthPos").value) || 0;
-
-            for (let index = 0; index < images.length; index++) {
-                const aspectRatio = images[index].width / images[index].height;
-                let imgWidth = canvas.width;
-                let imgHeight = imgWidth / aspectRatio;
-
-                if (imgHeight > canvas.height) {
-                    imgHeight = canvas.height;
-                    imgWidth = imgHeight * aspectRatio;
-                }
-
-                if (index === 0) {
-                    ctx.drawImage(images[index], (canvas.width - imgWidth - ExtraWidthP) / 2, (canvas.height - imgHeight - ExtraHightP) / 8, imgWidth, imgHeight);
-                } else {
-                    ctx.drawImage(images[index], (canvas.width - imgWidth) / 2, (canvas.height - imgHeight) / 2, imgWidth, imgHeight);
-                }
-                console.log(images[index].hy)
+            
+            const spectRatio = MainImage.width / MainImage.height;
+            let mgWidth = ArtImage.width * (ArtImage.h / 100);
+            let mgHeight = ArtImage.height * (ArtImage.w / 100);
+            if (ArtImage.src) {
+                ImageSizeNoRedraw();
             }
+
+            ctx.drawImage(ArtImage, (canvas.width - mgWidth - ExtraWidthP) / 2, (canvas.height - mgHeight - ExtraHightP) / 8, mgWidth, mgHeight);
+
+            const aspectRatio = MainImage.width / MainImage.height;
+            let imgWidth = canvas.width;
+            let imgHeight = imgWidth / aspectRatio;
+
+            if (imgHeight > canvas.height) {
+                imgHeight = canvas.height;
+                imgWidth = imgHeight * aspectRatio;
+            }
+            ctx.drawImage(MainImage, (canvas.width - imgWidth) / 2, (canvas.height - imgHeight) / 8, imgWidth, imgHeight);
+
+
 
             console.log("Drawn " + images.length + " images");
         }
