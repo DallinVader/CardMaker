@@ -7,61 +7,153 @@
         <title>Card Maker</title>
     </head>
     <body>
-        
         <h1 style="text-align: center;">Card Maker</h1>
-        <canvas id="cardCanvas" width="2500" height="3500"></canvas>
         
-    <div class="controls">
-        <input type="file" id="Art" accept="image/*" multiple>
-
-        <button onclick="downloadCard()">Download Card</button>
-
-    </div>
-    <h1>
-        <input value="0" type="range" min="-5000" max="5000" placeholder="Hight Pos Y" id="ArtHightPos" oninput="ImagePos()">
-        <input value="0" type="range" min="-5000" max="5000" placeholder="Width Pos X" id="ArtWidthPos" oninput="ImagePos()">
-    </h1>
-    <h1>
-        <input value="116" type="text" min="1" max="500" placeholder="Art Hight" id="ArtHight" oninput="ImageSize()">
-        <input value="116" type="text" min="1" max="500" placeholder="Art Width" id="ArtWidth" oninput="ImageSize()">
-    </h1>
-    <h1>
-        <input type="text" placeholder="Title" id="Title" oninput="redrawCanvas()">
-        <input type="range" id="TitleFontSize" min="0" max="300" oninput="redrawCanvas()">
-    </h1>
-    <h1 style="font-size: 125%;">
-        Damage Stats
-        <input type="checkbox" onclick="ToggelSwitch()" checked>
-        <input type="text" value="0" placeholder="Damage" id="DamageID" oninput="redrawCanvas()">
-        <input type="text" value="0" placeholder="Defense" id="DefenseID" oninput="redrawCanvas()">
-    </h1>
-    <h1 style="font-size: 125%;">
-        Types
-        <input type="text" placeholder="Type" oninput="redrawCanvas()" id="Type" value="Type">
-        <input type="text" placeholder="Subtype" oninput="redrawCanvas()" id="Subtype" value="Subtype">
-        <input type="range" id="TypeFontSize" min="0" max="300" oninput="redrawCanvas()" value="100">
-        <input type="range" id="SubtypeFontSize" min="0" max="300" oninput="redrawCanvas()" value="80">
-    </h1>
-    <h1 style="font-size: 125%;">
-        Treasure cost
-        <input type="text" id="TreasureCost" placeholder="Cost" value="0" oninput="redrawCanvas()">
-        <input type="range" id="TreasureFontSize" min="0" max="300" oninput="redrawCanvas()">
-    </h1>
-    <h1 style="font-size: 125%;">
-        Discription
-        <input type="text" id="MainDisciption" placeholder="MainDisciption" oninput="redrawCanvas()">
-        <input type="range" id="MainDisciptionFontSize" min="0" max="300" oninput="redrawCanvas()">
-    </h1>
-    <h1 style="font-size: 125%;">
-        Sub Discription
-        <input type="text" id="SubDisciption" placeholder="Sub Disciption" oninput="redrawCanvas()">
-        <input type="range" id="SubDisciptionFontSize" min="0" max="300" oninput="redrawCanvas()">
-    </h1>
-    <h1 style="font-size: 125%;">
-        Quote
-        <input type="text" id="QoteDiscription" placeholder="Quote" oninput="redrawCanvas()">
-        <input type="range" id="QoteDiscriptionFontSize" min="0" max="300" oninput="redrawCanvas()">
-    </h1>
+        <div class="main-container">
+            <div class="card-preview">
+                <canvas id="cardCanvas" width="2500" height="3500"></canvas>
+            </div>
+            
+            <div class="controls-panel">
+                <div class="controls">
+                    <input type="file" id="Art" accept="image/*" multiple>
+                    <button onclick="downloadCard()">Download Card</button>
+                    <button onclick="openFullscreen()">Fullscreen Card</button>
+                </div>
+                
+                <div class="control-section">
+                    <h2>Art Size</h2>
+                    <div class="input-group">
+                        <label>Art Size (%):</label>
+                        <input value="116" type="number" min="1" max="500" placeholder="Size" id="ArtHight" oninput="ImageSize()">
+                        <small>Drag the bottom-right corner on the card to resize, or type a value</small>
+                    </div>
+                </div>
+                
+                <div class="control-section">
+                    <h2>Art Position</h2>
+                    <div class="input-group">
+                        <label>Vertical Position (Y):</label>
+                        <input value="0" type="number" min="-5000" max="5000" placeholder="0" id="ArtHightPos" oninput="ImagePos()">
+                        <small>Drag the art image on the card to move, or type a value</small>
+                    </div>
+                    <div class="input-group">
+                        <label>Horizontal Position (X):</label>
+                        <input value="0" type="number" min="-5000" max="5000" placeholder="0" id="ArtWidthPos" oninput="ImagePos()">
+                        <small>Negative moves left, positive moves right</small>
+                    </div>
+                </div>
+                
+                <div class="control-section">
+                    <h2>Title</h2>
+                    <div class="input-group">
+                        <label>Title Text:</label>
+                        <input type="text" placeholder="Enter card title" id="Title" oninput="redrawCanvas()">
+                    </div>
+                    <div class="input-group">
+                        <label>Font Size: <span id="TitleFontSizeValue">200</span></label>
+                        <input type="range" id="TitleFontSize" min="50" max="300" value="200" oninput="redrawCanvas()">
+                        <div class="quick-buttons">
+                            <button type="button" onclick="setFontSize('TitleFontSize', 150)">Small</button>
+                            <button type="button" onclick="setFontSize('TitleFontSize', 200)">Medium</button>
+                            <button type="button" onclick="setFontSize('TitleFontSize', 250)">Large</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="control-section">
+                    <h2>Damage Stats</h2>
+                    <div class="input-group">
+                        <label>Show Stats:</label>
+                        <input type="checkbox" onclick="ToggelSwitch()" checked>
+                    </div>
+                    <div class="input-group">
+                        <label>Damage:</label>
+                        <input type="number" value="0" min="0" max="999" placeholder="0" id="DamageID" oninput="redrawCanvas()">
+                    </div>
+                    <div class="input-group">
+                        <label>Defense:</label>
+                        <input type="number" value="0" min="0" max="999" placeholder="0" id="DefenseID" oninput="redrawCanvas()">
+                    </div>
+                </div>
+                
+                <div class="control-section">
+                    <h2>Types</h2>
+                    <div class="input-group">
+                        <label>Type:</label>
+                        <input type="text" placeholder="Enter type" oninput="redrawCanvas()" id="Type" value="">
+                    </div>
+                    <div class="input-group">
+                        <label>Type Font Size: <span id="TypeFontSizeValue">100</span></label>
+                        <input type="range" id="TypeFontSize" min="50" max="200" oninput="redrawCanvas()" value="100">
+                    </div>
+                    <div class="input-group">
+                        <label>Subtype:</label>
+                        <input type="text" placeholder="Enter subtype" oninput="redrawCanvas()" id="Subtype" value="">
+                    </div>
+                    <div class="input-group">
+                        <label>Subtype Font Size: <span id="SubtypeFontSizeValue">80</span></label>
+                        <input type="range" id="SubtypeFontSize" min="50" max="200" oninput="redrawCanvas()" value="80">
+                    </div>
+                </div>
+                
+                <div class="control-section">
+                    <h2>Treasure Cost</h2>
+                    <div class="input-group">
+                        <label>Cost:</label>
+                        <input type="number" id="TreasureCost" placeholder="0" value="0" min="0" max="999" oninput="redrawCanvas()">
+                    </div>
+                    <div class="input-group">
+                        <label>Font Size: <span id="TreasureFontSizeValue">150</span></label>
+                        <input type="range" id="TreasureFontSize" min="50" max="300" value="150" oninput="redrawCanvas()">
+                    </div>
+                </div>
+                
+                <div class="control-section">
+                    <h2>Description</h2>
+                    <div class="input-group">
+                        <label>Main Description:</label>
+                        <textarea id="MainDisciption" placeholder="Enter main description (supports multiple lines)" rows="3" oninput="redrawCanvas()"></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label>Font Size: <span id="MainDisciptionFontSizeValue">80</span></label>
+                        <input type="range" id="MainDisciptionFontSize" min="50" max="200" value="80" oninput="redrawCanvas()">
+                    </div>
+                </div>
+                
+                <div class="control-section">
+                    <h2>Sub Description</h2>
+                    <div class="input-group">
+                        <label>Sub Description:</label>
+                        <textarea id="SubDisciption" placeholder="Enter sub description (supports multiple lines)" rows="2" oninput="redrawCanvas()"></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label>Font Size: <span id="SubDisciptionFontSizeValue">70</span></label>
+                        <input type="range" id="SubDisciptionFontSize" min="50" max="200" value="70" oninput="redrawCanvas()">
+                    </div>
+                </div>
+                
+                <div class="control-section">
+                    <h2>Quote</h2>
+                    <div class="input-group">
+                        <label>Quote Text:</label>
+                        <textarea id="QoteDiscription" placeholder="Enter quote text" rows="2" oninput="redrawCanvas()"></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label>Font Size: <span id="QoteDiscriptionFontSizeValue">60</span></label>
+                        <input type="range" id="QoteDiscriptionFontSize" min="50" max="200" value="60" oninput="redrawCanvas()">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Fullscreen Modal -->
+        <div id="fullscreenModal" class="fullscreen-modal" onclick="closeFullscreen()">
+            <div class="fullscreen-content" onclick="event.stopPropagation()">
+                <span class="close-fullscreen" onclick="closeFullscreen()">&times;</span>
+                <canvas id="fullscreenCanvas" width="2500" height="3500"></canvas>
+            </div>
+        </div>
 
     <script>
         const canvas = document.getElementById('cardCanvas');
@@ -90,6 +182,211 @@
 
         Quote = document.getElementById("QoteDiscription");
         QuoteFontSize = document.getElementById("QoteDiscriptionFontSize");
+        
+        // Update font size displays
+        function updateFontSizeDisplay() {
+            document.getElementById("TitleFontSizeValue").textContent = TitleSize.value;
+            document.getElementById("TypeFontSizeValue").textContent = TypeFontSize.value;
+            document.getElementById("SubtypeFontSizeValue").textContent = SubtypeFontSize.value;
+            document.getElementById("TreasureFontSizeValue").textContent = TreasureFontSize.value;
+            document.getElementById("MainDisciptionFontSizeValue").textContent = DiscriptionFontSize.value;
+            document.getElementById("SubDisciptionFontSizeValue").textContent = SubFontSize.value;
+            document.getElementById("QoteDiscriptionFontSizeValue").textContent = QuoteFontSize.value;
+        }
+        
+        // Add event listeners to update font size displays
+        TitleSize.addEventListener('input', updateFontSizeDisplay);
+        TypeFontSize.addEventListener('input', updateFontSizeDisplay);
+        SubtypeFontSize.addEventListener('input', updateFontSizeDisplay);
+        TreasureFontSize.addEventListener('input', updateFontSizeDisplay);
+        DiscriptionFontSize.addEventListener('input', updateFontSizeDisplay);
+        SubFontSize.addEventListener('input', updateFontSizeDisplay);
+        QuoteFontSize.addEventListener('input', updateFontSizeDisplay);
+        
+        // Initialize font size displays
+        updateFontSizeDisplay();
+
+        // Drag and resize functionality for art image
+        let isDragging = false;
+        let isResizing = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let startArtX = 0;
+        let startArtY = 0;
+        let startArtSize = 0;
+        let artBounds = { x: 0, y: 0, width: 0, height: 0 };
+        let canvasScale = 1;
+        let canvasOffsetX = 0;
+        let canvasOffsetY = 0;
+        
+        // Calculate canvas scale and offset for mouse coordinate conversion
+        function updateCanvasTransform() {
+            const rect = canvas.getBoundingClientRect();
+            canvasScale = canvas.width / rect.width;
+            canvasOffsetX = rect.left;
+            canvasOffsetY = rect.top;
+        }
+        
+        // Get mouse position in canvas coordinates
+        function getCanvasMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (e.clientX - rect.left) * scaleX,
+                y: (e.clientY - rect.top) * scaleY
+            };
+        }
+        
+        // Calculate art image bounds
+        function calculateArtBounds() {
+            const ExtraHightP = parseInt(document.getElementById("ArtHightPos").value) || 0;
+            const ExtraWidthP = parseInt(document.getElementById("ArtWidthPos").value) || 0;
+            const artSize = ArtImage.h || 116;
+            const mgWidth = ArtImage.width * (artSize / 100);
+            const mgHeight = ArtImage.height * (artSize / 100);
+            const x = (canvas.width - mgWidth - ExtraWidthP) / 2;
+            const y = (canvas.height - mgHeight - ExtraHightP) / 8;
+            
+            artBounds = { x, y, width: mgWidth, height: mgHeight };
+            return artBounds;
+        }
+        
+        // Check if point is inside art image
+        function isPointInArt(x, y) {
+            calculateArtBounds();
+            return x >= artBounds.x && x <= artBounds.x + artBounds.width &&
+                   y >= artBounds.y && y <= artBounds.y + artBounds.height;
+        }
+        
+        // Check if point is near resize handle (bottom-right corner)
+        function isPointNearResizeHandle(x, y) {
+            calculateArtBounds();
+            const handleSize = 40; // Larger handle for easier grabbing
+            const handleX = artBounds.x + artBounds.width;
+            const handleY = artBounds.y + artBounds.height;
+            return Math.abs(x - handleX) < handleSize && Math.abs(y - handleY) < handleSize;
+        }
+        
+        // Check if point is near vertical edge for easier Y-axis dragging
+        function isPointNearVerticalEdge(x, y) {
+            calculateArtBounds();
+            const edgeTolerance = 30; // Wider tolerance for vertical edges
+            const nearLeftEdge = Math.abs(x - artBounds.x) < edgeTolerance;
+            const nearRightEdge = Math.abs(x - (artBounds.x + artBounds.width)) < edgeTolerance;
+            const inVerticalRange = y >= artBounds.y && y <= artBounds.y + artBounds.height;
+            return (nearLeftEdge || nearRightEdge) && inVerticalRange;
+        }
+        
+        // Mouse down event
+        canvas.addEventListener('mousedown', function(e) {
+            if (!ArtImage.src) return;
+            
+            const mousePos = getCanvasMousePos(e);
+            updateCanvasTransform();
+            
+            if (isPointNearResizeHandle(mousePos.x, mousePos.y)) {
+                isResizing = true;
+                startArtSize = ArtImage.h || 116;
+                dragStartX = mousePos.x;
+                dragStartY = mousePos.y;
+                canvas.style.cursor = 'nwse-resize';
+            } else if (isPointInArt(mousePos.x, mousePos.y) || isPointNearVerticalEdge(mousePos.x, mousePos.y)) {
+                isDragging = true;
+                startArtX = parseInt(document.getElementById("ArtWidthPos").value) || 0;
+                startArtY = parseInt(document.getElementById("ArtHightPos").value) || 0;
+                dragStartX = mousePos.x;
+                dragStartY = mousePos.y;
+                canvas.style.cursor = 'move';
+            }
+        });
+        
+        // Mouse move event
+        canvas.addEventListener('mousemove', function(e) {
+            if (!ArtImage.src) return;
+            
+            const mousePos = getCanvasMousePos(e);
+            calculateArtBounds();
+            
+            // Update cursor
+            if (isResizing) {
+                canvas.style.cursor = 'nwse-resize';
+            } else if (isDragging) {
+                canvas.style.cursor = 'move';
+            } else if (isPointNearResizeHandle(mousePos.x, mousePos.y)) {
+                canvas.style.cursor = 'nwse-resize';
+            } else if (isPointInArt(mousePos.x, mousePos.y) || isPointNearVerticalEdge(mousePos.x, mousePos.y)) {
+                canvas.style.cursor = 'move';
+            } else {
+                canvas.style.cursor = 'default';
+            }
+            
+            if (isDragging) {
+                // Calculate movement in canvas coordinates
+                const deltaX = mousePos.x - dragStartX;
+                const deltaY = mousePos.y - dragStartY;
+                
+                // Make Y-axis movement more sensitive (multiply by 1.5 for easier vertical dragging)
+                const sensitivityY = 1.5;
+                
+                // Update position (inverse because positive Y moves down in canvas but we want negative to move up)
+                const newX = startArtX - deltaX;
+                const newY = startArtY - (deltaY * sensitivityY);
+                
+                document.getElementById("ArtWidthPos").value = Math.round(newX);
+                document.getElementById("ArtHightPos").value = Math.round(newY);
+                ImagePos();
+            } else if (isResizing) {
+                // Calculate size based on distance from center - make it more sensitive
+                const startCenterX = artBounds.x + artBounds.width / 2;
+                const startCenterY = artBounds.y + artBounds.height / 2;
+                const startDistance = Math.sqrt(
+                    Math.pow(dragStartX - startCenterX, 2) + 
+                    Math.pow(dragStartY - startCenterY, 2)
+                );
+                const currentDistance = Math.sqrt(
+                    Math.pow(mousePos.x - startCenterX, 2) + 
+                    Math.pow(mousePos.y - startCenterY, 2)
+                );
+                
+                // Increase sensitivity for resizing (multiply by 1.3)
+                const sizeChange = (currentDistance / startDistance) * startArtSize * 1.3;
+                const newSize = Math.max(10, Math.min(500, Math.round(sizeChange)));
+                
+                document.getElementById("ArtHight").value = newSize;
+                ImageSize();
+            }
+        });
+        
+        // Mouse up event
+        canvas.addEventListener('mouseup', function(e) {
+            isDragging = false;
+            isResizing = false;
+            canvas.style.cursor = 'default';
+        });
+        
+        // Mouse leave event
+        canvas.addEventListener('mouseleave', function(e) {
+            isDragging = false;
+            isResizing = false;
+            canvas.style.cursor = 'default';
+        });
+        
+        // Redraw with visual feedback on hover
+        let hoverRedrawTimeout;
+        canvas.addEventListener('mousemove', function(e) {
+            if (isDragging || isResizing) return;
+            
+            clearTimeout(hoverRedrawTimeout);
+            hoverRedrawTimeout = setTimeout(() => {
+                const mousePos = getCanvasMousePos(e);
+                if (ArtImage.src && isPointInArt(mousePos.x, mousePos.y)) {
+                    redrawCanvasWithHover();
+                } else {
+                    redrawCanvas();
+                }
+            }, 50);
+        });
 
         const images = [];
         let MainImage = new Image();
@@ -103,6 +400,11 @@
         ArtImage = new Image();
         ArtImage.hy = 0;
         ArtImage.wx = 0;
+        ArtImage.src = "The lIch King.png";
+        ArtImage.onload = function() {
+            ImageSizeNoRedraw();
+            redrawCanvas();
+        };
         MainImage.onload = function () {
             redrawCanvas();
         }
@@ -124,19 +426,24 @@
 
         function ImageSize() {
             const ExtraHight = parseInt(document.getElementById("ArtHight").value) || 100;
-            const ExtraWidth = parseInt(document.getElementById("ArtWidth").value) || 100;
             
             ArtImage.h = ExtraHight;
-            ArtImage.w = ExtraWidth;
+            ArtImage.w = ExtraHight; // Use same value for both width and height
             redrawCanvas()
         }
 
         function ImageSizeNoRedraw() {
             const ExtraHight = parseInt(document.getElementById("ArtHight").value) || 100;
-            const ExtraWidth = parseInt(document.getElementById("ArtWidth").value) || 100;
             
             ArtImage.h = ExtraHight;
-            ArtImage.w = ExtraWidth;
+            ArtImage.w = ExtraHight; // Use same value for both width and height
+        }
+        
+        // Quick font size preset function
+        function setFontSize(elementId, size) {
+            const element = document.getElementById(elementId);
+            element.value = size;
+            element.dispatchEvent(new Event('input'));
         }
 
         document.getElementById("Art").addEventListener("change", function (event) {
@@ -162,6 +469,37 @@
             reader.readAsDataURL(file[0]); // Read the first file as data URL
         });
 
+        // Redraw canvas with hover outline
+        function redrawCanvasWithHover() {
+            redrawCanvas();
+            if (!ArtImage.src) return;
+            
+            calculateArtBounds();
+            ctx.strokeStyle = 'rgba(0, 150, 255, 0.8)';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(artBounds.x, artBounds.y, artBounds.width, artBounds.height);
+            ctx.setLineDash([]);
+            
+            // Draw resize handle (larger for easier grabbing)
+            const handleSize = 25;
+            ctx.fillStyle = 'rgba(0, 150, 255, 0.9)';
+            ctx.fillRect(
+                artBounds.x + artBounds.width - handleSize/2,
+                artBounds.y + artBounds.height - handleSize/2,
+                handleSize,
+                handleSize
+            );
+            
+            // Draw vertical edge indicators for easier Y-axis dragging
+            const edgeWidth = 4;
+            ctx.fillStyle = 'rgba(0, 150, 255, 0.5)';
+            // Left edge
+            ctx.fillRect(artBounds.x - edgeWidth/2, artBounds.y, edgeWidth, artBounds.height);
+            // Right edge
+            ctx.fillRect(artBounds.x + artBounds.width - edgeWidth/2, artBounds.y, edgeWidth, artBounds.height);
+        }
+        
         // Redraw the canvas with all images and text
         function redrawCanvas() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -172,11 +510,12 @@
             
             //Draw art image
             const spectRatio = MainImage.width / MainImage.height;
-            let mgWidth = ArtImage.width * (ArtImage.h / 100);
-            let mgHeight = ArtImage.height * (ArtImage.w / 100);
             if (ArtImage.src) {
                 ImageSizeNoRedraw();
             }
+            const artSize = ArtImage.h || 116;
+            let mgWidth = ArtImage.width * (artSize / 100);
+            let mgHeight = ArtImage.height * (artSize / 100);
 
             ctx.drawImage(ArtImage, (canvas.width - mgWidth - ExtraWidthP) / 2, (canvas.height - mgHeight - ExtraHightP) / 8, mgWidth, mgHeight);
 
@@ -249,6 +588,15 @@
                 i++;
                 ctx.fillText(lin, (canvas.width / 2), (canvas.height / 1.9) + (100 * i))
             });
+            
+            // Update fullscreen canvas if modal is open
+            const modal = document.getElementById('fullscreenModal');
+            if (modal.style.display === 'block') {
+                const fullscreenCanvas = document.getElementById('fullscreenCanvas');
+                const fullscreenCtx = fullscreenCanvas.getContext('2d');
+                fullscreenCtx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
+                fullscreenCtx.drawImage(canvas, 0, 0);
+            }
         }
 
         function WrapText(Text) {
@@ -290,6 +638,31 @@
             link.href = canvas.toDataURL('image/png', 1.0); // High-resolution export
             link.click();
         }
+
+        // Fullscreen functionality
+        function openFullscreen() {
+            const modal = document.getElementById('fullscreenModal');
+            const fullscreenCanvas = document.getElementById('fullscreenCanvas');
+            const fullscreenCtx = fullscreenCanvas.getContext('2d');
+            
+            // Copy the current canvas to the fullscreen canvas
+            fullscreenCtx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
+            fullscreenCtx.drawImage(canvas, 0, 0);
+            
+            modal.style.display = 'block';
+        }
+
+        function closeFullscreen() {
+            const modal = document.getElementById('fullscreenModal');
+            modal.style.display = 'none';
+        }
+
+        // Close fullscreen on Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeFullscreen();
+            }
+        });
 
 
     </script>

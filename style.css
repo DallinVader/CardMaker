@@ -1,23 +1,254 @@
 h1{
     font-family: Medieval;
     text-align: center;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 10px;
+    border-radius: 5px;
+    backdrop-filter: blur(5px);
+    margin: 10px 20px;
 }
 @font-face {
     font-family: Medieval;
     src: url(Medieval.ttf);
 }
 
+body {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background-image: url('The lIch King.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    min-height: 100vh;
+}
+
+.main-container {
+    display: flex;
+    gap: 20px;
+    padding: 20px;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.card-preview {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-width: 0;
+    position: sticky;
+    top: 20px;
+    height: fit-content;
+    max-height: calc(100vh - 100px);
+    overflow: hidden;
+}
+
 #cardCanvas {
     border: 1px solid black;
     display: block;
-    margin: 0 auto;
-    max-width: 14%;
-    max-height: 14%;
+    max-width: 70%;
+    max-height: calc(100vh - 100px);
+    width: auto;
+    height: auto;
+    object-fit: contain;
 }
+
+.controls-panel {
+    flex: 0 0 400px;
+    max-width: 400px;
+    overflow-y: auto;
+    max-height: calc(90vh - 40px);
+    padding-right: 10px;
+    scrollbar-width: thin;
+    scrollbar-color: #888 #f1f1f1;
+    background-color: rgba(255, 255, 255, 0.7);
+    padding: 15px;
+    border-radius: 10px;
+    backdrop-filter: blur(10px);
+}
+
+.controls-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.controls-panel::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.controls-panel::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.controls-panel::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
 .controls {
     text-align: center;
-    margin-top: 10px;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #ccc;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 15px;
+    border-radius: 5px;
+    backdrop-filter: blur(5px);
 }
+
+.controls input[type="file"] {
+    margin-bottom: 10px;
+    width: 100%;
+}
+
+.controls button {
+    margin: 5px;
+    padding: 10px 20px;
+    cursor: pointer;
+}
+
+.control-section {
+    margin-bottom: 25px;
+    padding: 15px;
+    background-color: rgba(245, 245, 245, 0.9);
+    border-radius: 5px;
+    backdrop-filter: blur(5px);
+}
+
+.control-section h2 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 18px;
+    font-family: Medieval;
+    text-align: left;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 5px;
+}
+
+.input-group {
+    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.input-group label {
+    font-weight: bold;
+    font-size: 14px;
+    color: #333;
+}
+
+.input-group input[type="text"],
+.input-group input[type="number"] {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 14px;
+}
+
+.input-group textarea {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 14px;
+    resize: vertical;
+    font-family: inherit;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.input-group input[type="range"] {
+    width: 100%;
+}
+
+.input-group span {
+    display: inline-block;
+    min-width: 40px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.input-group small {
+    font-size: 11px;
+    color: #666;
+    font-style: italic;
+    margin-top: -3px;
+}
+
+.quick-buttons {
+    display: flex;
+    gap: 5px;
+    margin-top: 5px;
+}
+
+.quick-buttons button {
+    flex: 1;
+    padding: 5px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background-color: #f0f0f0;
+    transition: background-color 0.2s;
+}
+
+.quick-buttons button:hover {
+    background-color: #e0e0e0;
+}
+
 canvas{
     background-color: black;
+}
+
+/* Fullscreen Modal Styles */
+.fullscreen-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    overflow: auto;
+}
+
+.fullscreen-content {
+    position: relative;
+    margin: auto;
+    padding: 20px;
+    width: 90%;
+    max-width: 90%;
+    height: 90%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#fullscreenCanvas {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    border: 2px solid white;
+    box-shadow: 0 4px 20px rgba(255, 255, 255, 0.3);
+}
+
+.close-fullscreen {
+    position: absolute;
+    top: 15px;
+    right: 35px;
+    color: #f1f1f1;
+    font-size: 40px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 1001;
+}
+
+.close-fullscreen:hover,
+.close-fullscreen:focus {
+    color: #fff;
+    text-decoration: none;
 }
