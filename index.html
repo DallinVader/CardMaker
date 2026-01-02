@@ -16,9 +16,17 @@
             
             <div class="controls-panel">
                 <div class="controls">
-                    <input type="file" id="Art" accept="image/*" multiple>
+                    <div class="input-group">
+                        <label>Card Base/Frame:</label>
+                        <input type="file" id="CardBase" accept="image/*">
+                    </div>
+                    <div class="input-group">
+                        <label>Art Image:</label>
+                        <input type="file" id="Art" accept="image/*" multiple>
+                    </div>
                     <button onclick="downloadCard()">Download Card</button>
                     <button onclick="openFullscreen()">Fullscreen Card</button>
+                    <button onclick="resetEverything()" style="background-color: #ff6b6b; color: white;">Reset All</button>
                 </div>
                 
                 <div class="control-section">
@@ -445,7 +453,103 @@
             element.value = size;
             element.dispatchEvent(new Event('input'));
         }
+        
+        // Reset everything to defaults
+        function resetEverything() {
+            if (!confirm('Are you sure you want to reset everything? This will clear all your current settings.')) {
+                return;
+            }
+            
+            // Reset file inputs
+            document.getElementById("CardBase").value = '';
+            document.getElementById("Art").value = '';
+            
+            // Reset art position
+            document.getElementById("ArtHightPos").value = 0;
+            document.getElementById("ArtWidthPos").value = 0;
+            
+            // Reset art size
+            document.getElementById("ArtHight").value = 116;
+            
+            // Reset title
+            document.getElementById("Title").value = '';
+            document.getElementById("TitleFontSize").value = 200;
+            
+            // Reset damage stats
+            document.getElementById("DamageID").value = 0;
+            document.getElementById("DefenseID").value = 0;
+            const damageCheckbox = document.querySelector('input[type="checkbox"][onclick="ToggelSwitch()"]');
+            if (damageCheckbox) damageCheckbox.checked = true;
+            IsSwitchedOn = true;
+            
+            // Reset types
+            document.getElementById("Type").value = '';
+            document.getElementById("TypeFontSize").value = 100;
+            document.getElementById("Subtype").value = '';
+            document.getElementById("SubtypeFontSize").value = 80;
+            
+            // Reset treasure cost
+            document.getElementById("TreasureCost").value = 0;
+            document.getElementById("TreasureFontSize").value = 150;
+            
+            // Reset descriptions
+            document.getElementById("MainDisciption").value = '';
+            document.getElementById("MainDisciptionFontSize").value = 80;
+            document.getElementById("SubDisciption").value = '';
+            document.getElementById("SubDisciptionFontSize").value = 70;
+            document.getElementById("QoteDiscription").value = '';
+            document.getElementById("QoteDiscriptionFontSize").value = 60;
+            
+            // Reset images to defaults
+            MainImage = new Image();
+            MainImage.src = "CardFrame.png";
+            MainImage.hy = 0;
+            MainImage.wx = 0;
+            MainImage.onload = function() {
+                redrawCanvas();
+            };
+            
+            ArtImage = new Image();
+            ArtImage.src = "The lIch King.png";
+            ArtImage.hy = 0;
+            ArtImage.wx = 0;
+            ArtImage.onload = function() {
+                ImageSizeNoRedraw();
+                redrawCanvas();
+            };
+            
+            // Update font size displays
+            updateFontSizeDisplay();
+            
+            // Redraw canvas
+            redrawCanvas();
+        }
 
+        // Card base/frame file upload
+        document.getElementById("CardBase").addEventListener("change", function (event) {
+            let file = event.target.files[0];
+            if (!file) return;
+            
+            let img = new Image();
+            let reader = new FileReader();
+            
+            reader.onload = function(e) {
+                img.src = e.target.result;
+            };
+            
+            reader.onloadend = function() {
+                MainImage = img;
+                MainImage.hy = 0;
+                MainImage.wx = 0;
+                MainImage.onload = function() {
+                    redrawCanvas();
+                };
+            };
+            
+            reader.readAsDataURL(file);
+        });
+        
+        // Art image file upload
         document.getElementById("Art").addEventListener("change", function (event) {
             let file = event.target.files;
             let img = new Image();
