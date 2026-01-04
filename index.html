@@ -67,6 +67,10 @@
                             <button type="button" onclick="setFontSize('TitleFontSize', 250)">Large</button>
                         </div>
                     </div>
+                    <div class="input-group">
+                        <label>Center Align:</label>
+                        <input type="checkbox" id="TitleCenterAlign" checked onchange="redrawCanvas()">
+                    </div>
                 </div>
                 
                 <div class="control-section">
@@ -96,12 +100,20 @@
                         <input type="range" id="TypeFontSize" min="50" max="200" oninput="redrawCanvas()" value="100">
                     </div>
                     <div class="input-group">
+                        <label>Type Center Align:</label>
+                        <input type="checkbox" id="TypeCenterAlign" checked onchange="redrawCanvas()">
+                    </div>
+                    <div class="input-group">
                         <label>Subtype:</label>
                         <input type="text" placeholder="Enter subtype" oninput="redrawCanvas()" id="Subtype" value="">
                     </div>
                     <div class="input-group">
                         <label>Subtype Font Size: <span id="SubtypeFontSizeValue">80</span></label>
                         <input type="range" id="SubtypeFontSize" min="50" max="200" oninput="redrawCanvas()" value="80">
+                    </div>
+                    <div class="input-group">
+                        <label>Subtype Center Align:</label>
+                        <input type="checkbox" id="SubtypeCenterAlign" checked onchange="redrawCanvas()">
                     </div>
                 </div>
                 
@@ -115,6 +127,10 @@
                         <label>Font Size: <span id="TreasureFontSizeValue">150</span></label>
                         <input type="range" id="TreasureFontSize" min="50" max="300" value="150" oninput="redrawCanvas()">
                     </div>
+                    <div class="input-group">
+                        <label>Center Align:</label>
+                        <input type="checkbox" id="TreasureCenterAlign" checked onchange="redrawCanvas()">
+                    </div>
                 </div>
                 
                 <div class="control-section">
@@ -126,6 +142,10 @@
                     <div class="input-group">
                         <label>Font Size: <span id="MainDisciptionFontSizeValue">80</span></label>
                         <input type="range" id="MainDisciptionFontSize" min="50" max="200" value="80" oninput="redrawCanvas()">
+                    </div>
+                    <div class="input-group">
+                        <label>Center Align:</label>
+                        <input type="checkbox" id="MainDescriptionCenterAlign" onchange="redrawCanvas()">
                     </div>
                 </div>
                 
@@ -139,6 +159,10 @@
                         <label>Font Size: <span id="SubDisciptionFontSizeValue">70</span></label>
                         <input type="range" id="SubDisciptionFontSize" min="50" max="200" value="70" oninput="redrawCanvas()">
                     </div>
+                    <div class="input-group">
+                        <label>Center Align:</label>
+                        <input type="checkbox" id="SubDescriptionCenterAlign" checked onchange="redrawCanvas()">
+                    </div>
                 </div>
                 
                 <div class="control-section">
@@ -150,6 +174,10 @@
                     <div class="input-group">
                         <label>Font Size: <span id="QoteDiscriptionFontSizeValue">60</span></label>
                         <input type="range" id="QoteDiscriptionFontSize" min="50" max="200" value="60" oninput="redrawCanvas()">
+                    </div>
+                    <div class="input-group">
+                        <label>Center Align:</label>
+                        <input type="checkbox" id="QuoteCenterAlign" checked onchange="redrawCanvas()">
                     </div>
                 </div>
             </div>
@@ -190,6 +218,15 @@
 
         Quote = document.getElementById("QoteDiscription");
         QuoteFontSize = document.getElementById("QoteDiscriptionFontSize");
+        
+        // Alignment checkboxes
+        TitleCenterAlign = document.getElementById("TitleCenterAlign");
+        TypeCenterAlign = document.getElementById("TypeCenterAlign");
+        SubtypeCenterAlign = document.getElementById("SubtypeCenterAlign");
+        TreasureCenterAlign = document.getElementById("TreasureCenterAlign");
+        MainDescriptionCenterAlign = document.getElementById("MainDescriptionCenterAlign");
+        SubDescriptionCenterAlign = document.getElementById("SubDescriptionCenterAlign");
+        QuoteCenterAlign = document.getElementById("QuoteCenterAlign");
         
         // Update font size displays
         function updateFontSizeDisplay() {
@@ -474,6 +511,7 @@
             // Reset title
             document.getElementById("Title").value = '';
             document.getElementById("TitleFontSize").value = 200;
+            document.getElementById("TitleCenterAlign").checked = true;
             
             // Reset damage stats
             document.getElementById("DamageID").value = 0;
@@ -485,20 +523,26 @@
             // Reset types
             document.getElementById("Type").value = '';
             document.getElementById("TypeFontSize").value = 100;
+            document.getElementById("TypeCenterAlign").checked = true;
             document.getElementById("Subtype").value = '';
             document.getElementById("SubtypeFontSize").value = 80;
+            document.getElementById("SubtypeCenterAlign").checked = true;
             
             // Reset treasure cost
             document.getElementById("TreasureCost").value = 0;
             document.getElementById("TreasureFontSize").value = 150;
+            document.getElementById("TreasureCenterAlign").checked = true;
             
             // Reset descriptions
             document.getElementById("MainDisciption").value = '';
             document.getElementById("MainDisciptionFontSize").value = 80;
+            document.getElementById("MainDescriptionCenterAlign").checked = false;
             document.getElementById("SubDisciption").value = '';
             document.getElementById("SubDisciptionFontSize").value = 70;
+            document.getElementById("SubDescriptionCenterAlign").checked = true;
             document.getElementById("QoteDiscription").value = '';
             document.getElementById("QoteDiscriptionFontSize").value = 60;
+            document.getElementById("QuoteCenterAlign").checked = true;
             
             // Reset images to defaults
             MainImage = new Image();
@@ -667,36 +711,48 @@
             }
             
             ctx.font = TitleSize.value + "px Medieval"
-            ctx.fillText(CardTitle.value, canvas.width - (canvas.width / 2), canvas.height / 12.5)
+            ctx.textAlign = TitleCenterAlign.checked ? 'center' : 'left';
+            const titleX = TitleCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10);
+            ctx.fillText(CardTitle.value, titleX, canvas.height / 12.5)
 
             ctx.font = TypeFontSize.value + "px Medieval"
-            ctx.fillText(Type.value, (canvas.width / 5), canvas.height /7.3)
+            ctx.textAlign = TypeCenterAlign.checked ? 'center' : 'left';
+            const typeX = TypeCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 5);
+            ctx.fillText(Type.value, typeX, canvas.height /7.3)
             ctx.font = SubtypeFontSize.value + "px Medieval"
-            ctx.fillText(Subtype.value, canvas.width - (canvas.width / 5), canvas.height /7.3)
+            ctx.textAlign = SubtypeCenterAlign.checked ? 'center' : 'left';
+            const subtypeX = SubtypeCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 5);
+            ctx.fillText(Subtype.value, subtypeX, canvas.height /7.3)
 
             ctx.font = TreasureFontSize.value + "px Medieval"
-            ctx.fillText(TreasureCost.value, canvas.width - (canvas.width / 6.9), canvas.height / 1.99)
+            ctx.textAlign = TreasureCenterAlign.checked ? 'center' : 'left';
+            const treasureX = TreasureCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10);
+            ctx.fillText(TreasureCost.value, treasureX, canvas.height / 1.99)
 
 
             ctx.font = QuoteFontSize.value + "px Medieval"
-            ctx.fillText(Quote.value, (canvas.width / 2), canvas.height - (canvas.height / 13))
+            ctx.textAlign = QuoteCenterAlign.checked ? 'center' : 'left';
+            const quoteX = QuoteCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10);
+            ctx.fillText(Quote.value, quoteX, canvas.height - (canvas.height / 13))
 
 
             ctx.font = DiscriptionFontSize.value + "px Medieval"
-            ctx.textAlign = 'left';
+            ctx.textAlign = MainDescriptionCenterAlign.checked ? 'center' : 'left';
+            const descriptionX = MainDescriptionCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10);
             i = 0;
             WrapText(Discription.value).forEach(lin => {
                 i++;
-                ctx.fillText(lin, (canvas.width / 10), (canvas.height / 1.6) + (125 * i))
+                ctx.fillText(lin, descriptionX, (canvas.height / 1.6) + (125 * i))
             });
 
 
             ctx.font = SubFontSize.value + "px Medieval"
-            ctx.textAlign = 'center';
+            ctx.textAlign = SubDescriptionCenterAlign.checked ? 'center' : 'left';
+            const subDescriptionX = SubDescriptionCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10);
             i = 0;
             WrapText(SubDisciption.value).forEach(lin => {
                 i++;
-                ctx.fillText(lin, (canvas.width / 2), (canvas.height / 1.9) + (100 * i))
+                ctx.fillText(lin, subDescriptionX, (canvas.height / 1.9) + (100 * i))
             });
             
             // Update fullscreen canvas if modal is open
