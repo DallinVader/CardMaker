@@ -24,6 +24,13 @@
                         <label>Art Image:</label>
                         <input type="file" id="Art" accept="image/*" multiple>
                     </div>
+                    <label for="downloadScale">Download Scale:</label>
+                    <select id="downloadScale">
+                        <option value="1">1 (Full Size)</option>
+                        <option value="0.75">0.75</option>
+                        <option value="0.5">0.5</option>
+                        <option value="0.25">0.25</option>
+                    </select>
                     <button onclick="downloadCard()">Download Card</button>
                     <button onclick="openFullscreen()">Fullscreen Card</button>
                     <button onclick="resetEverything()" style="background-color: #ff6b6b; color: white;">Reset All</button>
@@ -780,7 +787,7 @@
         function downloadCard() {
             const link = document.createElement('a');
             link.download = 'card.png';
-            link.href = canvas.toDataURL('image/png', 1.0); // High-resolution export
+            link.href = canvas.toDataURL('image/png', document.getElementById('downloadScale').value); // High-resolution export
             link.click();
         }
 
