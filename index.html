@@ -100,20 +100,12 @@
                         <input type="range" id="TypeFontSize" min="50" max="200" oninput="redrawCanvas()" value="100">
                     </div>
                     <div class="input-group">
-                        <label>Type Center Align:</label>
-                        <input type="checkbox" id="TypeCenterAlign" checked onchange="redrawCanvas()">
-                    </div>
-                    <div class="input-group">
                         <label>Subtype:</label>
                         <input type="text" placeholder="Enter subtype" oninput="redrawCanvas()" id="Subtype" value="">
                     </div>
                     <div class="input-group">
                         <label>Subtype Font Size: <span id="SubtypeFontSizeValue">80</span></label>
                         <input type="range" id="SubtypeFontSize" min="50" max="200" oninput="redrawCanvas()" value="80">
-                    </div>
-                    <div class="input-group">
-                        <label>Subtype Center Align:</label>
-                        <input type="checkbox" id="SubtypeCenterAlign" checked onchange="redrawCanvas()">
                     </div>
                 </div>
                 
@@ -217,8 +209,6 @@
         
         // Alignment checkboxes
         TitleCenterAlign = document.getElementById("TitleCenterAlign");
-        TypeCenterAlign = document.getElementById("TypeCenterAlign");
-        SubtypeCenterAlign = document.getElementById("SubtypeCenterAlign");
         MainDescriptionCenterAlign = document.getElementById("MainDescriptionCenterAlign");
         SubDescriptionCenterAlign = document.getElementById("SubDescriptionCenterAlign");
         QuoteCenterAlign = document.getElementById("QuoteCenterAlign");
@@ -518,10 +508,8 @@
             // Reset types
             document.getElementById("Type").value = '';
             document.getElementById("TypeFontSize").value = 100;
-            document.getElementById("TypeCenterAlign").checked = true;
             document.getElementById("Subtype").value = '';
             document.getElementById("SubtypeFontSize").value = 80;
-            document.getElementById("SubtypeCenterAlign").checked = true;
             
             // Reset treasure cost
             document.getElementById("TreasureCost").value = 0;
@@ -710,13 +698,11 @@
             ctx.fillText(CardTitle.value, titleX, canvas.height / 12.5)
 
             ctx.font = TypeFontSize.value + "px Medieval"
-            ctx.textAlign = TypeCenterAlign.checked ? 'center' : 'left';
-            const typeX = TypeCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 5);
-            ctx.fillText(Type.value, typeX, canvas.height /7.3)
+            ctx.textAlign = 'center';
+            ctx.fillText(Type.value, (canvas.width / 5), canvas.height /7.3)
             ctx.font = SubtypeFontSize.value + "px Medieval"
-            ctx.textAlign = SubtypeCenterAlign.checked ? 'center' : 'left';
-            const subtypeX = SubtypeCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 5);
-            ctx.fillText(Subtype.value, subtypeX, canvas.height /7.3)
+            ctx.textAlign = 'center';
+            ctx.fillText(Subtype.value, canvas.width - (canvas.width / 5), canvas.height /7.3)
 
             ctx.font = TreasureFontSize.value + "px Medieval"
             ctx.textAlign = 'center';
