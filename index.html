@@ -637,6 +637,7 @@
             ctx.font = "200px Medieval"
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+            ctx.fillStyle = 'black';
             
             //Draw damage stats
             if (IsSwitchedOn) {
@@ -654,6 +655,7 @@
                 document.fonts.load('10px Medieval').then(() => {
                     ctx.font = "175px Medieval"
                     ctx.textAlign = 'center';
+                    ctx.fillStyle = 'black';
                     ctx.fillText(Dam.value, canvas.width / 12.5, canvas.height / 12.5)
                     ctx.fillText(Def.value, canvas.width - (canvas.width / 12.5), canvas.height / 12.5)
                 })
