@@ -602,11 +602,15 @@
             ctx.fillRect(artBounds.x - edgeWidth/2, artBounds.y, edgeWidth, artBounds.height);
             // Right edge
             ctx.fillRect(artBounds.x + artBounds.width - edgeWidth/2, artBounds.y, edgeWidth, artBounds.height);
+            
+            // Reset fillStyle to black after drawing hover indicators
+            ctx.fillStyle = 'black';
         }
         
         // Redraw the canvas with all images and text
         function redrawCanvas() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'black'; // Reset fillStyle to black at the start
         
             // Get the value of ExtraHight (add a check if it is set, to avoid NaN issues)
             const ExtraHightP = parseInt(document.getElementById("ArtHightPos").value) || 0;
