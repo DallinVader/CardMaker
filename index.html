@@ -24,13 +24,6 @@
                         <label>Art Image:</label>
                         <input type="file" id="Art" accept="image/*" multiple>
                     </div>
-                    <label for="downloadScale">Download Scale:</label>
-                    <select id="downloadScale">
-                        <option value="1">1 (Full Size)</option>
-                        <option value="0.75">0.75</option>
-                        <option value="0.5">0.5</option>
-                        <option value="0.25">0.25</option>
-                    </select>
                     <div class="input-group">
                         <label for="downloadFormat">File Format:</label>
                         <select id="downloadFormat">
@@ -814,40 +807,38 @@
         toggleQualitySlider();
         document.getElementById('downloadFormat').addEventListener('change', toggleQualitySlider);
         
-        // Download the final card at the selected scale and format
+        // Download the final card at the selected format
         function downloadCard() {
-            // Get the selected scale value (1 = full size, 0.75 = 75%, etc.)
-            const scaleSelect = document.getElementById('downloadScale');
+            // Get format settings (always full size now)
             const formatSelect = document.getElementById('downloadFormat');
-            const scale = parseFloat(scaleSelect.value) || 1;
             const format = formatSelect.value;
+            const scale = 1; // Always full size
             
-            // Calculate scaled dimensions
-            const scaledWidth = Math.round(canvas.width * scale);
-            const scaledHeight = Math.round(canvas.height * scale);
+            // Use original canvas dimensions
+            const scaledWidth = canvas.width;
+            const scaledHeight = canvas.height;
             
-            // Create a temporary canvas for the scaled image
+            // Create a temporary canvas for the image
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = scaledWidth;
             tempCanvas.height = scaledHeight;
             const tempCtx = tempCanvas.getContext('2d');
             
-            // Use high-quality image smoothing for better scaling
+            // Use high-quality image smoothing
             tempCtx.imageSmoothingEnabled = true;
             tempCtx.imageSmoothingQuality = 'high';
             
-            // Draw the original canvas scaled to the new dimensions
-            tempCtx.drawImage(canvas, 0, 0, scaledWidth, scaledHeight);
+            // Draw the original canvas to the temporary canvas
+            tempCtx.drawImage(canvas, 0, 0);
             
             // Get format and quality settings
             const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
             const quality = format === 'jpeg' ? parseFloat(document.getElementById('jpegQuality').value) : undefined;
             const fileExtension = format === 'jpeg' ? 'jpg' : 'png';
             
-            // Create download link with scaled image
+            // Create download link
             const link = document.createElement('a');
-            const scaleText = scaleSelect.options[scaleSelect.selectedIndex].text.replace(/[^0-9]/g, '');
-            link.download = `card_${scaleText}x.${fileExtension}`;
+            link.download = `card.${fileExtension}`;
             link.href = tempCanvas.toDataURL(mimeType, quality);
             
             // Trigger download
