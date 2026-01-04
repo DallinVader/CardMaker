@@ -783,12 +783,38 @@
 
 
 
-        // Download the final card
+        // Download the final card at the selected scale
         function downloadCard() {
+            // Get the selected scale value (1 = full size, 0.75 = 75%, etc.)
+            const scaleSelect = document.getElementById('downloadScale');
+            const scale = parseFloat(scaleSelect.value) || 1;
+            
+            // Calculate scaled dimensions
+            const scaledWidth = Math.round(canvas.width * scale);
+            const scaledHeight = Math.round(canvas.height * scale);
+            
+            // Create a temporary canvas for the scaled image
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = scaledWidth;
+            tempCanvas.height = scaledHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Use high-quality image smoothing for better scaling
+            tempCtx.imageSmoothingEnabled = true;
+            tempCtx.imageSmoothingQuality = 'high';
+            
+            // Draw the original canvas scaled to the new dimensions
+            tempCtx.drawImage(canvas, 0, 0, scaledWidth, scaledHeight);
+            
+            // Create download link with scaled image
             const link = document.createElement('a');
-            link.download = 'card.png';
-            link.href = canvas.toDataURL('image/png', document.getElementById('downloadScale').value); // High-resolution export
+            link.download = `card_${scaleSelect.options[scaleSelect.selectedIndex].text.replace(/[^0-9]/g, '')}x.png`;
+            link.href = tempCanvas.toDataURL('image/png');
+            
+            // Trigger download
+            document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
         }
 
         // Fullscreen functionality
