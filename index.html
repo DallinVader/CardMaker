@@ -36,148 +36,189 @@
                         <input type="range" id="jpegQuality" min="0.1" max="1" step="0.1" value="0.8" oninput="updateQualityDisplay()">
                         <small>Lower quality = smaller file size</small>
                     </div>
-                    <button onclick="downloadCard()">Download Card</button>
-                    <button onclick="openFullscreen()">Fullscreen Card</button>
-                    <button onclick="resetEverything()" style="background-color: #ff6b6b; color: white;">Reset All</button>
-                </div>
-                
-                <div class="control-section">
-                    <h2>Art Size</h2>
-                    <div class="input-group">
-                        <label>Art Size (%):</label>
-                        <input value="116" type="number" min="1" max="500" placeholder="Size" id="ArtHight" oninput="ImageSize()">
-                        <small>Drag the bottom-right corner on the card to resize, or type a value</small>
+                    <button onclick="downloadCard()" title="Ctrl+D">Download Card</button>
+                    <button onclick="openFullscreen()" title="Ctrl+F">Fullscreen Card</button>
+                    <button onclick="resetEverything()" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: white;" title="Ctrl+R">Reset All</button>
+                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(200, 200, 220, 0.3); font-size: 11px; color: #718096;">
+                        <strong>Keyboard Shortcuts:</strong><br>
+                        <kbd>Ctrl+D</kbd> Download | <kbd>Ctrl+F</kbd> Fullscreen | <kbd>Ctrl+R</kbd> Reset<br>
+                        <kbd>1-9</kbd> Toggle sections | <kbd>Esc</kbd> Close/Blur
                     </div>
                 </div>
                 
                 <div class="control-section">
-                    <h2>Art Position</h2>
-                    <div class="input-group">
-                        <label>Vertical Position (Y):</label>
-                        <input value="0" type="number" min="-5000" max="5000" placeholder="0" id="ArtHightPos" oninput="ImagePos()">
-                        <small>Drag the art image on the card to move, or type a value</small>
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <h2>Art Size</h2>
                     </div>
-                    <div class="input-group">
-                        <label>Horizontal Position (X):</label>
-                        <input value="0" type="number" min="-5000" max="5000" placeholder="0" id="ArtWidthPos" oninput="ImagePos()">
-                        <small>Negative moves left, positive moves right</small>
-                    </div>
-                </div>
-                
-                <div class="control-section">
-                    <h2>Title</h2>
-                    <div class="input-group">
-                        <label>Title Text:</label>
-                        <input type="text" placeholder="Enter card title" id="Title" oninput="redrawCanvas()">
-                    </div>
-                    <div class="input-group">
-                        <label>Font Size: <span id="TitleFontSizeValue">200</span></label>
-                        <input type="range" id="TitleFontSize" min="50" max="300" value="200" oninput="redrawCanvas()">
-                        <div class="quick-buttons">
-                            <button type="button" onclick="setFontSize('TitleFontSize', 150)">Small</button>
-                            <button type="button" onclick="setFontSize('TitleFontSize', 200)">Medium</button>
-                            <button type="button" onclick="setFontSize('TitleFontSize', 250)">Large</button>
+                    <div class="section-content">
+                        <div class="input-group">
+                            <label>Art Size (%):</label>
+                            <input value="116" type="number" min="1" max="500" placeholder="Size" id="ArtHight" oninput="ImageSize()">
+                            <small>Drag the bottom-right corner on the card to resize, or type a value</small>
                         </div>
                     </div>
-                    <div class="input-group">
-                        <label>Center Align:</label>
-                        <input type="checkbox" id="TitleCenterAlign" checked onchange="redrawCanvas()">
+                </div>
+                
+                <div class="control-section">
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <h2>Art Position</h2>
+                    </div>
+                    <div class="section-content">
+                        <div class="input-group">
+                            <label>Vertical Position (Y):</label>
+                            <input value="0" type="number" min="-5000" max="5000" placeholder="0" id="ArtHightPos" oninput="ImagePos()">
+                            <small>Drag the art image on the card to move, or type a value</small>
+                        </div>
+                        <div class="input-group">
+                            <label>Horizontal Position (X):</label>
+                            <input value="0" type="number" min="-5000" max="5000" placeholder="0" id="ArtWidthPos" oninput="ImagePos()">
+                            <small>Negative moves left, positive moves right</small>
+                        </div>
                     </div>
                 </div>
                 
                 <div class="control-section">
-                    <h2>Damage Stats</h2>
-                    <div class="input-group">
-                        <label>Show Stats:</label>
-                        <input type="checkbox" onclick="ToggelSwitch()" checked>
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <h2>Title</h2>
                     </div>
-                    <div class="input-group">
-                        <label>Damage:</label>
-                        <input type="number" value="0" min="0" max="999" placeholder="0" id="DamageID" oninput="redrawCanvas()">
-                    </div>
-                    <div class="input-group">
-                        <label>Defense:</label>
-                        <input type="number" value="0" min="0" max="999" placeholder="0" id="DefenseID" oninput="redrawCanvas()">
-                    </div>
-                </div>
-                
-                <div class="control-section">
-                    <h2>Types</h2>
-                    <div class="input-group">
-                        <label>Type:</label>
-                        <input type="text" placeholder="Enter type" oninput="redrawCanvas()" id="Type" value="">
-                    </div>
-                    <div class="input-group">
-                        <label>Type Font Size: <span id="TypeFontSizeValue">100</span></label>
-                        <input type="range" id="TypeFontSize" min="50" max="200" oninput="redrawCanvas()" value="100">
-                    </div>
-                    <div class="input-group">
-                        <label>Subtype:</label>
-                        <input type="text" placeholder="Enter subtype" oninput="redrawCanvas()" id="Subtype" value="">
-                    </div>
-                    <div class="input-group">
-                        <label>Subtype Font Size: <span id="SubtypeFontSizeValue">80</span></label>
-                        <input type="range" id="SubtypeFontSize" min="50" max="200" oninput="redrawCanvas()" value="80">
+                    <div class="section-content">
+                        <div class="input-group">
+                            <label>Title Text:</label>
+                            <input type="text" placeholder="Enter card title" id="Title" oninput="redrawCanvas()">
+                        </div>
+                        <div class="input-group">
+                            <label>Font Size: <span id="TitleFontSizeValue">200</span></label>
+                            <input type="range" id="TitleFontSize" min="50" max="300" value="200" oninput="redrawCanvas()">
+                            <div class="quick-buttons">
+                                <button type="button" onclick="setFontSize('TitleFontSize', 150)">Small</button>
+                                <button type="button" onclick="setFontSize('TitleFontSize', 200)">Medium</button>
+                                <button type="button" onclick="setFontSize('TitleFontSize', 250)">Large</button>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Center Align:</label>
+                            <input type="checkbox" id="TitleCenterAlign" checked onchange="redrawCanvas()">
+                        </div>
                     </div>
                 </div>
                 
                 <div class="control-section">
-                    <h2>Treasure Cost</h2>
-                    <div class="input-group">
-                        <label>Cost:</label>
-                        <input type="number" id="TreasureCost" placeholder="0" value="0" min="0" max="999" oninput="redrawCanvas()">
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <h2>Damage Stats</h2>
                     </div>
-                    <div class="input-group">
-                        <label>Font Size: <span id="TreasureFontSizeValue">150</span></label>
-                        <input type="range" id="TreasureFontSize" min="50" max="300" value="150" oninput="redrawCanvas()">
-                    </div>
-                </div>
-                
-                <div class="control-section">
-                    <h2>Description</h2>
-                    <div class="input-group">
-                        <label>Main Description:</label>
-                        <textarea id="MainDisciption" placeholder="Enter main description (supports multiple lines)" rows="3" oninput="redrawCanvas()"></textarea>
-                    </div>
-                    <div class="input-group">
-                        <label>Font Size: <span id="MainDisciptionFontSizeValue">80</span></label>
-                        <input type="range" id="MainDisciptionFontSize" min="50" max="200" value="80" oninput="redrawCanvas()">
-                    </div>
-                    <div class="input-group">
-                        <label>Center Align:</label>
-                        <input type="checkbox" id="MainDescriptionCenterAlign" onchange="redrawCanvas()">
+                    <div class="section-content">
+                        <div class="input-group">
+                            <label>Show Stats:</label>
+                            <input type="checkbox" onclick="ToggelSwitch()" checked>
+                        </div>
+                        <div class="input-group">
+                            <label>Damage:</label>
+                            <input type="number" value="0" min="0" max="999" placeholder="0" id="DamageID" oninput="redrawCanvas()">
+                        </div>
+                        <div class="input-group">
+                            <label>Defense:</label>
+                            <input type="number" value="0" min="0" max="999" placeholder="0" id="DefenseID" oninput="redrawCanvas()">
+                        </div>
                     </div>
                 </div>
                 
                 <div class="control-section">
-                    <h2>Sub Description</h2>
-                    <div class="input-group">
-                        <label>Sub Description:</label>
-                        <textarea id="SubDisciption" placeholder="Enter sub description (supports multiple lines)" rows="2" oninput="redrawCanvas()"></textarea>
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <h2>Types</h2>
                     </div>
-                    <div class="input-group">
-                        <label>Font Size: <span id="SubDisciptionFontSizeValue">70</span></label>
-                        <input type="range" id="SubDisciptionFontSize" min="50" max="200" value="70" oninput="redrawCanvas()">
-                    </div>
-                    <div class="input-group">
-                        <label>Center Align:</label>
-                        <input type="checkbox" id="SubDescriptionCenterAlign" checked onchange="redrawCanvas()">
+                    <div class="section-content">
+                        <div class="input-group">
+                            <label>Type:</label>
+                            <input type="text" placeholder="Enter type" oninput="redrawCanvas()" id="Type" value="">
+                        </div>
+                        <div class="input-group">
+                            <label>Type Font Size: <span id="TypeFontSizeValue">100</span></label>
+                            <input type="range" id="TypeFontSize" min="50" max="200" oninput="redrawCanvas()" value="100">
+                        </div>
+                        <div class="input-group">
+                            <label>Subtype:</label>
+                            <input type="text" placeholder="Enter subtype" oninput="redrawCanvas()" id="Subtype" value="">
+                        </div>
+                        <div class="input-group">
+                            <label>Subtype Font Size: <span id="SubtypeFontSizeValue">80</span></label>
+                            <input type="range" id="SubtypeFontSize" min="50" max="200" oninput="redrawCanvas()" value="80">
+                        </div>
                     </div>
                 </div>
                 
                 <div class="control-section">
-                    <h2>Quote</h2>
-                    <div class="input-group">
-                        <label>Quote Text:</label>
-                        <textarea id="QoteDiscription" placeholder="Enter quote text" rows="2" oninput="redrawCanvas()"></textarea>
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <h2>Treasure Cost</h2>
                     </div>
-                    <div class="input-group">
-                        <label>Font Size: <span id="QoteDiscriptionFontSizeValue">60</span></label>
-                        <input type="range" id="QoteDiscriptionFontSize" min="50" max="200" value="60" oninput="redrawCanvas()">
+                    <div class="section-content">
+                        <div class="input-group">
+                            <label>Cost:</label>
+                            <input type="number" id="TreasureCost" placeholder="0" value="0" min="0" max="999" oninput="redrawCanvas()">
+                        </div>
+                        <div class="input-group">
+                            <label>Font Size: <span id="TreasureFontSizeValue">150</span></label>
+                            <input type="range" id="TreasureFontSize" min="50" max="300" value="150" oninput="redrawCanvas()">
+                        </div>
                     </div>
-                    <div class="input-group">
-                        <label>Center Align:</label>
-                        <input type="checkbox" id="QuoteCenterAlign" checked onchange="redrawCanvas()">
+                </div>
+                
+                <div class="control-section">
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <h2>Description</h2>
+                    </div>
+                    <div class="section-content">
+                        <div class="input-group">
+                            <label>Main Description:</label>
+                            <textarea id="MainDisciption" placeholder="Enter main description (supports multiple lines)" rows="3" oninput="redrawCanvas()"></textarea>
+                        </div>
+                        <div class="input-group">
+                            <label>Font Size: <span id="MainDisciptionFontSizeValue">80</span></label>
+                            <input type="range" id="MainDisciptionFontSize" min="50" max="200" value="80" oninput="redrawCanvas()">
+                        </div>
+                        <div class="input-group">
+                            <label>Center Align:</label>
+                            <input type="checkbox" id="MainDescriptionCenterAlign" onchange="redrawCanvas()">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="control-section">
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <h2>Sub Description</h2>
+                    </div>
+                    <div class="section-content">
+                        <div class="input-group">
+                            <label>Sub Description:</label>
+                            <textarea id="SubDisciption" placeholder="Enter sub description (supports multiple lines)" rows="2" oninput="redrawCanvas()"></textarea>
+                        </div>
+                        <div class="input-group">
+                            <label>Font Size: <span id="SubDisciptionFontSizeValue">70</span></label>
+                            <input type="range" id="SubDisciptionFontSize" min="50" max="200" value="70" oninput="redrawCanvas()">
+                        </div>
+                        <div class="input-group">
+                            <label>Center Align:</label>
+                            <input type="checkbox" id="SubDescriptionCenterAlign" checked onchange="redrawCanvas()">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="control-section">
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <h2>Quote</h2>
+                    </div>
+                    <div class="section-content">
+                        <div class="input-group">
+                            <label>Quote Text:</label>
+                            <textarea id="QoteDiscription" placeholder="Enter quote text" rows="2" oninput="redrawCanvas()"></textarea>
+                        </div>
+                        <div class="input-group">
+                            <label>Font Size: <span id="QoteDiscriptionFontSizeValue">60</span></label>
+                            <input type="range" id="QoteDiscriptionFontSize" min="50" max="200" value="60" oninput="redrawCanvas()">
+                        </div>
+                        <div class="input-group">
+                            <label>Center Align:</label>
+                            <input type="checkbox" id="QuoteCenterAlign" checked onchange="redrawCanvas()">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -192,6 +233,55 @@
         </div>
 
     <script>
+        // Collapsible sections functionality
+        function toggleSection(header) {
+            const section = header.parentElement;
+            section.classList.toggle('collapsed');
+        }
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(event) {
+            // Don't trigger shortcuts when typing in inputs
+            if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+                if (event.key === 'Escape') {
+                    event.target.blur();
+                }
+                return;
+            }
+            
+            // Ctrl/Cmd + D: Download card
+            if ((event.ctrlKey || event.metaKey) && event.key === 'd') {
+                event.preventDefault();
+                downloadCard();
+            }
+            
+            // Ctrl/Cmd + F: Fullscreen
+            if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
+                event.preventDefault();
+                openFullscreen();
+            }
+            
+            // Ctrl/Cmd + R: Reset (with confirmation)
+            if ((event.ctrlKey || event.metaKey) && event.key === 'r') {
+                event.preventDefault();
+                if (confirm('Reset all settings? (Ctrl+R to confirm)')) {
+                    resetEverything();
+                }
+            }
+            
+            // Number keys 1-9: Toggle sections
+            if (event.key >= '1' && event.key <= '9') {
+                const sections = document.querySelectorAll('.control-section');
+                const index = parseInt(event.key) - 1;
+                if (sections[index]) {
+                    const header = sections[index].querySelector('.section-header');
+                    if (header) {
+                        toggleSection(header);
+                    }
+                }
+            }
+        });
+        
         const canvas = document.getElementById('cardCanvas');
         const ctx = canvas.getContext('2d');
 
@@ -333,6 +423,7 @@
                 dragStartX = mousePos.x;
                 dragStartY = mousePos.y;
                 canvas.style.cursor = 'nwse-resize';
+                redrawCanvas(); // Redraw without hover border
             } else if (isPointInArt(mousePos.x, mousePos.y) || isPointNearVerticalEdge(mousePos.x, mousePos.y)) {
                 isDragging = true;
                 startArtX = parseInt(document.getElementById("ArtWidthPos").value) || 0;
@@ -340,6 +431,7 @@
                 dragStartX = mousePos.x;
                 dragStartY = mousePos.y;
                 canvas.style.cursor = 'move';
+                redrawCanvas(); // Redraw without hover border
             }
         });
         
@@ -414,21 +506,7 @@
             canvas.style.cursor = 'default';
         });
         
-        // Redraw with visual feedback on hover
-        let hoverRedrawTimeout;
-        canvas.addEventListener('mousemove', function(e) {
-            if (isDragging || isResizing) return;
-            
-            clearTimeout(hoverRedrawTimeout);
-            hoverRedrawTimeout = setTimeout(() => {
-                const mousePos = getCanvasMousePos(e);
-                if (ArtImage.src && isPointInArt(mousePos.x, mousePos.y)) {
-                    redrawCanvasWithHover();
-                } else {
-                    redrawCanvas();
-                }
-            }, 50);
-        });
+        // Note: Hover border removed per user request
 
         const images = [];
         let MainImage = new Image();
@@ -611,40 +689,6 @@
             reader.readAsDataURL(file[0]); // Read the first file as data URL
         });
 
-        // Redraw canvas with hover outline
-        function redrawCanvasWithHover() {
-            redrawCanvas();
-            if (!ArtImage.src) return;
-            
-            calculateArtBounds();
-            ctx.strokeStyle = 'rgba(0, 150, 255, 0.8)';
-            ctx.lineWidth = 3;
-            ctx.setLineDash([5, 5]);
-            ctx.strokeRect(artBounds.x, artBounds.y, artBounds.width, artBounds.height);
-            ctx.setLineDash([]);
-            
-            // Draw resize handle (larger for easier grabbing)
-            const handleSize = 25;
-            ctx.fillStyle = 'rgba(0, 150, 255, 0.9)';
-            ctx.fillRect(
-                artBounds.x + artBounds.width - handleSize/2,
-                artBounds.y + artBounds.height - handleSize/2,
-                handleSize,
-                handleSize
-            );
-            
-            // Draw vertical edge indicators for easier Y-axis dragging
-            const edgeWidth = 4;
-            ctx.fillStyle = 'rgba(0, 150, 255, 0.5)';
-            // Left edge
-            ctx.fillRect(artBounds.x - edgeWidth/2, artBounds.y, edgeWidth, artBounds.height);
-            // Right edge
-            ctx.fillRect(artBounds.x + artBounds.width - edgeWidth/2, artBounds.y, edgeWidth, artBounds.height);
-            
-            // Reset fillStyle to black after drawing hover indicators
-            ctx.fillStyle = 'black';
-        }
-        
         // Redraw the canvas with all images and text
         function redrawCanvas() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -807,41 +851,20 @@
         toggleQualitySlider();
         document.getElementById('downloadFormat').addEventListener('change', toggleQualitySlider);
         
-        // Download the final card at the selected scale and format
+        // Download the final card at the selected format
         function downloadCard() {
-            // Get the selected scale value (1 = full size, 0.75 = 75%, etc.)
-            const scaleSelect = document.getElementById('downloadScale');
             const formatSelect = document.getElementById('downloadFormat');
-            const scale = parseFloat(scaleSelect.value) || 1;
             const format = formatSelect.value;
-            
-            // Calculate scaled dimensions
-            const scaledWidth = Math.round(canvas.width * scale);
-            const scaledHeight = Math.round(canvas.height * scale);
-            
-            // Create a temporary canvas for the scaled image
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = scaledWidth;
-            tempCanvas.height = scaledHeight;
-            const tempCtx = tempCanvas.getContext('2d');
-            
-            // Use high-quality image smoothing for better scaling
-            tempCtx.imageSmoothingEnabled = true;
-            tempCtx.imageSmoothingQuality = 'high';
-            
-            // Draw the original canvas scaled to the new dimensions
-            tempCtx.drawImage(canvas, 0, 0, scaledWidth, scaledHeight);
             
             // Get format and quality settings
             const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
             const quality = format === 'jpeg' ? parseFloat(document.getElementById('jpegQuality').value) : undefined;
             const fileExtension = format === 'jpeg' ? 'jpg' : 'png';
             
-            // Create download link with scaled image
+            // Create download link
             const link = document.createElement('a');
-            const scaleText = scaleSelect.options[scaleSelect.selectedIndex].text.replace(/[^0-9]/g, '');
-            link.download = `card_${scaleText}x.${fileExtension}`;
-            link.href = tempCanvas.toDataURL(mimeType, quality);
+            link.download = `card.${fileExtension}`;
+            link.href = canvas.toDataURL(mimeType, quality);
             
             // Trigger download
             document.body.appendChild(link);
@@ -867,10 +890,13 @@
             modal.style.display = 'none';
         }
 
-        // Close fullscreen on Escape key
+        // Close fullscreen on Escape key (only when modal is open)
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape') {
-                closeFullscreen();
+                const modal = document.getElementById('fullscreenModal');
+                if (modal.style.display === 'block') {
+                    closeFullscreen();
+                }
             }
         });
 
