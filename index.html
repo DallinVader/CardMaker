@@ -15,55 +15,24 @@
             </div>
             
             <div class="controls-panel">
-                <div class="controls">
-                    <div class="input-group">
-                        <label>Card Base/Frame:</label>
-                        <input type="file" id="CardBase" accept="image/*">
-                    </div>
-                    <div class="input-group">
-                        <label>Art Image:</label>
-                        <input type="file" id="Art" accept="image/*" multiple>
-                    </div>
-                    <div class="input-group">
-                        <label for="downloadFormat">File Format:</label>
-                        <select id="downloadFormat">
-                            <option value="png">PNG (High Quality, Larger File)</option>
-                            <option value="jpeg" selected>JPEG (Smaller File Size)</option>
-                        </select>
-                    </div>
-                    <div class="input-group" id="qualityGroup">
-                        <label>JPEG Quality: <span id="jpegQualityValue">0.8</span></label>
-                        <input type="range" id="jpegQuality" min="0.1" max="1" step="0.1" value="0.8" oninput="updateQualityDisplay()">
-                        <small>Lower quality = smaller file size</small>
-                    </div>
-                    <button onclick="downloadCard()" title="Ctrl+D">Download Card</button>
-                    <button onclick="openFullscreen()" title="Ctrl+F">Fullscreen Card</button>
-                    <button onclick="resetEverything()" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: white;" title="Ctrl+R">Reset All</button>
-                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(200, 200, 220, 0.3); font-size: 11px; color: #718096;">
-                        <strong>Keyboard Shortcuts:</strong><br>
-                        <kbd>Ctrl+D</kbd> Download | <kbd>Ctrl+F</kbd> Fullscreen | <kbd>Ctrl+R</kbd> Reset<br>
-                        <kbd>1-9</kbd> Toggle sections | <kbd>Esc</kbd> Close/Blur
-                    </div>
-                </div>
-                
-                <div class="control-section">
+                <div class="control-section collapsed">
                     <div class="section-header" onclick="toggleSection(this)">
-                        <h2>Art Size</h2>
+                        <h2>Card Images</h2>
                     </div>
                     <div class="section-content">
+                        <div class="input-group">
+                            <label>Card Base/Frame:</label>
+                            <input type="file" id="CardBase" accept="image/*">
+                        </div>
+                        <div class="input-group">
+                            <label>Art Image:</label>
+                            <input type="file" id="Art" accept="image/*" multiple>
+                        </div>
                         <div class="input-group">
                             <label>Art Size (%):</label>
                             <input value="116" type="number" min="1" max="500" placeholder="Size" id="ArtHight" oninput="ImageSize()">
                             <small>Drag the bottom-right corner on the card to resize, or type a value</small>
                         </div>
-                    </div>
-                </div>
-                
-                <div class="control-section">
-                    <div class="section-header" onclick="toggleSection(this)">
-                        <h2>Art Position</h2>
-                    </div>
-                    <div class="section-content">
                         <div class="input-group">
                             <label>Vertical Position (Y):</label>
                             <input value="0" type="number" min="-5000" max="5000" placeholder="0" id="ArtHightPos" oninput="ImagePos()">
@@ -77,7 +46,37 @@
                     </div>
                 </div>
                 
-                <div class="control-section">
+                <div class="control-section collapsed">
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <h2>Export</h2>
+                    </div>
+                    <div class="section-content">
+                        <div class="input-group">
+                            <label for="downloadFormat">File Format:</label>
+                            <select id="downloadFormat">
+                                <option value="png">PNG (High Quality, Larger File)</option>
+                                <option value="jpeg" selected>JPEG (Smaller File Size)</option>
+                            </select>
+                        </div>
+                        <div class="input-group" id="qualityGroup">
+                            <label>JPEG Quality: <span id="jpegQualityValue">0.8</span></label>
+                            <input type="range" id="jpegQuality" min="0.1" max="1" step="0.1" value="0.8" oninput="updateQualityDisplay()">
+                            <small>Lower quality = smaller file size</small>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+                            <button onclick="downloadCard()" title="Ctrl+D">Download Card</button>
+                            <button onclick="openFullscreen()" title="Ctrl+F">Fullscreen Card</button>
+                            <button onclick="resetEverything()" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: white;" title="Ctrl+R">Reset All</button>
+                        </div>
+                        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(200, 200, 220, 0.3); font-size: 11px; color: #718096;">
+                            <strong>Keyboard Shortcuts:</strong><br>
+                            <kbd>Ctrl+D</kbd> Download | <kbd>Ctrl+F</kbd> Fullscreen | <kbd>Ctrl+R</kbd> Reset<br>
+                            <kbd>1-9</kbd> Toggle sections | <kbd>Esc</kbd> Close/Blur
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="control-section collapsed">
                     <div class="section-header" onclick="toggleSection(this)">
                         <h2>Title</h2>
                     </div>
@@ -102,7 +101,7 @@
                     </div>
                 </div>
                 
-                <div class="control-section">
+                <div class="control-section collapsed">
                     <div class="section-header" onclick="toggleSection(this)">
                         <h2>Damage Stats</h2>
                     </div>
@@ -122,14 +121,23 @@
                     </div>
                 </div>
                 
-                <div class="control-section">
+                <div class="control-section collapsed">
                     <div class="section-header" onclick="toggleSection(this)">
                         <h2>Types</h2>
                     </div>
                     <div class="section-content">
                         <div class="input-group">
                             <label>Type:</label>
-                            <input type="text" placeholder="Enter type" oninput="redrawCanvas()" id="Type" value="">
+                            <select id="Type" onchange="redrawCanvas()">
+                                <option value="">Select type</option>
+                                <option value="Unit">Unit</option>
+                                <option value="Spell">Spell</option>
+                                <option value="Equipment">Equipment</option>
+                                <option value="Holding">Holding</option>
+                                <option value="Wealth">Wealth</option>
+                                <option value="Hero">Hero</option>
+                                <option value="Tactic">Tactic</option>
+                            </select>
                         </div>
                         <div class="input-group">
                             <label>Type Font Size: <span id="TypeFontSizeValue">100</span></label>
@@ -137,7 +145,23 @@
                         </div>
                         <div class="input-group">
                             <label>Subtype:</label>
-                            <input type="text" placeholder="Enter subtype" oninput="redrawCanvas()" id="Subtype" value="">
+                            <select id="Subtype" onchange="redrawCanvas()">
+                                <option value="">Select subtype</option>
+                                <option value="Army">Army</option>
+                                <option value="Evocation">Evocation</option>
+                                <option value="Divination">Divination</option>
+                                <option value="Necromancy">Necromancy</option>
+                                <option value="Enchantment">Enchantment</option>
+                                <option value="Transmutation">Transmutation</option>
+                                <option value="Weapon">Weapon</option>
+                                <option value="Armor">Armor</option>
+                                <option value="Economy">Economy</option>
+                                <option value="Ritual">Ritual</option>
+                                <option value="Commander">Commander</option>
+                                <option value="Vehicle">Vehicle</option>
+                                <option value="Tool">Tool</option>
+                                <option value="Ship">Ship</option>
+                            </select>
                         </div>
                         <div class="input-group">
                             <label>Subtype Font Size: <span id="SubtypeFontSizeValue">80</span></label>
@@ -146,7 +170,7 @@
                     </div>
                 </div>
                 
-                <div class="control-section">
+                <div class="control-section collapsed">
                     <div class="section-header" onclick="toggleSection(this)">
                         <h2>Treasure Cost</h2>
                     </div>
@@ -162,7 +186,7 @@
                     </div>
                 </div>
                 
-                <div class="control-section">
+                <div class="control-section collapsed">
                     <div class="section-header" onclick="toggleSection(this)">
                         <h2>Description</h2>
                     </div>
@@ -182,7 +206,7 @@
                     </div>
                 </div>
                 
-                <div class="control-section">
+                <div class="control-section collapsed">
                     <div class="section-header" onclick="toggleSection(this)">
                         <h2>Sub Description</h2>
                     </div>
@@ -202,7 +226,7 @@
                     </div>
                 </div>
                 
-                <div class="control-section">
+                <div class="control-section collapsed">
                     <div class="section-header" onclick="toggleSection(this)">
                         <h2>Quote</h2>
                     </div>
@@ -523,6 +547,8 @@
         ArtImage.src = "The lIch King.png";
         ArtImage.onload = function() {
             ImageSizeNoRedraw();
+            // Set initial background image
+            document.body.style.backgroundImage = `url('${ArtImage.src}')`;
             redrawCanvas();
         };
         MainImage.onload = function () {
@@ -631,6 +657,8 @@
             ArtImage.wx = 0;
             ArtImage.onload = function() {
                 ImageSizeNoRedraw();
+                // Reset background image to default
+                document.body.style.backgroundImage = `url('${ArtImage.src}')`;
                 redrawCanvas();
             };
             
@@ -673,6 +701,8 @@
             
             reader.onload = function(e) {
                 img.src = e.target.result; // Set image source to uploaded file as data URL
+                // Update body background image with the uploaded art
+                document.body.style.backgroundImage = `url('${e.target.result}')`;
             };
 
             const ExtraHight = parseInt(document.getElementById("ArtHightPos").value) || 0;
