@@ -3,47 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Upload Grid</title>
+    <title>Card Grid</title>
     <style>
-        body {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 20px;
-        }
-        .grid {
+        .grid-container {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 10px;
-            width: 100%;
-            max-width: 960px;
         }
-        .grid img {
+        .grid-item {
             width: 100%;
-            height: auto;
+            height: 100px;
+            border: 1px solid #ccc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
         }
     </style>
 </head>
 <body>
-    <h1>Upload Images</h1>
-    <form id="upload-form">
-        <div class="grid">
-            <input type="file" accept="image/*" id="img1" required>
-            <input type="file" accept="image/*" id="img2" required>
-            <input type="file" accept="image/*" id="img3" required>
-            <input type="file" accept="image/*" id="img4" required>
-            <input type="file" accept="image/*" id="img5" required>
-            <input type="file" accept="image/*" id="img6" required>
-            <input type="file" accept="image/*" id="img7" required>
-            <input type="file" accept="image/*" id="img8" required>
-            <input type="file" accept="image/*" id="img9" required>
-        </div>
-        <button type="submit">Download PDF</button>
-    </form>
+    <h1>Upload Your Cards</h1>
+    <input type="file" id="fileUpload" accept="image/*" multiple>
+    <button id="downloadBtn">Download as PDF</button>
+    <div class="grid-container" id="gridContainer"></div>
+
     <script>
-        document.getElementById('upload-form').addEventListener('submit', function(event) {
-            event.preventDefault();
-            // Logic to handle image processing and PDF generation goes here.
+        const fileUpload = document.getElementById('fileUpload');
+        const gridContainer = document.getElementById('gridContainer');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        fileUpload.addEventListener('change', handleFiles);
+
+        function handleFiles() {
+            const files = this.files;
+            gridContainer.innerHTML = '';
+            for (let i = 0; i < files.length && i < 9; i++) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const gridItem = document.createElement('div');
+                    gridItem.classList.add('grid-item');
+                    gridItem.style.backgroundImage = `url(${e.target.result})`;
+                    gridItem.style.backgroundSize = 'cover';
+                    gridItem.style.backgroundPosition = 'center';
+                    gridContainer.appendChild(gridItem);
+                };
+                reader.readAsDataURL(files[i]);
+            }
+        }
+
+        downloadBtn.addEventListener('click', function() {
+            // PDF download functionality to be implemented
+            alert('PDF download functionality not implemented yet.');
         });
     </script>
 </body>
