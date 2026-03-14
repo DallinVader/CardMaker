@@ -54,9 +54,18 @@
                         <div class="input-group">
                             <label for="downloadFormat">File Format:</label>
                             <select id="downloadFormat">
-                                <option value="png">PNG (High Quality, Larger File)</option>
-                                <option value="jpeg" selected>JPEG (Smaller File Size)</option>
+                                <option value="png" selected>PNG (High Quality, Larger File)</option>
+                                <option value="jpeg">JPEG (Smaller File Size)</option>
                             </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Export Size:</label>
+                            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                <span><span id="exportWidthValue">800</span> × <span id="exportHeightValue">1120</span> px</span>
+                                <input type="number" id="exportWidthInput" min="100" max="2500" value="800" oninput="syncExportWidthFromInput()" style="width: 90px;">
+                            </div>
+                            <input type="range" id="exportWidth" min="100" max="2500" value="800" oninput="updateExportSizeDisplayFromSlider()">
+                            <small>This control only affects the downloaded image size, not the preview. Height is adjusted automatically.</small>
                         </div>
                         <div class="input-group" id="qualityGroup">
                             <label>JPEG Quality: <span id="jpegQualityValue">0.8</span></label>
@@ -875,11 +884,56 @@
             const qualityGroup = document.getElementById('qualityGroup');
             qualityGroup.style.display = formatSelect.value === 'jpeg' ? 'block' : 'none';
         }
+
+        // Shared export size update helper
+        function updateExportSize(width) {
+            const exportWidthValue = document.getElementById('exportWidthValue');
+            const exportHeightValue = document.getElementById('exportHeightValue');
+            const aspectRatio = 3500 / 2500; // Match original canvas aspect ratio so 820 -> 1148
+            const clampedWidth = Math.max(100, Math.min(2500, width || 800));
+            const height = Math.round(clampedWidth * aspectRatio);
+
+            if (exportWidthValue) {
+                exportWidthValue.textContent = clampedWidth;
+            }
+            if (exportHeightValue) {
+                exportHeightValue.textContent = height;
+            }
+        }
+
+        // Slider -> labels + number input
+        function updateExportSizeDisplayFromSlider() {
+            const exportWidth = document.getElementById('exportWidth');
+            const exportWidthInput = document.getElementById('exportWidthInput');
+            if (!exportWidth) return;
+
+            const width = parseInt(exportWidth.value, 10) || 800;
+            if (exportWidthInput) {
+                exportWidthInput.value = width;
+            }
+            updateExportSize(width);
+        }
+
+        // Number input -> slider + labels
+        function syncExportWidthFromInput() {
+            const exportWidthInput = document.getElementById('exportWidthInput');
+            const exportWidth = document.getElementById('exportWidth');
+            if (!exportWidthInput || !exportWidth) return;
+
+            let width = parseInt(exportWidthInput.value, 10);
+            if (isNaN(width)) width = 800;
+            width = Math.max(100, Math.min(2500, width));
+
+            exportWidthInput.value = width;
+            exportWidth.value = width;
+            updateExportSize(width);
+        }
         
         // Initialize quality display and format toggle
         updateQualityDisplay();
         toggleQualitySlider();
         document.getElementById('downloadFormat').addEventListener('change', toggleQualitySlider);
+        updateExportSizeDisplayFromSlider();
         
         // Download the final card at the selected format
         function downloadCard() {
@@ -890,11 +944,30 @@
             const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
             const quality = format === 'jpeg' ? parseFloat(document.getElementById('jpegQuality').value) : undefined;
             const fileExtension = format === 'jpeg' ? 'jpg' : 'png';
-            
+
+            // Determine target export size from slider (height auto-calculated to preserve aspect ratio)
+            const widthSlider = document.getElementById('exportWidth');
+            const targetWidth = widthSlider ? parseInt(widthSlider.value, 10) || 800 : 800;
+            const aspectRatio = 3500 / 2500; // Match original canvas 2500 x 3500 ratio so 820 -> 1148
+            const targetHeight = Math.round(targetWidth * aspectRatio);
+
+            // Determine which canvas to export from based on target size
+            let exportCanvas = canvas;
+
+            if (targetWidth > 0 && targetHeight > 0 && (targetWidth !== canvas.width || targetHeight !== canvas.height)) {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = targetWidth;
+                tempCanvas.height = targetHeight;
+                const tempCtx = tempCanvas.getContext('2d');
+
+                tempCtx.drawImage(canvas, 0, 0, targetWidth, targetHeight);
+                exportCanvas = tempCanvas;
+            }
+
             // Create download link
             const link = document.createElement('a');
             link.download = `card.${fileExtension}`;
-            link.href = canvas.toDataURL(mimeType, quality);
+            link.href = exportCanvas.toDataURL(mimeType, quality);
             
             // Trigger download
             document.body.appendChild(link);
