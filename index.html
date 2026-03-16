@@ -266,7 +266,8 @@
         <div id="fullscreenModal" class="fullscreen-modal" onclick="closeFullscreen()">
             <div class="fullscreen-content" onclick="event.stopPropagation()">
                 <span class="close-fullscreen" onclick="closeFullscreen()">&times;</span>
-                <canvas id="fullscreenCanvas" width="2500" height="3500"></canvas>
+                <!-- Fullscreen canvas includes bleed (10% larger than main canvas) -->
+                <canvas id="fullscreenCanvas" width="2750" height="3850"></canvas>
             </div>
         </div>
 
@@ -322,6 +323,9 @@
         
         const canvas = document.getElementById('cardCanvas');
         const ctx = canvas.getContext('2d');
+        // 0.125" bleed on each side for a 2.5" x 3.5" card => 2.75" x 3.75"
+        // Scale factor is 2.75 / 2.5 = 1.1
+        const BLEED_SCALE = 1.1;
 
         let IsSwitchedOn = true;
         Dam = document.getElementById("DamageID");
@@ -834,13 +838,26 @@
                 ctx.fillText(lin, subDescriptionX, (canvas.height / 1.9) + (100 * i))
             });
             
-            // Update fullscreen canvas if modal is open
+            // Update fullscreen canvas if modal is open (with black bleed)
             const modal = document.getElementById('fullscreenModal');
             if (modal.style.display === 'block') {
                 const fullscreenCanvas = document.getElementById('fullscreenCanvas');
                 const fullscreenCtx = fullscreenCanvas.getContext('2d');
                 fullscreenCtx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
-                fullscreenCtx.drawImage(canvas, 0, 0);
+                // Fill bleed as black and center the trim canvas inside
+                fullscreenCtx.fillStyle = 'black';
+                fullscreenCtx.fillRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
+                const trimWidth = canvas.width;
+                const trimHeight = canvas.height;
+                const scale = Math.min(
+                    fullscreenCanvas.width / (trimWidth * BLEED_SCALE),
+                    fullscreenCanvas.height / (trimHeight * BLEED_SCALE)
+                );
+                const targetTrimWidth = trimWidth * scale;
+                const targetTrimHeight = trimHeight * scale;
+                const offsetX = (fullscreenCanvas.width - targetTrimWidth) / 2;
+                const offsetY = (fullscreenCanvas.height - targetTrimHeight) / 2;
+                fullscreenCtx.drawImage(canvas, 0, 0, trimWidth, trimHeight, offsetX, offsetY, targetTrimWidth, targetTrimHeight);
             }
         }
 
@@ -940,7 +957,7 @@
         document.getElementById('downloadFormat').addEventListener('change', toggleQualitySlider);
         updateExportSizeDisplayFromSlider();
         
-        // Download the final card at the selected format
+        // Download the final card at the selected format (with black bleed area, included in selected size)
         function downloadCard() {
             const formatSelect = document.getElementById('downloadFormat');
             const format = formatSelect.value;
@@ -950,24 +967,31 @@
             const quality = format === 'jpeg' ? parseFloat(document.getElementById('jpegQuality').value) : undefined;
             const fileExtension = format === 'jpeg' ? 'jpg' : 'png';
 
-            // Determine target export size from slider (height auto-calculated to preserve aspect ratio)
+            // Slider value represents the TOTAL size (trim + bleed).
+            // We compute the inner trim size from it so the black bleed is included within the selected size.
             const widthSlider = document.getElementById('exportWidth');
-            const targetWidth = widthSlider ? parseInt(widthSlider.value, 10) || 800 : 800;
-            const aspectRatio = 3500 / 2500; // Match original canvas 2500 x 3500 ratio so 820 -> 1148
-            const targetHeight = Math.round(targetWidth * aspectRatio);
+            const totalWidth = widthSlider ? parseInt(widthSlider.value, 10) || 800 : 800;
+            const aspectRatio = 3500 / 2500; // Match original canvas 2500 x 3500 ratio
+            const totalHeight = Math.round(totalWidth * aspectRatio);
 
-            // Determine which canvas to export from based on target size
-            let exportCanvas = canvas;
+            // Compute inner trim size: total size already includes bleed,
+            // so trim is slightly smaller by the BLEED_SCALE factor.
+            const trimWidth = Math.round(totalWidth / BLEED_SCALE);
+            const trimHeight = Math.round(totalHeight / BLEED_SCALE);
 
-            if (targetWidth > 0 && targetHeight > 0 && (targetWidth !== canvas.width || targetHeight !== canvas.height)) {
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = targetWidth;
-                tempCanvas.height = targetHeight;
-                const tempCtx = tempCanvas.getContext('2d');
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = totalWidth;
+            exportCanvas.height = totalHeight;
+            const exportCtx = exportCanvas.getContext('2d');
 
-                tempCtx.drawImage(canvas, 0, 0, targetWidth, targetHeight);
-                exportCanvas = tempCanvas;
-            }
+            // Fill bleed area with black (this is the full selected size)
+            exportCtx.fillStyle = 'black';
+            exportCtx.fillRect(0, 0, totalWidth, totalHeight);
+
+            // Draw the designed card centered at TRIM size inside the black bleed
+            const offsetX = Math.round((totalWidth - trimWidth) / 2);
+            const offsetY = Math.round((totalHeight - trimHeight) / 2);
+            exportCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, offsetX, offsetY, trimWidth, trimHeight);
 
             // Create download link
             const link = document.createElement('a');
@@ -984,13 +1008,9 @@
         function openFullscreen() {
             const modal = document.getElementById('fullscreenModal');
             const fullscreenCanvas = document.getElementById('fullscreenCanvas');
-            const fullscreenCtx = fullscreenCanvas.getContext('2d');
-            
-            // Copy the current canvas to the fullscreen canvas
-            fullscreenCtx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
-            fullscreenCtx.drawImage(canvas, 0, 0);
-            
             modal.style.display = 'block';
+            // Ensure fullscreen canvas is rendered with black bleed immediately
+            redrawCanvas();
         }
 
         function closeFullscreen() {
