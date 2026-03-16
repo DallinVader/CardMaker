@@ -35,10 +35,22 @@
             border-radius: 6px;
             cursor: pointer;
             font-size: 1rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
         }
         .btn-print { background: #2c7; color: #fff; }
         .btn-pdf { background: #07c; color: #fff; }
         .btn-print:hover, .btn-pdf:hover { opacity: 0.9; }
+        .btn-back {
+            background: #1a202c;
+            color: #fff;
+        }
+        .btn-back::before {
+            content: '←';
+            font-size: 1.1rem;
+        }
+        .btn-back:hover { opacity: 0.9; }
         .grid-container {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -112,6 +124,7 @@
         <input type="file" id="fileUpload" accept="image/*" multiple>
         <button type="button" class="btn-print" id="printBtn">Print / Save as PDF</button>
         <button type="button" class="btn-pdf" id="downloadPdfBtn">Download PDF</button>
+        <button type="button" class="btn-back" onclick="window.location.href='index.html'">Back to Card Maker</button>
     </div>
     <div class="grid-container" id="gridContainer"></div>
 
