@@ -979,17 +979,19 @@
             const trimWidth = Math.round(totalWidth / BLEED_SCALE);
             const trimHeight = Math.round(totalHeight / BLEED_SCALE);
 
+            // Extra bleed: extend 10px to the left and 10px to the right
+            const extraBleedX = 10;
             const exportCanvas = document.createElement('canvas');
-            exportCanvas.width = totalWidth;
+            exportCanvas.width = totalWidth + extraBleedX * 2;
             exportCanvas.height = totalHeight;
             const exportCtx = exportCanvas.getContext('2d');
 
             // Fill bleed area with black (this is the full selected size)
             exportCtx.fillStyle = 'black';
-            exportCtx.fillRect(0, 0, totalWidth, totalHeight);
+            exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
 
             // Draw the designed card centered at TRIM size inside the black bleed
-            const offsetX = Math.round((totalWidth - trimWidth) / 2);
+            const offsetX = Math.round((exportCanvas.width - trimWidth) / 2);
             const offsetY = Math.round((totalHeight - trimHeight) / 2);
             exportCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, offsetX, offsetY, trimWidth, trimHeight);
 
