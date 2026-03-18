@@ -61,6 +61,7 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
         .grid-item {
+            position: relative;
             aspect-ratio: 2.5 / 3.5;
             border: 1px solid #ccc;
             border-radius: 4px;
@@ -71,6 +72,67 @@
             background: #eee;
             background-size: cover;
             background-position: center;
+        }
+        .slot-remove {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            z-index: 2;
+            border: none;
+            border-radius: 999px;
+            padding: 4px 8px;
+            background: #d62b2b;
+            color: #fff;
+            font-size: 0.85rem;
+            cursor: pointer;
+            opacity: 0.9;
+            pointer-events: auto;
+            transition: opacity 120ms ease;
+        }
+        .slot-remove:hover {
+            background: #b81f1f;
+        }
+        .slot-remove:focus {
+            outline: 2px solid rgba(214,43,43,0.35);
+            outline-offset: 2px;
+        }
+        .slot-replace {
+            position: absolute;
+            top: 6px;
+            left: 50%;
+            right: auto;
+            transform: translateX(-50%);
+            z-index: 2;
+            border: none;
+            border-radius: 999px;
+            padding: 4px 8px;
+            background: rgba(0,0,0,0.5);
+            color: #fff;
+            font-size: 0.85rem;
+            cursor: pointer;
+            opacity: 0.9;
+            pointer-events: auto;
+            transition: opacity 120ms ease;
+        }
+        .slot-replace:hover {
+            background: rgba(0,0,0,0.7);
+        }
+        .slot-replace:focus {
+            outline: 2px solid rgba(0,0,0,0.35);
+            outline-offset: 2px;
+        }
+        .grid-item:hover .slot-remove,
+        .grid-item:focus-within .slot-remove {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .grid-item:hover .slot-replace,
+        .grid-item:focus-within .slot-replace {
+            opacity: 1;
+        }
+        .slot-remove:focus {
+            outline: 2px solid rgba(0,0,0,0.35);
+            outline-offset: 2px;
         }
         .grid-item.empty::before {
             content: 'Card ' attr(data-index);
@@ -114,70 +176,230 @@
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
+            /* When printing, hide empty cards so removed ones aren't printed. */
+            body.print-mode .grid-item.empty { display: none !important; }
         }
     </style>
 </head>
 <body>
-    <h1 class="no-print">Upload 9 Cards</h1>
+    <h1 class="no-print">Upload Cards (up to 9)</h1>
     <div class="controls no-print">
-        <label for="fileUpload">Choose images (up to 9)</label>
+        <label for="singleUpload">Add one card</label>
+        <input type="file" id="singleUpload" accept="image/*">
+
+        <label for="fileUpload">Add multiple (up to 9)</label>
         <input type="file" id="fileUpload" accept="image/*" multiple>
+        <button type="button" class="btn-pdf" id="repatUploadBtn" title="Repeat the last multi-upload selection until all empty slots are filled.">repeat upload</button>
         <button type="button" class="btn-print" id="printBtn">Print / Save as PDF</button>
         <button type="button" class="btn-pdf" id="downloadPdfBtn">Download PDF</button>
         <button type="button" class="btn-back" onclick="window.location.href='index.html'">Back to Card Maker</button>
     </div>
     <div class="grid-container" id="gridContainer"></div>
+    <!-- Reused for per-slot Replace actions (opens file picker for a specific slot). -->
+    <input type="file" id="slotReplaceInput" accept="image/*" style="display:none;">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
+        const singleUpload = document.getElementById('singleUpload');
         const fileUpload = document.getElementById('fileUpload');
         const gridContainer = document.getElementById('gridContainer');
         const printBtn = document.getElementById('printBtn');
         const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+        const repatUploadBtn = document.getElementById('repatUploadBtn');
+        const slotReplaceInput = document.getElementById('slotReplaceInput');
         const SLOTS = 9;
 
+        // Slot state (0-based): holds a data URL for uploaded cards, or null.
+        const slots = new Array(SLOTS).fill(null);
+        const loadingSlots = new Set();
+        const slotRequestId = new Array(SLOTS).fill(0);
+        let slotEls = [];
+        let lastMultiSelectedFiles = [];
+        let slotIndexPendingReplace = null;
+
         function ensureSlots() {
-            const current = gridContainer.querySelectorAll('.grid-item').length;
             gridContainer.innerHTML = '';
+            slotEls = [];
             for (let i = 0; i < SLOTS; i++) {
                 const div = document.createElement('div');
                 div.className = 'grid-item empty';
-                div.dataset.index = i + 1;
+                div.dataset.index = i + 1; // 1-based label for the empty placeholder
+
+                // Per-slot remove button so you can work around mistakes.
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'slot-remove no-print';
+                removeBtn.textContent = 'X';
+                removeBtn.setAttribute('aria-label', 'Remove this card');
+                removeBtn.addEventListener('click', () => removeSlot(i));
+                div.appendChild(removeBtn);
+
+                // Per-slot replace button so you can target a specific slot.
+                const replaceBtn = document.createElement('button');
+                replaceBtn.type = 'button';
+                replaceBtn.className = 'slot-replace no-print';
+                replaceBtn.textContent = 'Replace';
+                replaceBtn.addEventListener('click', () => startReplaceSlot(i));
+                div.appendChild(replaceBtn);
+
                 gridContainer.appendChild(div);
+                slotEls.push(div);
             }
         }
 
         ensureSlots();
 
-        fileUpload.addEventListener('change', function () {
-            const files = Array.from(this.files).slice(0, SLOTS);
-            const items = gridContainer.querySelectorAll('.grid-item');
-            files.forEach((file, i) => {
+        function startReplaceSlot(index) {
+            slotIndexPendingReplace = index;
+            slotReplaceInput.value = ''; // Allow re-selecting the same file.
+            slotReplaceInput.click();
+        }
+
+        function setSlot(index, dataUrl) {
+            slots[index] = dataUrl;
+            const el = slotEls[index];
+            el.classList.remove('empty');
+            el.style.backgroundImage = `url(${dataUrl})`;
+            el.style.backgroundSize = 'cover';
+            el.style.backgroundPosition = 'center';
+        }
+
+        function removeSlot(index) {
+            // Invalidate any in-flight FileReader updates for this slot.
+            slotRequestId[index] += 1;
+            loadingSlots.delete(index);
+            slots[index] = null;
+            const el = slotEls[index];
+            el.classList.add('empty');
+            el.style.backgroundImage = '';
+        }
+
+        function replaceSlotFromFile(index, file) {
+            const requestId = (slotRequestId[index] += 1);
+            loadingSlots.add(index);
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                if (slotRequestId[index] !== requestId) return;
+                loadingSlots.delete(index);
+                setSlot(index, e.target.result);
+            };
+            reader.onerror = function () {
+                if (slotRequestId[index] !== requestId) return;
+                loadingSlots.delete(index);
+                // Leave the slot as-is on error.
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearFileInput(inputEl) {
+            // Allow re-uploading the same file(s) after removing them.
+            inputEl.value = '';
+        }
+
+        function handleFiles(filesLike) {
+            const files = Array.from(filesLike || []);
+            const assigned = [];
+
+            function findNextEmptySlotConsideringLoading() {
+                for (let i = 0; i < SLOTS; i++) {
+                    if (!slots[i] && !loadingSlots.has(i)) return i;
+                }
+                return -1;
+            }
+
+            for (const file of files) {
+                const slotIndex = findNextEmptySlotConsideringLoading();
+                if (slotIndex === -1) break; // No space left.
+
+                // Invalidate any prior in-flight read for this slot, and mark it as loading.
+                const requestId = (slotRequestId[slotIndex] += 1);
+                loadingSlots.add(slotIndex);
+                assigned.push({ slotIndex, file, requestId });
+            }
+
+            for (const { slotIndex, file, requestId } of assigned) {
                 const reader = new FileReader();
                 reader.onload = function (e) {
-                    const item = items[i];
-                    item.classList.remove('empty');
-                    item.style.backgroundImage = `url(${e.target.result})`;
-                    item.style.backgroundSize = 'cover';
-                    item.style.backgroundPosition = 'center';
+                    // Only set if this is still the latest request for the slot.
+                    if (slotRequestId[slotIndex] !== requestId) return;
+                    loadingSlots.delete(slotIndex);
+                    setSlot(slotIndex, e.target.result);
+                };
+                reader.onerror = function () {
+                    if (slotRequestId[slotIndex] !== requestId) return;
+                    loadingSlots.delete(slotIndex);
+                    // Leave slot empty on error.
                 };
                 reader.readAsDataURL(file);
-            });
-            for (let i = files.length; i < SLOTS; i++) {
-                const item = items[i];
-                item.classList.add('empty');
-                item.style.backgroundImage = '';
             }
+        }
+
+        singleUpload.addEventListener('change', function () {
+            handleFiles(this.files);
+            clearFileInput(this);
+        });
+
+        fileUpload.addEventListener('change', function () {
+            lastMultiSelectedFiles = Array.from(this.files || []);
+            handleFiles(this.files);
+            clearFileInput(this);
+        });
+
+        repatUploadBtn.addEventListener('click', function () {
+            if (!lastMultiSelectedFiles || lastMultiSelectedFiles.length === 0) {
+                alert('Select images in "Add multiple" first.');
+                return;
+            }
+
+            // Fill only remaining empty slots (skip already-filled + in-flight loading slots).
+            const emptySlotCount = slots.reduce((acc, v, i) => {
+                if (!v && !loadingSlots.has(i)) return acc + 1;
+                return acc;
+            }, 0);
+
+            if (emptySlotCount <= 0) {
+                alert('No empty slots left to fill.');
+                return;
+            }
+
+            const repeatBatch = [];
+            for (let n = 0; n < emptySlotCount; n++) {
+                repeatBatch.push(lastMultiSelectedFiles[n % lastMultiSelectedFiles.length]);
+            }
+
+            handleFiles(repeatBatch);
+        });
+
+        slotReplaceInput.addEventListener('change', function () {
+            if (slotIndexPendingReplace === null) return;
+            const file = (this.files && this.files[0]) ? this.files[0] : null;
+            if (!file) {
+                slotIndexPendingReplace = null;
+                return;
+            }
+
+            const index = slotIndexPendingReplace;
+            slotIndexPendingReplace = null;
+            replaceSlotFromFile(index, file);
+            clearFileInput(this);
         });
 
         printBtn.addEventListener('click', function () {
+            // Hide empty slots during print so removed cards aren't printed.
+            document.body.classList.add('print-mode');
             window.print();
         });
 
+        // Restore the UI after printing finishes.
+        window.onafterprint = function () {
+            document.body.classList.remove('print-mode');
+        };
+
         downloadPdfBtn.addEventListener('click', function () {
-            const items = gridContainer.querySelectorAll('.grid-item');
-            const hasAny = Array.from(items).some(el => el.style.backgroundImage && el.style.backgroundImage !== 'none');
+            const filledIndices = slots.map((v, i) => (v ? i : null)).filter(v => v !== null);
+            const hasAny = filledIndices.length > 0;
             if (!hasAny) {
                 alert('Upload at least one card image first.');
                 return;
@@ -200,11 +422,14 @@
                 var wrap = document.createElement('div');
                 wrap.style.cssText = 'position:absolute;left:-9999px;width:' + w + 'px;height:' + h + 'px;overflow:hidden;';
                 var clone = el.cloneNode(true);
+                // Remove UI-only controls so they don't get captured into the PDF.
+                clone.querySelectorAll('.slot-remove, .slot-replace').forEach(btn => btn.remove());
                 clone.style.width = w + 'px';
                 clone.style.height = h + 'px';
                 clone.style.backgroundSize = 'cover';
                 clone.style.backgroundPosition = 'center';
                 clone.style.borderRadius = '0';
+                clone.style.border = 'none';
                 wrap.appendChild(clone);
                 document.body.appendChild(wrap);
                 return html2canvas(clone, {
@@ -221,7 +446,8 @@
                 });
             }
 
-            const promises = Array.from(items).map(captureCard);
+            // Only capture filled slots; removed/empty ones are skipped.
+            const promises = filledIndices.map(i => captureCard(slotEls[i]));
             Promise.all(promises).then(function (images) {
                 const { jsPDF } = window.jspdf;
                 const pdf = new jsPDF({
