@@ -64,6 +64,16 @@
             opacity: 0.45;
             cursor: not-allowed;
         }
+        .btn-bleed {
+            background: #b8860b;
+            color: #fff;
+            border: 2px solid rgba(255,255,255,0.35);
+        }
+        .btn-bleed[aria-pressed="false"] {
+            background: #555;
+            border-color: rgba(255,255,255,0.2);
+        }
+        .btn-bleed:hover { opacity: 0.92; }
         .grid-container {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -75,7 +85,6 @@
             width: 100%;
             align-self: center;
         }
-        /* Trim 2.5×3.5" from Card Maker exports (2.75×3.75" incl. 0.125" bleed each side) */
         .grid-item {
             aspect-ratio: 2.5 / 3.5;
             border: 1px solid #ccc;
@@ -85,8 +94,14 @@
             justify-content: center;
             align-items: center;
             background: #eee;
-            background-size: 110% auto;
             background-position: center;
+        }
+        /* 2.75×3.75" Card Maker PNG: crop to 2.5×3.5" trim */
+        .grid-container.trim-bleed .grid-item {
+            background-size: 110% auto;
+        }
+        .grid-container.no-bleed .grid-item {
+            background-size: cover;
         }
         .grid-item.empty::before {
             content: 'Card ' attr(data-index);
@@ -136,11 +151,16 @@
                 margin: 0;
                 border: none;
                 border-radius: 0;
-                background-size: 110% auto;
                 background-position: center;
                 overflow: hidden;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
+            }
+            .grid-container.trim-bleed .grid-item {
+                background-size: 110% auto;
+            }
+            .grid-container.no-bleed .grid-item {
+                background-size: cover;
             }
         }
     </style>
@@ -150,6 +170,7 @@
     <div class="controls no-print">
         <label for="fileUpload">Choose images (up to 9)</label>
         <input type="file" id="fileUpload" accept="image/*" multiple>
+        <button type="button" class="btn-bleed" id="bleedToggleBtn" aria-pressed="true" title="Turn on if images are Card Maker exports with black bleed (2.75×3.75). Turn off for trim-only PNGs.">Bleed: yes</button>
         <button type="button" class="btn-print" id="printBtn">Print / Save as PDF</button>
         <button type="button" class="btn-pdf" id="downloadPdfBtn">Download PDF</button>
         <button type="button" class="btn-repeat" id="repeatBtn" disabled title="Fill all 9 slots by cycling your uploaded images">Repeat</button>
@@ -165,10 +186,27 @@
         const printBtn = document.getElementById('printBtn');
         const downloadPdfBtn = document.getElementById('downloadPdfBtn');
         const repeatBtn = document.getElementById('repeatBtn');
+        const bleedToggleBtn = document.getElementById('bleedToggleBtn');
         const SLOTS = 9;
+
+        /** Match Card Maker export: trim/bleed crop vs full fit for trim-only images */
+        let cardHasBleed = true;
 
         /** @type {string[]} data URLs from the last file selection (order preserved) */
         let uploadedUrls = [];
+
+        function syncBleedMode() {
+            gridContainer.classList.remove('trim-bleed', 'no-bleed');
+            gridContainer.classList.add(cardHasBleed ? 'trim-bleed' : 'no-bleed');
+            if (bleedToggleBtn) {
+                bleedToggleBtn.setAttribute('aria-pressed', cardHasBleed ? 'true' : 'false');
+                bleedToggleBtn.textContent = cardHasBleed ? 'Bleed: yes' : 'Bleed: no';
+            }
+        }
+
+        function getCardBackgroundSizeForCapture() {
+            return cardHasBleed ? '110% auto' : 'cover';
+        }
 
         function readFileAsDataURL(file) {
             return new Promise(function (resolve, reject) {
@@ -187,13 +225,9 @@
                     const url = urls[i % urls.length];
                     item.classList.remove('empty');
                     item.style.backgroundImage = `url(${url})`;
-                    item.style.backgroundSize = '110% auto';
-                    item.style.backgroundPosition = 'center';
                 } else if (i < urls.length) {
                     item.classList.remove('empty');
                     item.style.backgroundImage = `url(${urls[i]})`;
-                    item.style.backgroundSize = '110% auto';
-                    item.style.backgroundPosition = 'center';
                 } else {
                     item.classList.add('empty');
                     item.style.backgroundImage = '';
@@ -213,6 +247,12 @@
         }
 
         ensureSlots();
+        syncBleedMode();
+
+        bleedToggleBtn.addEventListener('click', function () {
+            cardHasBleed = !cardHasBleed;
+            syncBleedMode();
+        });
 
         fileUpload.addEventListener('change', function () {
             const files = Array.from(this.files).slice(0, SLOTS);
@@ -271,7 +311,7 @@
                 var clone = el.cloneNode(true);
                 clone.style.width = w + 'px';
                 clone.style.height = h + 'px';
-                clone.style.backgroundSize = '110% auto';
+                clone.style.backgroundSize = getCardBackgroundSizeForCapture();
                 clone.style.backgroundPosition = 'center';
                 clone.style.overflow = 'hidden';
                 clone.style.borderRadius = '0';
