@@ -12,6 +12,10 @@
             margin: 0 auto;
             padding: 1rem;
             background: #f0f0f0;
+            min-height: 100vh;
+            display: grid;
+            grid-template-rows: auto auto 1fr;
+            justify-items: center;
         }
         h1 { margin-top: 0; }
         .controls {
@@ -68,6 +72,8 @@
             padding: 12px;
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            width: 100%;
+            align-self: center;
         }
         /* Trim 2.5×3.5" from Card Maker exports (2.75×3.75" incl. 0.125" bleed each side) */
         .grid-item {
@@ -99,17 +105,28 @@
                 padding: 0;
                 background: #fff;
                 max-width: none;
+                min-height: 11in;
+                height: 100%;
             }
-            body { padding: 0 !important; }
+            body {
+                padding: 0 !important;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                min-height: 11in;
+            }
             .no-print { display: none !important; }
             .grid-container {
                 gap: 0;
                 padding: 0;
-                margin: 0 auto;
+                margin: 0;
                 box-shadow: none;
                 border-radius: 0;
                 width: 7.5in;
                 height: 10.5in;
+                flex-shrink: 0;
+                align-self: center;
                 grid-template-columns: repeat(3, 2.5in);
                 grid-template-rows: repeat(3, 3.5in);
             }
