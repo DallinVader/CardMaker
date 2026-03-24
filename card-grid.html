@@ -51,6 +51,15 @@
             font-size: 1.1rem;
         }
         .btn-back:hover { opacity: 0.9; }
+        .btn-repeat {
+            background: #5b4;
+            color: #fff;
+        }
+        .btn-repeat:hover { opacity: 0.9; }
+        .btn-repeat:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
         .grid-container {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -60,6 +69,7 @@
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
+        /* Trim 2.5×3.5" from Card Maker exports (2.75×3.75" incl. 0.125" bleed each side) */
         .grid-item {
             aspect-ratio: 2.5 / 3.5;
             border: 1px solid #ccc;
@@ -69,7 +79,7 @@
             justify-content: center;
             align-items: center;
             background: #eee;
-            background-size: cover;
+            background-size: 110% auto;
             background-position: center;
         }
         .grid-item.empty::before {
@@ -98,19 +108,20 @@
                 margin: 0 auto;
                 box-shadow: none;
                 border-radius: 0;
-                /* 3 × 2.5" and 3 × 3.5" layout, but allow slight bleed to avoid white gaps */
                 width: 7.5in;
                 height: 10.5in;
                 grid-template-columns: repeat(3, 2.5in);
                 grid-template-rows: repeat(3, 3.5in);
             }
             .grid-item {
-                /* Slightly oversize with negative margins to remove visible gaps between cards */
-                width: 2.52in;
-                height: 3.52in;
-                margin: -0.01in;
+                width: 2.5in;
+                height: 3.5in;
+                margin: 0;
                 border: none;
                 border-radius: 0;
+                background-size: 110% auto;
+                background-position: center;
+                overflow: hidden;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
@@ -124,6 +135,7 @@
         <input type="file" id="fileUpload" accept="image/*" multiple>
         <button type="button" class="btn-print" id="printBtn">Print / Save as PDF</button>
         <button type="button" class="btn-pdf" id="downloadPdfBtn">Download PDF</button>
+        <button type="button" class="btn-repeat" id="repeatBtn" disabled title="Fill all 9 slots by cycling your uploaded images">Repeat</button>
         <button type="button" class="btn-back" onclick="window.location.href='index.html'">Back to Card Maker</button>
     </div>
     <div class="grid-container" id="gridContainer"></div>
@@ -135,7 +147,42 @@
         const gridContainer = document.getElementById('gridContainer');
         const printBtn = document.getElementById('printBtn');
         const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+        const repeatBtn = document.getElementById('repeatBtn');
         const SLOTS = 9;
+
+        /** @type {string[]} data URLs from the last file selection (order preserved) */
+        let uploadedUrls = [];
+
+        function readFileAsDataURL(file) {
+            return new Promise(function (resolve, reject) {
+                const reader = new FileReader();
+                reader.onload = function () { resolve(reader.result); };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function setGridFromUrls(urls, repeat) {
+            const items = gridContainer.querySelectorAll('.grid-item');
+            for (let i = 0; i < SLOTS; i++) {
+                const item = items[i];
+                if (repeat) {
+                    const url = urls[i % urls.length];
+                    item.classList.remove('empty');
+                    item.style.backgroundImage = `url(${url})`;
+                    item.style.backgroundSize = '110% auto';
+                    item.style.backgroundPosition = 'center';
+                } else if (i < urls.length) {
+                    item.classList.remove('empty');
+                    item.style.backgroundImage = `url(${urls[i]})`;
+                    item.style.backgroundSize = '110% auto';
+                    item.style.backgroundPosition = 'center';
+                } else {
+                    item.classList.add('empty');
+                    item.style.backgroundImage = '';
+                }
+            }
+        }
 
         function ensureSlots() {
             const current = gridContainer.querySelectorAll('.grid-item').length;
@@ -152,23 +199,28 @@
 
         fileUpload.addEventListener('change', function () {
             const files = Array.from(this.files).slice(0, SLOTS);
-            const items = gridContainer.querySelectorAll('.grid-item');
-            files.forEach((file, i) => {
-                const reader = new FileReader();
-                reader.onload = function (e) {
-                    const item = items[i];
-                    item.classList.remove('empty');
-                    item.style.backgroundImage = `url(${e.target.result})`;
-                    item.style.backgroundSize = 'cover';
-                    item.style.backgroundPosition = 'center';
-                };
-                reader.readAsDataURL(file);
-            });
-            for (let i = files.length; i < SLOTS; i++) {
-                const item = items[i];
-                item.classList.add('empty');
-                item.style.backgroundImage = '';
+            if (files.length === 0) {
+                uploadedUrls = [];
+                repeatBtn.disabled = true;
+                return;
             }
+            Promise.all(files.map(readFileAsDataURL)).then(function (urls) {
+                uploadedUrls = urls;
+                repeatBtn.disabled = false;
+                setGridFromUrls(uploadedUrls, false);
+            }).catch(function () {
+                uploadedUrls = [];
+                repeatBtn.disabled = true;
+                alert('Could not read one or more files.');
+            });
+        });
+
+        repeatBtn.addEventListener('click', function () {
+            if (uploadedUrls.length === 0) {
+                alert('Upload at least one image first.');
+                return;
+            }
+            setGridFromUrls(uploadedUrls, true);
         });
 
         printBtn.addEventListener('click', function () {
@@ -202,8 +254,9 @@
                 var clone = el.cloneNode(true);
                 clone.style.width = w + 'px';
                 clone.style.height = h + 'px';
-                clone.style.backgroundSize = 'cover';
+                clone.style.backgroundSize = '110% auto';
                 clone.style.backgroundPosition = 'center';
+                clone.style.overflow = 'hidden';
                 clone.style.borderRadius = '0';
                 wrap.appendChild(clone);
                 document.body.appendChild(wrap);

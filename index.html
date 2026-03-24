@@ -64,13 +64,20 @@
                             </select>
                         </div>
                         <div class="input-group">
+                            <label>
+                                <input type="checkbox" id="exportIncludeBleed" checked onchange="updateExportBleedHint()">
+                                Include bleed in export
+                            </label>
+                            <small id="exportBleedHint">Downloaded image includes a black margin around the card for print bleed.</small>
+                        </div>
+                        <div class="input-group">
                             <label>Export Size:</label>
                             <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                                 <span><span id="exportWidthValue">800</span> × <span id="exportHeightValue">1120</span> px</span>
                                 <input type="number" id="exportWidthInput" min="100" max="2500" value="800" oninput="syncExportWidthFromInput()" style="width: 90px;">
                             </div>
                             <input type="range" id="exportWidth" min="100" max="2500" value="800" oninput="updateExportSizeDisplayFromSlider()">
-                            <small>This control only affects the downloaded image size, not the preview. Height is adjusted automatically.</small>
+                            <small id="exportSizeHelp">This control only affects the downloaded image size, not the preview. Height is adjusted automatically.</small>
                         </div>
                         <div class="input-group" id="qualityGroup">
                             <label>JPEG Quality: <span id="jpegQualityValue">0.8</span></label>
@@ -907,6 +914,20 @@
             qualityGroup.style.display = formatSelect.value === 'jpeg' ? 'block' : 'none';
         }
 
+        function updateExportBleedHint() {
+            const includeBleed = document.getElementById('exportIncludeBleed');
+            const hint = document.getElementById('exportBleedHint');
+            const help = document.getElementById('exportSizeHelp');
+            if (!includeBleed || !hint || !help) return;
+            if (includeBleed.checked) {
+                hint.textContent = 'Downloaded image includes a black margin around the card for print bleed. Width × height is the full file size; the card art is inset.';
+                help.textContent = 'This control only affects the downloaded image size, not the preview. With bleed on, the size is the full image including the margin.';
+            } else {
+                hint.textContent = 'Download is trim only: no black border. Width × height is exactly the card artwork.';
+                help.textContent = 'This control only affects the downloaded image size, not the preview. Height is adjusted automatically.';
+            }
+        }
+
         // Shared export size update helper
         function updateExportSize(width) {
             const exportWidthValue = document.getElementById('exportWidthValue');
@@ -956,8 +977,9 @@
         toggleQualitySlider();
         document.getElementById('downloadFormat').addEventListener('change', toggleQualitySlider);
         updateExportSizeDisplayFromSlider();
+        updateExportBleedHint();
         
-        // Download the final card at the selected format (with black bleed area, included in selected size)
+        // Download the final card at the selected format (optional black bleed within selected size)
         function downloadCard() {
             const formatSelect = document.getElementById('downloadFormat');
             const format = formatSelect.value;
@@ -967,31 +989,34 @@
             const quality = format === 'jpeg' ? parseFloat(document.getElementById('jpegQuality').value) : undefined;
             const fileExtension = format === 'jpeg' ? 'jpg' : 'png';
 
-            // Slider value represents the TOTAL size (trim + bleed).
-            // We compute the inner trim size from it so the black bleed is included within the selected size.
             const widthSlider = document.getElementById('exportWidth');
             const totalWidth = widthSlider ? parseInt(widthSlider.value, 10) || 800 : 800;
             const aspectRatio = 3500 / 2500; // Match original canvas 2500 x 3500 ratio
             const totalHeight = Math.round(totalWidth * aspectRatio);
 
-            // Compute inner trim size: total size already includes bleed,
-            // so trim is slightly smaller by the BLEED_SCALE factor.
-            const trimWidth = Math.round(totalWidth / BLEED_SCALE);
-            const trimHeight = Math.round(totalHeight / BLEED_SCALE);
+            const includeBleedEl = document.getElementById('exportIncludeBleed');
+            const includeBleed = includeBleedEl ? includeBleedEl.checked : true;
 
             const exportCanvas = document.createElement('canvas');
-            exportCanvas.width = totalWidth;
-            exportCanvas.height = totalHeight;
             const exportCtx = exportCanvas.getContext('2d');
 
-            // Fill bleed area with black (this is the full selected size)
-            exportCtx.fillStyle = 'black';
-            exportCtx.fillRect(0, 0, totalWidth, totalHeight);
-
-            // Draw the designed card centered at TRIM size inside the black bleed
-            const offsetX = Math.round((totalWidth - trimWidth) / 2);
-            const offsetY = Math.round((totalHeight - trimHeight) / 2);
-            exportCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, offsetX, offsetY, trimWidth, trimHeight);
+            if (includeBleed) {
+                // Slider value is TOTAL size (trim + bleed). Inner trim is smaller by BLEED_SCALE.
+                const trimWidth = Math.round(totalWidth / BLEED_SCALE);
+                const trimHeight = Math.round(totalHeight / BLEED_SCALE);
+                exportCanvas.width = totalWidth;
+                exportCanvas.height = totalHeight;
+                exportCtx.fillStyle = 'black';
+                exportCtx.fillRect(0, 0, totalWidth, totalHeight);
+                const offsetX = Math.round((totalWidth - trimWidth) / 2);
+                const offsetY = Math.round((totalHeight - trimHeight) / 2);
+                exportCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, offsetX, offsetY, trimWidth, trimHeight);
+            } else {
+                // Trim only: selected width × height is the full output (no black margin).
+                exportCanvas.width = totalWidth;
+                exportCanvas.height = totalHeight;
+                exportCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, totalWidth, totalHeight);
+            }
 
             // Create download link
             const link = document.createElement('a');
