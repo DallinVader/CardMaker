@@ -950,16 +950,37 @@
             });
         }
 
+        const DRIVE_FILES_API = 'https://www.googleapis.com/drive/v3/files';
+        const DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3/files';
+
+        function driveAuthHeaders(extra) {
+            const h = { Authorization: 'Bearer ' + driveAccessToken };
+            if (extra) {
+                Object.keys(extra).forEach(function (k) { h[k] = extra[k]; });
+            }
+            return h;
+        }
+
+        async function driveListFiles(q, pageSize) {
+            const u = new URL(DRIVE_FILES_API);
+            u.searchParams.set('spaces', 'appDataFolder');
+            u.searchParams.set('fields', 'files(id,name,modifiedTime)');
+            u.searchParams.set('pageSize', String(pageSize || 100));
+            u.searchParams.set('orderBy', 'modifiedTime desc');
+            if (q) u.searchParams.set('q', q);
+            const res = await fetch(u.toString(), { headers: driveAuthHeaders() });
+            const text = await res.text();
+            if (!res.ok) {
+                throw new Error(text || ('Drive list failed: ' + res.status));
+            }
+            const data = JSON.parse(text);
+            return data.files || [];
+        }
+
         async function findDriveProjectByName(fileName) {
             const escaped = fileName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-            const query = "name = '" + escaped + "' and trashed = false and '" + "appDataFolder" + "' in parents";
-            const response = await gapi.client.drive.files.list({
-                spaces: 'appDataFolder',
-                q: query,
-                fields: 'files(id, name, modifiedTime)',
-                pageSize: 1
-            });
-            const files = response.result.files || [];
+            const query = "name = '" + escaped + "' and trashed = false and 'appDataFolder' in parents";
+            const files = await driveListFiles(query, 1);
             return files.length > 0 ? files[0] : null;
         }
 
@@ -971,27 +992,33 @@
             if (!existingFileId) {
                 metadata.parents = ['appDataFolder'];
             }
-            const boundary = 'cardmaker_boundary_' + Date.now();
-            const delimiter = '\r\n--' + boundary + '\r\n';
-            const closeDelimiter = '\r\n--' + boundary + '--';
-            const body =
-                delimiter + 'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-                JSON.stringify(metadata) +
-                delimiter + 'Content-Type: application/json\r\n\r\n' +
-                jsonContent +
-                closeDelimiter;
+            const boundary = 'cardmaker_' + Date.now();
+            const crlf = '\r\n';
+            const multipartBody =
+                '--' + boundary + crlf +
+                'Content-Type: application/json; charset=UTF-8' + crlf + crlf +
+                JSON.stringify(metadata) + crlf +
+                '--' + boundary + crlf +
+                'Content-Type: application/json' + crlf + crlf +
+                jsonContent + crlf +
+                '--' + boundary + '--';
 
-            const path = existingFileId
-                ? '/upload/drive/v3/files/' + existingFileId
-                : '/upload/drive/v3/files';
+            const url = existingFileId
+                ? DRIVE_UPLOAD_API + '/' + encodeURIComponent(existingFileId) + '?uploadType=multipart'
+                : DRIVE_UPLOAD_API + '?uploadType=multipart';
+            const method = existingFileId ? 'PATCH' : 'POST';
 
-            await gapi.client.request({
-                path: path,
-                method: existingFileId ? 'PATCH' : 'POST',
-                params: { uploadType: 'multipart' },
-                headers: { 'Content-Type': 'multipart/related; boundary=' + boundary },
-                body: body
+            const res = await fetch(url, {
+                method: method,
+                headers: driveAuthHeaders({
+                    'Content-Type': 'multipart/related; boundary=' + boundary
+                }),
+                body: multipartBody
             });
+            const text = await res.text();
+            if (!res.ok) {
+                throw new Error(text || ('Drive upload failed: ' + res.status));
+            }
         }
 
         async function saveProjectToDrive() {
@@ -1011,20 +1038,14 @@
                 setDriveStatus('Saved "' + fileName + '" to Google Drive.');
             } catch (error) {
                 console.error(error);
-                setDriveStatus('Save failed. Check API setup and authorized origins.');
-                alert('Could not save to Google Drive.');
+                const msg = error && error.message ? error.message : String(error);
+                setDriveStatus('Save failed: ' + msg.slice(0, 200));
+                alert('Could not save to Google Drive.\n\n' + msg);
             }
         }
 
         async function listDriveProjects() {
-            const response = await gapi.client.drive.files.list({
-                spaces: 'appDataFolder',
-                q: "trashed = false and name contains '" + PROJECT_FILE_EXTENSION + "'",
-                fields: 'files(id, name, modifiedTime)',
-                pageSize: 100,
-                orderBy: 'modifiedTime desc'
-            });
-            return response.result.files || [];
+            return driveListFiles("trashed = false and name contains 'cardmaker'", 100);
         }
 
         async function loadProjectFromDrive() {
@@ -1052,20 +1073,20 @@
 
                 const file = files[idx];
                 setDriveStatus('Loading "' + file.name + '"...');
-                const response = await gapi.client.drive.files.get({
-                    fileId: file.id,
-                    alt: 'media'
-                });
-                const content = typeof response.body === 'string'
-                    ? response.body
-                    : JSON.stringify(response.result || {});
+                const mediaUrl = DRIVE_FILES_API + '/' + encodeURIComponent(file.id) + '?alt=media';
+                const mediaRes = await fetch(mediaUrl, { headers: driveAuthHeaders() });
+                const content = await mediaRes.text();
+                if (!mediaRes.ok) {
+                    throw new Error(content || ('Download failed: ' + mediaRes.status));
+                }
                 const state = JSON.parse(content);
                 applyProjectState(state);
                 setDriveStatus('Loaded "' + file.name + '".');
             } catch (error) {
                 console.error(error);
-                setDriveStatus('Load failed. Check API setup and authorized origins.');
-                alert('Could not load from Google Drive.');
+                const msg = error && error.message ? error.message : String(error);
+                setDriveStatus('Load failed: ' + msg.slice(0, 200));
+                alert('Could not load from Google Drive.\n\n' + msg);
             }
         }
 
