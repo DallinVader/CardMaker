@@ -1,0 +1,1706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saved Projects Manager – Card Maker</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { background: #0b1220; color: #e2e8f0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
+        .spm-wrap { max-width: 1200px; margin: 0 auto; padding: 22px 18px 40px; }
+        .spm-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+        .spm-title { font-family: Medieval, serif; font-size: 1.8rem; margin: 0; letter-spacing: .02em; color: #000; }
+        .spm-sub { margin: 10px 0 0; color: #94a3b8; font-size: 13px; line-height: 1.55; max-width: 62ch; }
+
+        .spm-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: flex-end; }
+        .spm-btn { padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #e2e8f0; cursor: pointer; font-weight: 700; }
+        a.spm-btn {
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+        .spm-btn:disabled { opacity: .5; cursor: not-allowed; }
+        .spm-nav-print {
+            background: linear-gradient(135deg, rgba(22,163,74,0.35), rgba(21,128,61,0.4));
+            border-color: rgba(34,197,94,0.4);
+            color: #bbf7d0;
+        }
+        .spm-nav-print:hover { filter: brightness(1.08); }
+        .spm-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-color: rgba(255,255,255,0.18); }
+        .spm-ghost { background: rgba(255,255,255,0.06); }
+
+        .spm-row { display: grid; grid-template-columns: 400px 1fr; gap: 22px; align-items: start; }
+        @media (max-width: 980px) { .spm-row { grid-template-columns: 1fr; } }
+
+        .spm-panel {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 16px;
+            padding: 20px 20px 22px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+            color: #e2e8f0;
+        }
+        .spm-panel h3 { margin: 0 0 12px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #93c5fd; }
+        .spm-panel .spm-list-heading { margin: 28px 0 12px; }
+
+        .spm-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 8px; }
+        .spm-stat {
+            background: rgba(15,23,42,0.45);
+            border: 1px solid rgba(148,163,184,0.18);
+            border-radius: 14px;
+            padding: 14px 16px;
+            min-height: 72px;
+        }
+        .spm-stat .k { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; line-height: 1.35; margin-bottom: 8px; }
+        .spm-stat .v { font-size: 20px; font-weight: 800; margin-top: 2px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+
+        .spm-status-card {
+            margin-top: 4px;
+            margin-bottom: 4px;
+            background: rgba(15,23,42,0.45);
+            border: 1px solid rgba(148,163,184,0.18);
+            border-radius: 14px;
+            padding: 14px 16px;
+        }
+        .spm-status-card .k { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+        .spm-status-card .v { font-size: 15px; font-weight: 800; color: #93c5fd; line-height: 1.35; }
+
+        .spm-list-box {
+            max-height: 260px; overflow: auto; border-radius: 12px;
+            border: 1px solid rgba(148,163,184,0.16);
+            background: rgba(15,23,42,0.35);
+            padding: 12px 14px;
+            color:#e2e8f0;
+        }
+        .spm-list-item {
+            display: flex; align-items: center; justify-content: space-between; gap: 14px;
+            padding: 10px 4px; min-height: 38px;
+            border-bottom: 1px dashed rgba(148,163,184,0.14);
+        }
+        .spm-list-item:last-child { border-bottom: none; }
+        .spm-list-item .name { color: #e2e8f0; font-weight: 700; font-size: 13px; line-height: 1.35; }
+        .spm-list-item .count { color: #93c5fd; font-weight: 900; font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; }
+
+        .spm-table-tools { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; }
+        .spm-select { padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #e2e8f0; font-weight: 800; }
+        .spm-input { padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #e2e8f0; min-width: 240px; font-weight: 700; }
+
+        .spm-table-scroll {
+            margin-top: 4px;
+            border-radius: 16px;
+            border: 1px solid rgba(148,163,184,0.16);
+        }
+        table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 16px; background: rgba(15,23,42,0.18); }
+        thead th {
+            position: sticky; top: 0;
+            background: rgba(15,23,42,0.92);
+            backdrop-filter: blur(8px);
+            color: #93c5fd;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            padding: 12px 12px;
+            border-bottom: 1px solid rgba(148,163,184,0.18);
+            text-align: left;
+            z-index: 1;
+        }
+        th.spm-th-check { text-align: center; vertical-align: middle; width: 48px !important; }
+        tbody td {
+            padding: 9px 11px;
+            border-bottom: 1px solid rgba(148,163,184,0.12);
+            vertical-align: middle;
+            font-size: 13px;
+            color: #e2e8f0;
+        }
+        td.spm-actions {
+            white-space: nowrap;
+            width: 1%;
+        }
+        tbody tr { background: transparent; transition: background 0.12s ease, box-shadow 0.12s ease; }
+        tbody tr:hover { background: rgba(102,126,234,0.1); }
+        tbody tr.spm-row-selected {
+            background: rgba(99,102,241,0.11);
+            box-shadow: inset 3px 0 0 #818cf8;
+        }
+        tbody tr.spm-row-selected:hover { background: rgba(99,102,241,0.16); }
+        .spm-name { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 900; }
+        .spm-muted { color: #cbd5e1; }
+
+        .spm-rarity {
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .spm-rarity select {
+            padding: 8px 10px; border-radius: 10px;
+            border: 1px solid rgba(148,163,184,0.25);
+            background: rgba(255,255,255,0.06);
+            color: #e2e8f0;
+            font-weight: 800;
+        }
+
+        .spm-th-sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+        .spm-th-sortable:hover { filter: brightness(1.08); }
+        .spm-th-arrow {
+            margin-left: 8px;
+            color: #cbd5e1;
+            font-weight: 900;
+            font-size: 12px;
+        }
+
+        /* Ensure select dropdown options are readable. Native option styling varies by browser,
+           but these rules prevent the common white-text-on-light-background issue. */
+        .spm-select option,
+        select[data-rarity-set] option {
+            background: #0b1220 !important;
+            color: #e2e8f0 !important;
+        }
+
+        .spm-select,
+        select[data-rarity-set] {
+            background: rgba(255,255,255,0.06) !important;
+            color: #e2e8f0 !important;
+        }
+
+        .spm-message { margin-top: 18px; font-size: 13px; color: #94a3b8; line-height: 1.5; }
+        .spm-message.is-error { color: #fca5a5; font-weight: 800; }
+        .spm-progress { color: #93c5fd; font-weight: 900; }
+
+        .spm-small-btn {
+            padding: 8px 10px; border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.16);
+            background: rgba(255,255,255,0.06);
+            color: #e2e8f0;
+            cursor: pointer;
+            font-weight: 800;
+        }
+        .spm-small-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+        .spm-filter-row { display: flex; flex-wrap: wrap; gap: 16px 18px; align-items: flex-end; margin-bottom: 18px; }
+        .spm-filter-row label { font-weight: 800; color: #e2e8f0; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; display: flex; flex-direction: column; gap: 8px; }
+        .spm-filter-row .spm-select { min-width: 152px; }
+
+        .spm-bulk-bar {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 14px 20px;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 16px 18px 18px;
+            border-radius: 16px;
+            border: 1px solid rgba(129,140,248,0.28);
+            background: linear-gradient(145deg, rgba(30,27,75,0.55) 0%, rgba(15,23,42,0.72) 100%);
+            box-shadow: 0 4px 24px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.06);
+        }
+        @media (max-width: 720px) {
+            .spm-bulk-bar { grid-template-columns: 1fr; }
+        }
+        .spm-bulk-head {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px;
+        }
+        .spm-bulk-title {
+            font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+            color: #a5b4fc;
+        }
+        .spm-bulk-badge {
+            display: inline-flex; align-items: baseline; gap: 8px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(15,23,42,0.65);
+            border: 1px solid rgba(165,180,252,0.35);
+            font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums;
+            color: #e0e7ff;
+        }
+        .spm-bulk-badge .spm-bulk-badge-sub {
+            font-size: 11px; font-weight: 700; letter-spacing: .04em;
+            text-transform: uppercase; color: #94a3b8;
+        }
+        .spm-bulk-actions {
+            display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 14px;
+        }
+        .spm-bulk-field {
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .spm-bulk-field > span {
+            font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #cbd5e1;
+        }
+        .spm-bulk-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+        .spm-bulk-inline .spm-select { min-width: 148px; margin: 0; }
+        .spm-bulk-apply-btn {
+            padding: 10px 16px !important;
+            border-radius: 10px !important;
+            background: linear-gradient(135deg, rgba(99,102,241,0.85), rgba(79,70,229,0.9)) !important;
+            border: 1px solid rgba(165,180,252,0.45) !important;
+            color: #fff !important;
+            font-weight: 800 !important;
+        }
+        .spm-bulk-apply-btn:disabled {
+            opacity: .45 !important;
+            cursor: not-allowed !important;
+            filter: none;
+        }
+        .spm-bulk-clear-btn {
+            padding: 10px 14px !important;
+            border-radius: 10px !important;
+            border: 1px solid rgba(148,163,184,0.35) !important;
+            background: rgba(255,255,255,0.05) !important;
+        }
+        .spm-bulk-meta {
+            grid-column: 1 / -1;
+            margin: 0;
+            padding-top: 2px;
+            font-size: 12px;
+            color: #94a3b8;
+            line-height: 1.45;
+        }
+        .spm-link-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            padding: 8px 10px; border-radius: 10px;
+            border: 1px solid rgba(102,126,234,0.45);
+            background: rgba(102,126,234,0.18);
+            color: #c7d2fe; font-weight: 800; font-size: 12px;
+            text-decoration: none; cursor: pointer;
+        }
+        .spm-link-btn:hover { filter: brightness(1.12); }
+        .spm-danger {
+            border-color: rgba(248,113,113,0.5);
+            background: rgba(239,68,68,0.12);
+            color: #fecaca;
+        }
+        /* Open + Delete stay on one compact row so table rows stay short */
+        .spm-actions {
+            display: inline-flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+        .spm-actions .spm-link-btn,
+        .spm-actions .spm-small-btn {
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1.2;
+            flex: 0 0 auto;
+        }
+        .spm-actions .spm-btn-edit { padding: 6px 10px; font-size: 11px; }
+
+        .spm-check-cell { text-align: center; }
+        .spm-row-check {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 22px;
+            height: 22px;
+            margin: 0;
+            border-radius: 7px;
+            border: 2px solid rgba(148,163,184,0.45);
+            background: rgba(15,23,42,0.85);
+            cursor: pointer;
+            flex-shrink: 0;
+            position: relative;
+            transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+        }
+        .spm-row-check:hover {
+            border-color: rgba(165,180,252,0.75);
+            box-shadow: 0 0 0 3px rgba(129,140,248,0.2);
+        }
+        .spm-row-check:focus-visible {
+            outline: none;
+            border-color: #a5b4fc;
+            box-shadow: 0 0 0 3px rgba(129,140,248,0.35);
+        }
+        .spm-row-check:checked {
+            background: linear-gradient(155deg, #818cf8 0%, #6366f1 100%);
+            border-color: #c7d2fe;
+        }
+        .spm-row-check:checked::after {
+            content: '';
+            position: absolute;
+            left: 6px;
+            top: 3px;
+            width: 5px;
+            height: 10px;
+            border: solid #fff;
+            border-width: 0 2.5px 2.5px 0;
+            transform: rotate(45deg);
+        }
+        .spm-row-check:indeterminate {
+            background: rgba(99,102,241,0.35);
+            border-color: #a5b4fc;
+        }
+        .spm-row-check:indeterminate::after {
+            content: '';
+            position: absolute;
+            left: 4px;
+            right: 4px;
+            top: 50%;
+            height: 2px;
+            margin-top: -1px;
+            border-radius: 1px;
+            background: #e0e7ff;
+        }
+        th .spm-row-check { vertical-align: middle; }
+
+        @media print { .spm-modal { display: none !important; } }
+
+        .spm-modal {
+            position: fixed; inset: 0; z-index: 1200;
+            display: none; align-items: center; justify-content: center;
+            padding: 16px;
+        }
+        .spm-modal.is-open { display: flex; }
+        .spm-modal-backdrop {
+            position: absolute; inset: 0;
+            background: rgba(2,6,23,0.72);
+            cursor: pointer;
+        }
+        .spm-modal-panel {
+            position: relative;
+            width: 100%;
+            max-width: 440px;
+            max-height: calc(100vh - 32px);
+            overflow: auto;
+            border-radius: 18px;
+            border: 1px solid rgba(148,163,184,0.22);
+            background: #111827;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.45);
+            padding: 22px 22px 18px;
+            color: #e2e8f0;
+        }
+        .spm-modal-panel h2 {
+            margin: 0 0 8px;
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #f1f5f9;
+        }
+        .spm-modal-close {
+            position: absolute; top: 12px; right: 12px;
+            width: 36px; height: 36px;
+            border: none; border-radius: 10px;
+            background: rgba(255,255,255,0.08);
+            color: #cbd5e1;
+            font-size: 22px; line-height: 1;
+            cursor: pointer;
+        }
+        .spm-modal-close:hover { background: rgba(255,255,255,0.14); }
+        .spm-modal-hint {
+            margin: 0 0 18px;
+            font-size: 13px;
+            color: #94a3b8;
+            line-height: 1.45;
+        }
+        .spm-modal-field { margin-bottom: 16px; }
+        .spm-modal-field label {
+            display: block;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            color: #94a3b8;
+            margin-bottom: 8px;
+        }
+        .spm-modal-field .spm-input,
+        .spm-modal-field .spm-select {
+            width: 100%;
+            box-sizing: border-box;
+            margin: 0;
+        }
+        .spm-modal-field input[type="number"] {
+            max-width: 120px;
+        }
+        .spm-modal-suffix {
+            display: block;
+            margin-top: 6px;
+            font-size: 12px;
+            color: #64748b;
+        }
+        .spm-modal-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 22px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(148,163,184,0.16);
+        }
+        .spm-modal-error {
+            margin: 12px 0 0;
+            font-size: 13px;
+            color: #fca5a5;
+            font-weight: 700;
+        }
+        .spm-btn-edit {
+            border: 1px solid rgba(251,191,36,0.45) !important;
+            background: rgba(245,158,11,0.14) !important;
+            color: #fde68a !important;
+        }
+        .spm-bulk-print-btn {
+            border: 1px solid rgba(34,197,94,0.45) !important;
+            background: linear-gradient(135deg, rgba(22,163,74,0.35), rgba(21,128,61,0.4)) !important;
+            color: #bbf7d0 !important;
+            font-weight: 800 !important;
+        }
+        .spm-bulk-print-btn:disabled {
+            opacity: 0.45 !important;
+            cursor: not-allowed !important;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="spm-wrap">
+        <div class="spm-top">
+            <div>
+                <h1 class="spm-title">Saved Projects Manager</h1>
+                <p class="spm-sub">Connect Google, load all Card Maker saves, then sort and edit rarity. Counts are computed from each save’s <code>Type</code>, <code>Subtype</code>, and optional <code>Rarity</code>.</p>
+            </div>
+            <div class="spm-controls">
+                <a href="index.html" class="spm-btn spm-ghost">Card Maker</a>
+                <a href="card-grid.html" class="spm-btn spm-nav-print">Print</a>
+                <button type="button" class="spm-btn spm-primary" id="spmSignInBtn">Connect Google</button>
+                <button type="button" class="spm-btn spm-ghost" id="spmSignOutBtn" disabled>Sign out</button>
+                <button type="button" class="spm-btn spm-ghost" id="spmRefreshBtn" disabled>Refresh</button>
+            </div>
+        </div>
+
+        <div class="spm-row">
+            <div class="spm-panel">
+                <h3>Summary</h3>
+                <div class="spm-stat-grid">
+                    <div class="spm-stat"><div class="k">Total saved projects</div><div class="v" id="spmTotalCount">—</div></div>
+                    <div class="spm-stat"><div class="k">Projects loaded</div><div class="v" id="spmLoadedCount">—</div></div>
+                </div>
+
+                <div class="spm-status-card">
+                    <div class="k">Status</div>
+                    <div class="v" id="spmStatus">Not connected</div>
+                </div>
+
+                <h3 class="spm-list-heading">Counts by type</h3>
+                <div class="spm-list-box" id="spmTypeCounts"></div>
+
+                <h3 class="spm-list-heading">Counts by subtype</h3>
+                <div class="spm-list-box" id="spmSubtypeCounts"></div>
+
+                <h3 class="spm-list-heading">Counts by rarity</h3>
+                <div class="spm-list-box" id="spmRarityCounts"></div>
+            </div>
+
+            <div class="spm-panel">
+                <div class="spm-table-tools">
+                    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+                        <label style="font-weight:900; color:#e2e8f0; font-size:13px;">
+                            Search
+                            <input class="spm-input" id="spmSearchInput" placeholder="name / type / subtype" />
+                        </label>
+                    </div>
+                    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:flex-end;">
+                        <button type="button" class="spm-small-btn" id="spmExportCsvBtn" disabled title="Download the current table as CSV">Export CSV</button>
+                        <label style="font-weight:900; color:#e2e8f0; font-size:13px;">
+                            Sort
+                            <select class="spm-select" id="spmSortSelect">
+                                <option value="updatedDesc">Recently updated</option>
+                                <option value="updatedAsc">Oldest updated</option>
+                                <option value="nameAsc">Name (A→Z)</option>
+                                <option value="nameDesc">Name (Z→A)</option>
+                                <option value="costAsc">Cost (low→high)</option>
+                                <option value="costDesc">Cost (high→low)</option>
+                                <option value="typeAsc">Type (A→Z)</option>
+                                <option value="typeDesc">Type (Z→A)</option>
+                                <option value="subtypeAsc">Subtype (A→Z)</option>
+                                <option value="subtypeDesc">Subtype (Z→A)</option>
+                                <option value="rarityAsc">Rarity (Common→Legendary)</option>
+                                <option value="rarityDesc">Rarity (Legendary→Common)</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="spm-filter-row">
+                    <label> Type
+                        <select class="spm-select" id="spmFilterType"><option value="">All types</option></select>
+                    </label>
+                    <label> Subtype
+                        <select class="spm-select" id="spmFilterSubtype"><option value="">All subtypes</option></select>
+                    </label>
+                    <label> Rarity
+                        <select class="spm-select" id="spmFilterRarity"><option value="">All rarities</option></select>
+                    </label>
+                    <button type="button" class="spm-small-btn" id="spmClearFiltersBtn">Clear filters</button>
+                </div>
+
+                <div class="spm-bulk-bar" id="spmBulkBar">
+                    <div class="spm-bulk-head">
+                        <span class="spm-bulk-title">Selection</span>
+                        <span class="spm-bulk-badge" id="spmSelectedLabel" aria-live="polite">
+                            <span id="spmSelectedCount">0</span>
+                            <span class="spm-bulk-badge-sub" id="spmSelectedSub">cards selected</span>
+                        </span>
+                    </div>
+                    <div class="spm-bulk-actions">
+                        <div class="spm-bulk-field">
+                            <span>Apply rarity</span>
+                            <div class="spm-bulk-inline">
+                                <select class="spm-select" id="spmBulkRaritySelect">
+                                    <option value="">Choose…</option>
+                                    <option value="Common">Common</option>
+                                    <option value="Uncommon">Uncommon</option>
+                                    <option value="Rare">Rare</option>
+                                    <option value="Mythic">Mythic</option>
+                                    <option value="Legendary">Legendary</option>
+                                </select>
+                                <button type="button" class="spm-small-btn spm-bulk-apply-btn" id="spmBulkApplyBtn" disabled>Apply</button>
+                            </div>
+                        </div>
+                        <button type="button" class="spm-small-btn spm-bulk-clear-btn" id="spmClearSelectionBtn">Clear selection</button>
+                        <button type="button" class="spm-small-btn spm-bulk-print-btn" id="spmOpenPrintGridBtn" disabled title="Opens Print 9-up sheet in a new tab">Open in print grid…</button>
+                    </div>
+                    <p class="spm-bulk-meta" id="spmFilteredHint"></p>
+                </div>
+
+                <div class="spm-table-scroll" style="max-height: 560px; overflow:auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="spm-th-check" title="Select all rows in the current filtered list"><input type="checkbox" class="spm-row-check" id="spmSelectAll" aria-label="Select all visible rows" /></th>
+                                <th style="width: 200px;" class="spm-th-sortable" data-sort-base="name">Save <span class="spm-th-arrow" data-arrow-base="name">↕</span></th>
+                                <th style="width: 72px;">Size</th>
+                                <th style="width: 72px;" class="spm-th-sortable" data-sort-base="cost">Cost <span class="spm-th-arrow" data-arrow-base="cost">↕</span></th>
+                                <th style="width: 130px;" class="spm-th-sortable" data-sort-base="type">Type <span class="spm-th-arrow" data-arrow-base="type">↕</span></th>
+                                <th style="width: 140px;" class="spm-th-sortable" data-sort-base="subtype">Subtype <span class="spm-th-arrow" data-arrow-base="subtype">↕</span></th>
+                                <th style="width: 130px;" class="spm-th-sortable" data-sort-base="rarity">Rarity <span class="spm-th-arrow" data-arrow-base="rarity">↕</span></th>
+                                <th style="width: 140px;" class="spm-th-sortable" data-sort-base="updated">Updated <span class="spm-th-arrow" data-arrow-base="updated">↕</span></th>
+                                <th class="spm-th-actions" style="width: 198px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="spmTableBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="spm-message" id="spmMessage" aria-live="polite"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="spmEditModal" class="spm-modal" aria-hidden="true">
+        <div class="spm-modal-backdrop" data-spm-edit-close></div>
+        <div class="spm-modal-panel" role="dialog" aria-modal="true" aria-labelledby="spmEditTitle">
+            <button type="button" class="spm-modal-close" data-spm-edit-close aria-label="Close">&times;</button>
+            <h2 id="spmEditTitle">Edit save</h2>
+            <p class="spm-modal-hint">Rename the file on Drive and adjust card fields. The editor will see these values when you open this save.</p>
+            <div class="spm-modal-field">
+                <label for="spmEditName">Save name</label>
+                <input type="text" id="spmEditName" class="spm-input" maxlength="100" autocomplete="off" />
+                <span class="spm-modal-suffix">Stored as <code style="color:#93c5fd">name<span class="spm-edit-ext">.cardmaker.json</span></code> in hidden app data.</span>
+            </div>
+            <div class="spm-modal-field">
+                <label for="spmEditType">Type</label>
+                <select id="spmEditType" class="spm-select"></select>
+            </div>
+            <div class="spm-modal-field">
+                <label for="spmEditSubtype">Subtype</label>
+                <select id="spmEditSubtype" class="spm-select"></select>
+            </div>
+            <div class="spm-modal-field">
+                <label for="spmEditCost">Treasure cost</label>
+                <input type="number" id="spmEditCost" class="spm-input" min="0" max="999" step="1" />
+            </div>
+            <div class="spm-modal-field">
+                <label for="spmEditRarity">Rarity</label>
+                <select id="spmEditRarity" class="spm-select"></select>
+            </div>
+            <p id="spmEditError" class="spm-modal-error" hidden></p>
+            <div class="spm-modal-actions">
+                <button type="button" class="spm-btn spm-ghost" data-spm-edit-close>Cancel</button>
+                <button type="button" class="spm-btn spm-primary" id="spmEditSaveBtn">Save changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+        const GOOGLE_CLIENT_ID = '984239146057-o6ujksfj9qk8tmqm9c8msrpidgm6492r.apps.googleusercontent.com';
+        const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+        const DRIVE_TOKEN_STORAGE_KEY = 'cardmaker_drive_session_v1';
+        const DRIVE_TOKEN_EXPIRY_BUFFER_MS = 120000;
+        const DRIVE_FILES_API = 'https://www.googleapis.com/drive/v3/files';
+        const DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3/files';
+        const PROJECT_FILE_EXTENSION = '.cardmaker.json';
+        const PRINT_IMPORT_STORAGE_KEY = 'cardmaker_print_import_v1';
+
+        const spmSignInBtn = document.getElementById('spmSignInBtn');
+        const spmSignOutBtn = document.getElementById('spmSignOutBtn');
+        const spmRefreshBtn = document.getElementById('spmRefreshBtn');
+        const spmStatus = document.getElementById('spmStatus');
+        const spmMessage = document.getElementById('spmMessage');
+
+        const spmTotalCount = document.getElementById('spmTotalCount');
+        const spmLoadedCount = document.getElementById('spmLoadedCount');
+        const spmTypeCounts = document.getElementById('spmTypeCounts');
+        const spmSubtypeCounts = document.getElementById('spmSubtypeCounts');
+        const spmRarityCounts = document.getElementById('spmRarityCounts');
+
+        const spmTableBody = document.getElementById('spmTableBody');
+        const spmSearchInput = document.getElementById('spmSearchInput');
+        const spmSortSelect = document.getElementById('spmSortSelect');
+        const spmFilterType = document.getElementById('spmFilterType');
+        const spmFilterSubtype = document.getElementById('spmFilterSubtype');
+        const spmFilterRarity = document.getElementById('spmFilterRarity');
+        const spmClearFiltersBtn = document.getElementById('spmClearFiltersBtn');
+        const spmExportCsvBtn = document.getElementById('spmExportCsvBtn');
+        const spmSelectAll = document.getElementById('spmSelectAll');
+        const spmSelectedCount = document.getElementById('spmSelectedCount');
+        const spmSelectedSub = document.getElementById('spmSelectedSub');
+        const spmBulkRaritySelect = document.getElementById('spmBulkRaritySelect');
+        const spmBulkApplyBtn = document.getElementById('spmBulkApplyBtn');
+        const spmClearSelectionBtn = document.getElementById('spmClearSelectionBtn');
+        const spmOpenPrintGridBtn = document.getElementById('spmOpenPrintGridBtn');
+        const spmFilteredHint = document.getElementById('spmFilteredHint');
+
+        const selectedProjectIds = new Set();
+
+        const RARITY_OPTIONS = [
+            '',
+            'Common',
+            'Uncommon',
+            'Rare',
+            'Mythic',
+            'Legendary'
+        ];
+
+        const TYPE_OPTIONS = ['Unit', 'Spell', 'Equipment', 'Holding', 'Wealth', 'Hero', 'Tactic'];
+        const SUBTYPE_OPTIONS = ['Army', 'Evocation', 'Divination', 'Necromancy', 'Enchantment', 'Transmutation', 'Weapon', 'Armor', 'Economy', 'Ritual', 'Commander', 'Vehicle', 'Tool', 'Ship'];
+
+        function setMessage(text, isError) {
+            if (!spmMessage) return;
+            spmMessage.textContent = text || '';
+            spmMessage.classList.toggle('is-error', !!isError);
+        }
+
+        function escapeHtml(s) {
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function displaySaveLabel(fileName) {
+            if (!fileName) return '';
+            var n = String(fileName);
+            var ext = PROJECT_FILE_EXTENSION;
+            if (n.toLowerCase().endsWith(ext.toLowerCase())) return n.slice(0, -ext.length);
+            return n;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === undefined || bytes === null) return '—';
+            var n = typeof bytes === 'string' ? parseInt(bytes, 10) : Number(bytes);
+            if (!isFinite(n) || n < 0) return '—';
+            if (n < 1024) return n + ' B';
+            if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+            return (n / 1048576).toFixed(2) + ' MB';
+        }
+
+        function filterValueFromSelect(el) {
+            if (!el || el.value === '') return null;
+            if (el.value === '__EMPTY__') return '';
+            return el.value;
+        }
+
+        function rebuildFilterSelects() {
+            function fill(sel, distinctVals, allLabel) {
+                if (!sel) return;
+                var prevRaw = sel.value;
+                var items = distinctVals.map(function (v) {
+                    return { v: v, l: v === '' ? '(empty)' : v };
+                });
+                items.sort(function (a, b) {
+                    if (a.v === '') return -1;
+                    if (b.v === '') return 1;
+                    return String(a.l).localeCompare(String(b.l), undefined, { sensitivity: 'base' });
+                });
+                var opts = '<option value="">' + escapeHtml(allLabel) + '</option>';
+                items.forEach(function (item) {
+                    var enc = item.v === '' ? '__EMPTY__' : item.v;
+                    opts += '<option value="' + escapeHtml(enc) + '">' + escapeHtml(item.l) + '</option>';
+                });
+                sel.innerHTML = opts;
+                var still = Array.from(sel.options).some(function (o) { return o.value === prevRaw; });
+                if (still) sel.value = prevRaw;
+            }
+            var types = [];
+            var subtypes = [];
+            var rarities = [];
+            var seenT = {};
+            var seenS = {};
+            var seenR = {};
+            projects.forEach(function (p) {
+                var t = p.fieldsType != null ? String(p.fieldsType) : '';
+                var s = p.fieldsSubtype != null ? String(p.fieldsSubtype) : '';
+                var r = p.rarity != null ? String(p.rarity) : '';
+                if (!seenT[t]) { seenT[t] = true; types.push(t); }
+                if (!seenS[s]) { seenS[s] = true; subtypes.push(s); }
+                if (!seenR[r]) { seenR[r] = true; rarities.push(r); }
+            });
+            fill(spmFilterType, types, 'All types');
+            fill(spmFilterSubtype, subtypes, 'All subtypes');
+            fill(spmFilterRarity, rarities, 'All rarities');
+        }
+
+        function readStoredDriveToken() {
+            try {
+                const raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
+                if (!raw) return null;
+                const data = JSON.parse(raw);
+                if (!data || !data.access_token || !data.expires_at) return null;
+                if (Date.now() >= data.expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
+                    localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
+                    return null;
+                }
+                return data.access_token;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function persistDriveToken(tokenResponse) {
+            const expiresInSec = parseInt(tokenResponse.expires_in || '3600', 10);
+            const expiresAt = Date.now() + expiresInSec * 1000 - DRIVE_TOKEN_EXPIRY_BUFFER_MS;
+            localStorage.setItem(DRIVE_TOKEN_STORAGE_KEY, JSON.stringify({
+                access_token: tokenResponse.access_token,
+                expires_at: expiresAt
+            }));
+        }
+
+        function driveAuthHeaders(token, extra) {
+            var h = { Authorization: 'Bearer ' + token };
+            if (extra && typeof extra === 'object') {
+                for (var k in extra) {
+                    if (Object.prototype.hasOwnProperty.call(extra, k)) h[k] = extra[k];
+                }
+            }
+            return h;
+        }
+
+        function parseDriveError(text, status) {
+            try {
+                const j = JSON.parse(text);
+                if (j.error) return j.error.message || JSON.stringify(j.error);
+            } catch (e) { /* ignore */ }
+            return text || ('HTTP ' + status);
+        }
+
+        let gisTokenClient = null;
+        let driveAccessToken = null;
+
+        function updateButtons() {
+            const signedIn = !!driveAccessToken;
+            spmSignOutBtn.disabled = !signedIn;
+            spmRefreshBtn.disabled = !signedIn;
+            spmSignInBtn.disabled = signedIn;
+            spmSignInBtn.textContent = signedIn ? 'Connected' : 'Connect Google';
+        }
+
+        function initTokenClient() {
+            if (gisTokenClient) return gisTokenClient;
+            if (!window.google || !google.accounts || !google.accounts.oauth2) return null;
+            gisTokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: GOOGLE_CLIENT_ID,
+                scope: DRIVE_SCOPE,
+                callback: function () {},
+                error_callback: function (err) {
+                    console.error('GIS error:', err);
+                    setMessage('Google sign-in failed.', true);
+                    spmStatus.textContent = 'Sign-in failed';
+                }
+            });
+            return gisTokenClient;
+        }
+
+        function waitForGoogleScripts(maxWaitMs) {
+            const step = 80;
+            let elapsed = 0;
+            return new Promise(function (resolve) {
+                function tick() {
+                    if (window.google && google.accounts && google.accounts.oauth2) return resolve(true);
+                    elapsed += step;
+                    if (elapsed >= maxWaitMs) return resolve(false);
+                    setTimeout(tick, step);
+                }
+                tick();
+            });
+        }
+
+        async function ensureSignedIn() {
+            if (driveAccessToken) return true;
+            const stored = readStoredDriveToken();
+            if (stored) {
+                driveAccessToken = stored;
+                spmStatus.textContent = 'Signed in (saved on this device)';
+                updateButtons();
+                return true;
+            }
+            spmStatus.textContent = 'Not connected';
+            return false;
+        }
+
+        async function handleSignIn() {
+            const ok = await waitForGoogleScripts(8000);
+            if (!ok) {
+                setMessage('Google scripts are not ready. Try again in a moment.', true);
+                return;
+            }
+            const client = initTokenClient();
+            if (!client) {
+                setMessage('Could not initialize Google sign-in.', true);
+                return;
+            }
+            spmStatus.textContent = 'Opening Google sign-in…';
+            setMessage('');
+            client.callback = function (tokenResponse) {
+                if (tokenResponse && tokenResponse.access_token) {
+                    persistDriveToken(tokenResponse);
+                    driveAccessToken = tokenResponse.access_token;
+                    spmStatus.textContent = 'Signed in (saved on this device)';
+                    updateButtons();
+                    refreshAll().catch(function (e) { console.error(e); });
+                } else {
+                    spmStatus.textContent = 'Sign-in failed';
+                    setMessage('Sign-in failed. Check OAuth origin.', true);
+                }
+            };
+            client.requestAccessToken({ prompt: 'consent' });
+        }
+
+        function handleSignOut() {
+            localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
+            driveAccessToken = null;
+            projects = [];
+            selectedProjectIds.clear();
+            if (spmBulkRaritySelect) spmBulkRaritySelect.value = '';
+            if (spmSelectAll) {
+                spmSelectAll.checked = false;
+                spmSelectAll.indeterminate = false;
+            }
+            spmStatus.textContent = 'Not connected';
+            updateButtons();
+            setMessage('Signed out.');
+            rebuildFilterSelects();
+            renderTable([]);
+            renderCounts({}, {}, {}, 0, 0);
+            if (spmFilteredHint) spmFilteredHint.textContent = '';
+            if (spmExportCsvBtn) spmExportCsvBtn.disabled = true;
+            if (spmTotalCount) spmTotalCount.textContent = '—';
+            if (spmLoadedCount) spmLoadedCount.textContent = '—';
+            updateBulkUi();
+        }
+
+        spmSignInBtn.addEventListener('click', handleSignIn);
+        spmSignOutBtn.addEventListener('click', handleSignOut);
+        spmRefreshBtn.addEventListener('click', function () { refreshAll(); });
+        spmSearchInput.addEventListener('input', function () { applyFiltersAndRender(); });
+        spmSortSelect.addEventListener('change', function () {
+            updateHeaderArrows();
+            applyFiltersAndRender();
+        });
+        if (spmFilterType) spmFilterType.addEventListener('change', function () { applyFiltersAndRender(); });
+        if (spmFilterSubtype) spmFilterSubtype.addEventListener('change', function () { applyFiltersAndRender(); });
+        if (spmFilterRarity) spmFilterRarity.addEventListener('change', function () { applyFiltersAndRender(); });
+        if (spmClearFiltersBtn) {
+            spmClearFiltersBtn.addEventListener('click', function () {
+                if (spmFilterType) spmFilterType.value = '';
+                if (spmFilterSubtype) spmFilterSubtype.value = '';
+                if (spmFilterRarity) spmFilterRarity.value = '';
+                applyFiltersAndRender();
+            });
+        }
+        if (spmBulkRaritySelect) {
+            spmBulkRaritySelect.addEventListener('change', updateBulkUi);
+        }
+        if (spmBulkApplyBtn) {
+            spmBulkApplyBtn.addEventListener('click', function () {
+                var r = spmBulkRaritySelect ? spmBulkRaritySelect.value : '';
+                if (!r) return;
+                var ids = Array.from(selectedProjectIds).filter(function (id) {
+                    return projects.some(function (p) { return p.file && p.file.id === id; });
+                });
+                if (!ids.length) return;
+                if (!confirm('Set rarity to “' + r + '” for ' + ids.length + ' selected save(s)?')) return;
+                setMessage('Updating ' + ids.length + ' save(s)…');
+                (async function () {
+                    try {
+                        for (var i = 0; i < ids.length; i++) {
+                            await updateProjectRarity(ids[i], r, { skipRecalc: true });
+                        }
+                        recalculateSummaryFromProjects();
+                        setMessage('Updated rarity on ' + ids.length + ' save(s).');
+                        if (spmBulkRaritySelect) spmBulkRaritySelect.value = '';
+                        updateBulkUi();
+                    } catch (err) {
+                        console.error(err);
+                        recalculateSummaryFromProjects();
+                        setMessage('Bulk update failed: ' + (err && err.message ? err.message : String(err)), true);
+                    }
+                })();
+            });
+        }
+        if (spmClearSelectionBtn) {
+            spmClearSelectionBtn.addEventListener('click', function () {
+                selectedProjectIds.clear();
+                applyFiltersAndRender();
+            });
+        }
+        if (spmOpenPrintGridBtn) {
+            spmOpenPrintGridBtn.addEventListener('click', function () {
+                var ids = Array.from(selectedProjectIds).filter(function (id) {
+                    return projects.some(function (p) { return p.file && p.file.id === id; });
+                });
+                if (!ids.length) {
+                    setMessage('Select one or more saves with the checkboxes, then open Print grid.', true);
+                    return;
+                }
+                try {
+                    /* localStorage (not sessionStorage): new tabs from window.open() do not share sessionStorage */
+                    localStorage.setItem(PRINT_IMPORT_STORAGE_KEY, JSON.stringify({ v: 1, fileIds: ids }));
+                } catch (e) {
+                    console.error(e);
+                    setMessage('Could not queue cards for print (storage blocked?).', true);
+                    return;
+                }
+                window.open('card-grid.html', '_blank', 'noopener,noreferrer');
+                setMessage('Opened print grid in a new tab with ' + ids.length + ' card(s). Up to 9 slots fill in order; sign in on the print page if prompted.', false);
+            });
+        }
+        if (spmSelectAll) {
+            spmSelectAll.addEventListener('change', function () {
+                var visible = getFilteredProjects();
+                if (spmSelectAll.checked) {
+                    visible.forEach(function (p) { selectedProjectIds.add(p.file.id); });
+                } else {
+                    visible.forEach(function (p) { selectedProjectIds.delete(p.file.id); });
+                }
+                applyFiltersAndRender();
+            });
+        }
+        if (spmExportCsvBtn) {
+            spmExportCsvBtn.addEventListener('click', function () {
+                var rows = getVisibleSortedProjects();
+                if (!rows.length) return;
+                function csvCell(v) {
+                    var s = String(v == null ? '' : v);
+                    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+                    return s;
+                }
+                var lines = [['Save name', 'File size', 'Cost', 'Type', 'Subtype', 'Rarity', 'Updated (local)', 'Drive file id'].map(csvCell).join(',')];
+                rows.forEach(function (p) {
+                    var name = displaySaveLabel(p.file.name);
+                    var when = p.file.modifiedTime ? new Date(p.file.modifiedTime).toISOString() : '';
+                    lines.push([
+                        name,
+                        p.file.size != null ? String(p.file.size) : '',
+                        isFinite(p.costNumber) ? String(p.costNumber) : '',
+                        p.fieldsType || '',
+                        p.fieldsSubtype || '',
+                        p.rarity || '',
+                        when,
+                        p.file.id
+                    ].map(csvCell).join(','));
+                });
+                var blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'cardmaker-saves-' + new Date().toISOString().slice(0, 10) + '.csv';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(a.href);
+                setMessage('Exported ' + rows.length + ' row(s) to CSV.');
+            });
+        }
+
+        /** List Card Maker appDataFolder files (hidden saves). */
+        async function listCardMakerProjects() {
+            const u = new URL(DRIVE_FILES_API);
+            u.searchParams.set('spaces', 'appDataFolder');
+            u.searchParams.set('fields', 'files(id,name,modifiedTime,size)');
+            u.searchParams.set('pageSize', '200');
+            const res = await fetch(u.toString(), { headers: driveAuthHeaders(driveAccessToken) });
+            const text = await res.text();
+            if (!res.ok) throw new Error(parseDriveError(text, res.status));
+            const data = JSON.parse(text);
+            return (data.files || []).filter(function (f) {
+                return f.name && f.name.toLowerCase().endsWith(PROJECT_FILE_EXTENSION) && f.name.indexOf('cardmaker') !== -1;
+            });
+        }
+
+        async function fetchDriveProjectJson(fileId) {
+            const mediaUrl = DRIVE_FILES_API + '/' + encodeURIComponent(fileId) + '?alt=media';
+            const res = await fetch(mediaUrl, { headers: driveAuthHeaders(driveAccessToken) });
+            const txt = await res.text();
+            if (!res.ok) throw new Error(parseDriveError(txt, res.status));
+            return JSON.parse(txt);
+        }
+
+        async function uploadProjectStateBytes(fileId, stateObj) {
+            const payload = JSON.stringify(stateObj);
+            const u = new URL(DRIVE_UPLOAD_API + '/' + encodeURIComponent(fileId));
+            u.searchParams.set('uploadType', 'media');
+            const res = await fetch(u.toString(), {
+                method: 'PATCH',
+                headers: driveAuthHeaders(driveAccessToken),
+                body: payload
+            });
+            const txt = await res.text();
+            if (!res.ok) throw new Error(parseDriveError(txt, res.status));
+        }
+
+        async function driveRenameFile(fileId, newName) {
+            const url = DRIVE_FILES_API + '/' + encodeURIComponent(fileId) + '?fields=id,name,modifiedTime,size';
+            const res = await fetch(url, {
+                method: 'PATCH',
+                headers: driveAuthHeaders(driveAccessToken, { 'Content-Type': 'application/json; charset=UTF-8' }),
+                body: JSON.stringify({ name: newName })
+            });
+            const txt = await res.text();
+            if (!res.ok) throw new Error(parseDriveError(txt, res.status));
+            return JSON.parse(txt);
+        }
+
+        function sanitizeSaveBaseName(raw) {
+            var s = String(raw || '').trim();
+            if (!s) return '';
+            var ext = PROJECT_FILE_EXTENSION;
+            if (s.toLowerCase().endsWith(ext.toLowerCase())) s = s.slice(0, -ext.length);
+            s = s.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
+            if (s.length > 100) s = s.slice(0, 100);
+            return s;
+        }
+
+        function fullDriveFileNameFromBase(base) {
+            var b = sanitizeSaveBaseName(base);
+            if (!b) throw new Error('Save name cannot be empty.');
+            return b + PROJECT_FILE_EXTENSION;
+        }
+
+        function parseNumberSafe(v) {
+            if (v === undefined || v === null) return NaN;
+            const n = typeof v === 'number' ? v : parseFloat(String(v));
+            return isFinite(n) ? n : NaN;
+        }
+
+        /** Very small concurrency helper for loading many saves. */
+        async function mapLimit(items, limit, fn) {
+            const out = new Array(items.length);
+            let idx = 0;
+            async function worker() {
+                while (idx < items.length) {
+                    const i = idx++;
+                    out[i] = await fn(items[i], i);
+                }
+            }
+            const workers = [];
+            for (let w = 0; w < Math.min(limit, items.length); w++) workers.push(worker());
+            await Promise.all(workers);
+            return out;
+        }
+
+        // Loaded projects cache
+        // { file: {id,name,modifiedTime,size}, state, fields, costNumber, rarity }
+        let projects = [];
+
+        function getFieldsFromState(state) {
+            return (state && state.fields) ? state.fields : {};
+        }
+
+        function computeRarityValue(fields) {
+            const r = fields && (fields.Rarity || fields.rarity || fields.cardRarity);
+            if (r === undefined || r === null) return '';
+            return String(r).trim();
+        }
+
+        function computeType(fields) { return fields && fields.Type ? String(fields.Type).trim() : ''; }
+        function computeSubtype(fields) { return fields && fields.Subtype ? String(fields.Subtype).trim() : ''; }
+        function computeCost(fields) { return parseNumberSafe(fields && fields.TreasureCost); }
+
+        function renderListBox(containerEl, countsMap) {
+            if (!containerEl) return;
+            const entries = Object.keys(countsMap).map(function (k) { return [k, countsMap[k]]; });
+            entries.sort(function (a, b) { return b[1] - a[1]; });
+            if (entries.length === 0) {
+                containerEl.innerHTML = '<div class="spm-muted">—</div>';
+                return;
+            }
+            containerEl.innerHTML = entries.map(function (e) {
+                const key = e[0] || '(empty)';
+                return '<div class="spm-list-item"><span class="name" title="' + escapeHtml(key) + '">' + escapeHtml(key) + '</span><span class="count">' + e[1] + '</span></div>';
+            }).join('');
+        }
+
+        function renderCounts(typeCounts, subtypeCounts, rarityCounts, total, loaded) {
+            spmTotalCount.textContent = total;
+            spmLoadedCount.textContent = loaded;
+            renderListBox(spmTypeCounts, typeCounts);
+            renderListBox(spmSubtypeCounts, subtypeCounts);
+            renderListBox(spmRarityCounts, rarityCounts);
+        }
+
+        function getFilteredProjects() {
+            const q = String(spmSearchInput.value || '').trim().toLowerCase();
+            const ft = filterValueFromSelect(spmFilterType);
+            const fst = filterValueFromSelect(spmFilterSubtype);
+            const fr = filterValueFromSelect(spmFilterRarity);
+            return projects.filter(function (p) {
+                if (ft !== null && (p.fieldsType || '') !== ft) return false;
+                if (fst !== null && (p.fieldsSubtype || '') !== fst) return false;
+                if (fr !== null && (p.rarity || '') !== fr) return false;
+                if (!q) return true;
+                const name = p.file && p.file.name ? String(p.file.name) : '';
+                const type = p.fieldsType || '';
+                const subtype = p.fieldsSubtype || '';
+                return name.toLowerCase().includes(q) || type.toLowerCase().includes(q) || subtype.toLowerCase().includes(q);
+            });
+        }
+
+        function getVisibleSortedProjects() {
+            return sortProjects(getFilteredProjects());
+        }
+
+        function recalculateSummaryFromProjects() {
+            const typeCounts = {};
+            const subtypeCounts = {};
+            const rarityCounts = {};
+            projects.forEach(function (p) {
+                const t = p.fieldsType || '';
+                const st = p.fieldsSubtype || '';
+                const r = p.rarity || '';
+                typeCounts[t || '(empty)'] = (typeCounts[t || '(empty)'] || 0) + 1;
+                subtypeCounts[st || '(empty)'] = (subtypeCounts[st || '(empty)'] || 0) + 1;
+                rarityCounts[r || '(empty)'] = (rarityCounts[r || '(empty)'] || 0) + 1;
+            });
+            const totalTxt = spmTotalCount.textContent;
+            renderCounts(typeCounts, subtypeCounts, rarityCounts, totalTxt, projects.length);
+            rebuildFilterSelects();
+            applyFiltersAndRender();
+        }
+
+        function syncSelectAllCheckbox() {
+            const visible = getFilteredProjects().map(function (p) { return p.file.id; });
+            const allChecked = visible.length > 0 && visible.every(function (id) { return selectedProjectIds.has(id); });
+            const some = visible.some(function (id) { return selectedProjectIds.has(id); });
+            if (spmSelectAll) {
+                spmSelectAll.checked = allChecked;
+                spmSelectAll.indeterminate = some && !allChecked;
+            }
+        }
+
+        function updateBulkUi() {
+            const n = selectedProjectIds.size;
+            if (spmSelectedCount) spmSelectedCount.textContent = String(n);
+            if (spmSelectedSub) spmSelectedSub.textContent = n === 1 ? 'card selected' : 'cards selected';
+            if (spmBulkApplyBtn) {
+                spmBulkApplyBtn.disabled = n === 0 || !(spmBulkRaritySelect && spmBulkRaritySelect.value);
+            }
+            if (spmOpenPrintGridBtn) spmOpenPrintGridBtn.disabled = n === 0;
+        }
+
+        function sortProjects(items) {
+            const sortKey = spmSortSelect.value;
+            function getUpdatedTime(p) {
+                const iso = p.file && p.file.modifiedTime ? p.file.modifiedTime : null;
+                const t = iso ? new Date(iso).getTime() : 0;
+                return isFinite(t) ? t : 0;
+            }
+            const rarityOrder = { 'Common': 1, 'Uncommon': 2, 'Rare': 3, 'Mythic': 4, 'Legendary': 5 };
+            return items.sort(function (a, b) {
+                if (sortKey === 'updatedDesc') return getUpdatedTime(b) - getUpdatedTime(a);
+                if (sortKey === 'updatedAsc') return getUpdatedTime(a) - getUpdatedTime(b);
+                if (sortKey === 'nameAsc') return String(a.file.name).localeCompare(String(b.file.name));
+                if (sortKey === 'nameDesc') return String(b.file.name).localeCompare(String(a.file.name));
+                const aCost = isFinite(a.costNumber) ? a.costNumber : Infinity;
+                const bCost = isFinite(b.costNumber) ? b.costNumber : Infinity;
+                if (sortKey === 'costAsc') return aCost - bCost;
+                if (sortKey === 'costDesc') return bCost - aCost;
+                if (sortKey === 'typeAsc') return String(a.fieldsType || '').localeCompare(String(b.fieldsType || ''));
+                if (sortKey === 'typeDesc') return String(b.fieldsType || '').localeCompare(String(a.fieldsType || ''));
+                if (sortKey === 'subtypeAsc') return String(a.fieldsSubtype || '').localeCompare(String(b.fieldsSubtype || ''));
+                if (sortKey === 'subtypeDesc') return String(b.fieldsSubtype || '').localeCompare(String(a.fieldsSubtype || ''));
+                if (sortKey === 'rarityAsc') return (rarityOrder[a.rarity] || 99) - (rarityOrder[b.rarity] || 99);
+                if (sortKey === 'rarityDesc') return (rarityOrder[b.rarity] || 99) - (rarityOrder[a.rarity] || 99);
+                return 0;
+            });
+        }
+
+        const spmArrowEls = {
+            name: document.querySelector('span[data-arrow-base="name"]'),
+            cost: document.querySelector('span[data-arrow-base="cost"]'),
+            type: document.querySelector('span[data-arrow-base="type"]'),
+            subtype: document.querySelector('span[data-arrow-base="subtype"]'),
+            rarity: document.querySelector('span[data-arrow-base="rarity"]'),
+            updated: document.querySelector('span[data-arrow-base="updated"]')
+        };
+
+        function updateHeaderArrows() {
+            function set(base, text) {
+                if (!spmArrowEls[base]) return;
+                spmArrowEls[base].textContent = text;
+            }
+            set('name', '↕');
+            set('cost', '↕');
+            set('type', '↕');
+            set('subtype', '↕');
+            set('rarity', '↕');
+            set('updated', '↕');
+
+            const key = spmSortSelect.value;
+            if (key === 'nameAsc') set('name', '▲');
+            if (key === 'nameDesc') set('name', '▼');
+            if (key === 'costAsc') set('cost', '▲');
+            if (key === 'costDesc') set('cost', '▼');
+            if (key === 'typeAsc') set('type', '▲');
+            if (key === 'typeDesc') set('type', '▼');
+            if (key === 'subtypeAsc') set('subtype', '▲');
+            if (key === 'subtypeDesc') set('subtype', '▼');
+            if (key === 'rarityAsc') set('rarity', '▲');
+            if (key === 'rarityDesc') set('rarity', '▼');
+            if (key === 'updatedDesc') set('updated', '▼');
+            if (key === 'updatedAsc') set('updated', '▲');
+        }
+
+        function toggleHeaderSort(base) {
+            const cur = spmSortSelect.value;
+            if (base === 'name') spmSortSelect.value = (cur === 'nameAsc') ? 'nameDesc' : 'nameAsc';
+            if (base === 'cost') spmSortSelect.value = (cur === 'costAsc') ? 'costDesc' : 'costAsc';
+            if (base === 'type') spmSortSelect.value = (cur === 'typeAsc') ? 'typeDesc' : 'typeAsc';
+            if (base === 'subtype') spmSortSelect.value = (cur === 'subtypeAsc') ? 'subtypeDesc' : 'subtypeAsc';
+            if (base === 'rarity') spmSortSelect.value = (cur === 'rarityAsc') ? 'rarityDesc' : 'rarityAsc';
+            if (base === 'updated') spmSortSelect.value = (cur === 'updatedAsc') ? 'updatedDesc' : 'updatedAsc';
+            updateHeaderArrows();
+            applyFiltersAndRender();
+        }
+
+        document.querySelectorAll('.spm-th-sortable[data-sort-base]').forEach(function (th) {
+            th.addEventListener('click', function () {
+                var base = th.getAttribute('data-sort-base');
+                if (!base) return;
+                toggleHeaderSort(base);
+            });
+        });
+
+        updateHeaderArrows();
+
+        function renderTable(items) {
+            if (!spmTableBody) return;
+            if (!items || items.length === 0) {
+                spmTableBody.innerHTML = '<tr><td colspan="9" class="spm-muted">No projects match the current filters (or nothing loaded yet).</td></tr>';
+                return;
+            }
+            spmTableBody.innerHTML = items.map(function (p) {
+                const nameShort = displaySaveLabel(p.file.name);
+                const when = p.file.modifiedTime ? escapeHtml(new Date(p.file.modifiedTime).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })) : '—';
+                const cost = isFinite(p.costNumber) ? String(p.costNumber) : '—';
+                const rarityValue = p.rarity || '';
+                const typeValue = p.fieldsType || '—';
+                const subtypeValue = p.fieldsSubtype || '—';
+                const sz = formatFileSize(p.file.size);
+                const szTitle = p.file.size != null ? escapeHtml(String(p.file.size) + ' bytes') : '';
+                const openHref = 'index.html?openDriveFile=' + encodeURIComponent(p.file.id);
+                const chk = selectedProjectIds.has(p.file.id) ? 'checked' : '';
+                const rowClass = selectedProjectIds.has(p.file.id) ? ' class="spm-row-selected"' : '';
+
+                const selectOptions = RARITY_OPTIONS.map(function (opt) {
+                    const val = opt;
+                    const selected = rarityValue === val ? 'selected' : '';
+                    const label = opt === '' ? '—' : opt;
+                    return '<option value="' + escapeHtml(val) + '" ' + selected + '>' + escapeHtml(label) + '</option>';
+                }).join('');
+
+                return '<tr' + rowClass + '>' +
+                    '<td class="spm-check-cell"><input type="checkbox" class="spm-row-check" data-spm-row-check data-project-id="' + escapeHtml(p.file.id) + '" ' + chk + ' aria-label="Select ' + escapeHtml(nameShort) + '"/></td>' +
+                    '<td class="spm-name" title="' + escapeHtml(p.file.name) + '">' + escapeHtml(nameShort) + '</td>' +
+                    '<td class="spm-muted" title="' + szTitle + '">' + escapeHtml(sz) + '</td>' +
+                    '<td>' + escapeHtml(cost) + '</td>' +
+                    '<td>' + escapeHtml(typeValue) + '</td>' +
+                    '<td>' + escapeHtml(subtypeValue) + '</td>' +
+                    '<td>' +
+                        '<div class="spm-rarity">' +
+                            '<select data-rarity-set data-project-id="' + escapeHtml(p.file.id) + '">' +
+                                selectOptions +
+                            '</select>' +
+                        '</div>' +
+                    '</td>' +
+                    '<td class="spm-muted">' + when + '</td>' +
+                    '<td class="spm-actions">' +
+                        '<button type="button" class="spm-small-btn spm-btn-edit" data-spm-edit data-project-id="' + escapeHtml(p.file.id) + '">Edit</button>' +
+                        '<a class="spm-link-btn" href="' + openHref + '" target="_blank" rel="noopener">Open</a>' +
+                        '<button type="button" class="spm-small-btn spm-danger" data-spm-delete data-project-id="' + escapeHtml(p.file.id) + '">Delete</button>' +
+                    '</td>' +
+                '</tr>';
+            }).join('');
+        }
+
+        function applyFiltersAndRender() {
+            const sorted = getVisibleSortedProjects();
+            renderTable(sorted);
+            if (spmFilteredHint) {
+                spmFilteredHint.textContent = projects.length
+                    ? ('Showing ' + sorted.length + ' of ' + projects.length + ' loaded')
+                    : '';
+            }
+            if (spmExportCsvBtn) spmExportCsvBtn.disabled = sorted.length === 0;
+            syncSelectAllCheckbox();
+            updateBulkUi();
+        }
+
+        async function refreshAll() {
+            setMessage('');
+            selectedProjectIds.clear();
+            if (spmBulkRaritySelect) spmBulkRaritySelect.value = '';
+            if (spmSelectAll) {
+                spmSelectAll.checked = false;
+                spmSelectAll.indeterminate = false;
+            }
+            spmStatus.textContent = 'Loading saved projects…';
+            spmTotalCount.textContent = '—';
+            spmLoadedCount.textContent = '—';
+
+            try {
+                if (!await ensureSignedIn()) {
+                    spmStatus.textContent = 'Not connected';
+                    updateButtons();
+                    return;
+                }
+
+                const files = await listCardMakerProjects();
+                spmTotalCount.textContent = files.length;
+                spmTypeCounts.innerHTML = '<div class="spm-muted">Loading…</div>';
+                spmSubtypeCounts.innerHTML = '<div class="spm-muted">Loading…</div>';
+                spmRarityCounts.innerHTML = '<div class="spm-muted">Loading…</div>';
+                spmStatus.textContent = 'Downloading saves (' + files.length + ')…';
+
+                projects = [];
+                spmLoadedCount.textContent = '0/' + files.length;
+
+                // Download JSON for every save so we can count/sort by fields.
+                const loaded = await mapLimit(files, 6, async function (file, i) {
+                    const state = await fetchDriveProjectJson(file.id);
+                    const fields = getFieldsFromState(state);
+                    const costNumber = computeCost(fields);
+                    const rarity = computeRarityValue(fields);
+                    const fieldsType = computeType(fields);
+                    const fieldsSubtype = computeSubtype(fields);
+                    return {
+                        file: file,
+                        state: state,
+                        fieldsType: fieldsType,
+                        fieldsSubtype: fieldsSubtype,
+                        costNumber: costNumber,
+                        rarity: rarity,
+                        fields: fields
+                    };
+                });
+
+                projects = loaded;
+                spmLoadedCount.textContent = String(projects.length) + '/' + files.length;
+
+                // Compute counts
+                const typeCounts = {};
+                const subtypeCounts = {};
+                const rarityCounts = {};
+                projects.forEach(function (p) {
+                    const t = p.fieldsType || '';
+                    const st = p.fieldsSubtype || '';
+                    const r = p.rarity || '';
+                    typeCounts[t || '(empty)'] = (typeCounts[t || '(empty)'] || 0) + 1;
+                    subtypeCounts[st || '(empty)'] = (subtypeCounts[st || '(empty)'] || 0) + 1;
+                    rarityCounts[r || '(empty)'] = (rarityCounts[r || '(empty)'] || 0) + 1;
+                });
+
+                spmStatus.textContent = 'Loaded ' + projects.length + ' project(s).';
+                renderCounts(typeCounts, subtypeCounts, rarityCounts, files.length, projects.length);
+                rebuildFilterSelects();
+                applyFiltersAndRender();
+                setMessage('Loaded ' + projects.length + ' saves.');
+            } catch (e) {
+                console.error(e);
+                spmStatus.textContent = 'Load failed';
+                setMessage('Could not load saves: ' + (e && e.message ? e.message : String(e)), true);
+            }
+        }
+
+        async function updateProjectRarity(projectId, newRarity, options) {
+            options = options || {};
+            if (!driveAccessToken) return;
+            const project = projects.find(function (p) { return p.file && p.file.id === projectId; });
+            if (!project) {
+                setMessage('Project not loaded yet.', true);
+                return;
+            }
+            const payloadState = project.state;
+            if (!payloadState || typeof payloadState !== 'object') return;
+            if (!payloadState.fields) payloadState.fields = {};
+            payloadState.fields.Rarity = newRarity;
+
+            await uploadProjectStateBytes(projectId, payloadState);
+
+            project.rarity = newRarity;
+            if (options.skipRecalc) return;
+
+            setMessage('Rarity updated.');
+            const typeCounts = {};
+            const subtypeCounts = {};
+            const rarityCounts = {};
+            projects.forEach(function (p) {
+                const t = p.fieldsType || '';
+                const st = p.fieldsSubtype || '';
+                const r = p.rarity || '';
+                typeCounts[t || '(empty)'] = (typeCounts[t || '(empty)'] || 0) + 1;
+                subtypeCounts[st || '(empty)'] = (subtypeCounts[st || '(empty)'] || 0) + 1;
+                rarityCounts[r || '(empty)'] = (rarityCounts[r || '(empty)'] || 0) + 1;
+            });
+            renderCounts(typeCounts, subtypeCounts, rarityCounts, spmTotalCount.textContent, projects.length);
+            rebuildFilterSelects();
+            applyFiltersAndRender();
+        }
+
+        async function deleteDriveProject(fileId) {
+            const url = DRIVE_FILES_API + '/' + encodeURIComponent(fileId);
+            const res = await fetch(url, { method: 'DELETE', headers: driveAuthHeaders(driveAccessToken) });
+            if (!res.ok) {
+                const t = await res.text();
+                throw new Error(parseDriveError(t, res.status));
+            }
+            projects = projects.filter(function (p) { return !p.file || p.file.id !== fileId; });
+            selectedProjectIds.delete(fileId);
+            var tc = parseInt(spmTotalCount.textContent, 10);
+            if (isFinite(tc) && tc > 0) spmTotalCount.textContent = String(tc - 1);
+            recalculateSummaryFromProjects();
+        }
+
+        spmTableBody.addEventListener('change', function (e) {
+            var rowChk = e.target.closest('[data-spm-row-check]');
+            if (rowChk) {
+                var pid = rowChk.getAttribute('data-project-id');
+                if (rowChk.checked) selectedProjectIds.add(pid);
+                else selectedProjectIds.delete(pid);
+                syncSelectAllCheckbox();
+                updateBulkUi();
+                return;
+            }
+            const sel = e.target.closest('[data-rarity-set]');
+            if (!sel) return;
+            const projectId = sel.getAttribute('data-project-id');
+            const newRarity = sel.value;
+            setMessage('Updating rarity…');
+            updateProjectRarity(projectId, newRarity).catch(function (err) {
+                console.error(err);
+                setMessage('Failed to update rarity: ' + (err && err.message ? err.message : String(err)), true);
+            });
+        });
+
+        var editModalProjectId = null;
+
+        function buildEditModalStaticSelects() {
+            var typeSel = document.getElementById('spmEditType');
+            var subSel = document.getElementById('spmEditSubtype');
+            var rarSel = document.getElementById('spmEditRarity');
+            if (typeSel) {
+                typeSel.innerHTML = '<option value="">— None</option>' + TYPE_OPTIONS.map(function (t) {
+                    return '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>';
+                }).join('');
+            }
+            if (subSel) {
+                subSel.innerHTML = '<option value="">— None</option>' + SUBTYPE_OPTIONS.map(function (t) {
+                    return '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>';
+                }).join('');
+            }
+            if (rarSel) {
+                rarSel.innerHTML = '<option value="">— None</option>' + RARITY_OPTIONS.filter(function (r) { return r !== ''; }).map(function (r) {
+                    return '<option value="' + escapeHtml(r) + '">' + escapeHtml(r) + '</option>';
+                }).join('');
+            }
+        }
+
+        function ensureOptionValue(sel, val) {
+            if (!sel) return;
+            if (val === undefined || val === null || val === '') {
+                sel.value = '';
+                return;
+            }
+            var s = String(val);
+            var found = Array.from(sel.options).some(function (o) { return o.value === s; });
+            if (!found) {
+                var o = document.createElement('option');
+                o.value = s;
+                o.textContent = s + ' (custom)';
+                sel.appendChild(o);
+            }
+            sel.value = s;
+        }
+
+        function closeSpmEditModal() {
+            var modal = document.getElementById('spmEditModal');
+            if (modal) {
+                modal.classList.remove('is-open');
+                modal.setAttribute('aria-hidden', 'true');
+            }
+            document.body.style.overflow = '';
+            editModalProjectId = null;
+        }
+
+        function openSpmEditModal(projectId) {
+            var project = projects.find(function (p) { return p.file && p.file.id === projectId; });
+            if (!project) return;
+            var errEl = document.getElementById('spmEditError');
+            if (errEl) {
+                errEl.hidden = true;
+                errEl.textContent = '';
+            }
+            editModalProjectId = projectId;
+            buildEditModalStaticSelects();
+            document.getElementById('spmEditName').value = displaySaveLabel(project.file.name);
+            var f = (project.state && project.state.fields) ? project.state.fields : {};
+            ensureOptionValue(document.getElementById('spmEditType'), f.Type != null ? String(f.Type) : '');
+            ensureOptionValue(document.getElementById('spmEditSubtype'), f.Subtype != null ? String(f.Subtype) : '');
+            var costEl = document.getElementById('spmEditCost');
+            if (costEl) {
+                var c = project.costNumber;
+                if (!isFinite(c)) c = parseNumberSafe(f.TreasureCost);
+                costEl.value = isFinite(c) ? String(Math.round(c)) : '0';
+            }
+            ensureOptionValue(document.getElementById('spmEditRarity'), project.rarity || '');
+            var modal = document.getElementById('spmEditModal');
+            if (modal) {
+                modal.classList.add('is-open');
+                modal.setAttribute('aria-hidden', 'false');
+            }
+            document.body.style.overflow = 'hidden';
+            var nameInput = document.getElementById('spmEditName');
+            if (nameInput) nameInput.focus();
+        }
+
+        async function saveSpmEditModal() {
+            var errEl = document.getElementById('spmEditError');
+            function showErr(msg) {
+                if (errEl) {
+                    errEl.textContent = msg;
+                    errEl.hidden = false;
+                }
+            }
+            function clearErr() {
+                if (errEl) {
+                    errEl.textContent = '';
+                    errEl.hidden = true;
+                }
+            }
+            clearErr();
+            var id = editModalProjectId;
+            var project = projects.find(function (p) { return p.file && p.file.id === id; });
+            if (!project) {
+                showErr('Project not found.');
+                return;
+            }
+            var newFullName;
+            try {
+                newFullName = fullDriveFileNameFromBase(document.getElementById('spmEditName').value);
+            } catch (e) {
+                showErr(e.message || String(e));
+                return;
+            }
+            var typeV = document.getElementById('spmEditType').value;
+            var subV = document.getElementById('spmEditSubtype').value;
+            var costRaw = document.getElementById('spmEditCost').value;
+            var costNum = parseInt(costRaw, 10);
+            if (isNaN(costNum)) costNum = 0;
+            costNum = Math.max(0, Math.min(999, costNum));
+            var rarityV = document.getElementById('spmEditRarity').value;
+
+            if (!project.state || typeof project.state !== 'object') project.state = {};
+            if (!project.state.fields) project.state.fields = {};
+            project.state.fields.Type = typeV;
+            project.state.fields.Subtype = subV;
+            project.state.fields.TreasureCost = String(costNum);
+            project.state.fields.Rarity = rarityV;
+
+            var btn = document.getElementById('spmEditSaveBtn');
+            if (btn) btn.disabled = true;
+            try {
+                if (newFullName !== project.file.name) {
+                    var meta = await driveRenameFile(project.file.id, newFullName);
+                    project.file.name = meta.name || newFullName;
+                    if (meta.modifiedTime) project.file.modifiedTime = meta.modifiedTime;
+                    if (meta.size != null) project.file.size = meta.size;
+                }
+                await uploadProjectStateBytes(project.file.id, project.state);
+                project.fieldsType = computeType(project.state.fields);
+                project.fieldsSubtype = computeSubtype(project.state.fields);
+                project.costNumber = computeCost(project.state.fields);
+                project.rarity = computeRarityValue(project.state.fields);
+                project.fields = project.state.fields;
+                recalculateSummaryFromProjects();
+                setMessage('Saved changes for “' + displaySaveLabel(project.file.name) + '”.');
+                closeSpmEditModal();
+            } catch (e) {
+                console.error(e);
+                showErr((e && e.message) ? e.message : String(e));
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        document.querySelectorAll('[data-spm-edit-close]').forEach(function (el) {
+            el.addEventListener('click', function () { closeSpmEditModal(); });
+        });
+        var spmEditSaveBtnEl = document.getElementById('spmEditSaveBtn');
+        if (spmEditSaveBtnEl) spmEditSaveBtnEl.addEventListener('click', function () { saveSpmEditModal(); });
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape') return;
+            var modal = document.getElementById('spmEditModal');
+            if (modal && modal.classList.contains('is-open')) closeSpmEditModal();
+        });
+        buildEditModalStaticSelects();
+
+        spmTableBody.addEventListener('click', function (e) {
+            var editBtn = e.target.closest('[data-spm-edit]');
+            if (editBtn) {
+                e.preventDefault();
+                openSpmEditModal(editBtn.getAttribute('data-project-id'));
+                return;
+            }
+            var del = e.target.closest('[data-spm-delete]');
+            if (!del) return;
+            var id = del.getAttribute('data-project-id');
+            var proj = projects.find(function (p) { return p.file && p.file.id === id; });
+            var label = proj ? displaySaveLabel(proj.file.name) : 'this save';
+            if (!confirm('Permanently delete “' + label + '”?\n\nApp Data files cannot be moved to Trash; this remove is permanent.')) return;
+            setMessage('Deleting…');
+            (async function () {
+                try {
+                    await deleteDriveProject(id);
+                    setMessage('Deleted “' + label + '”.');
+                } catch (err) {
+                    console.error(err);
+                    setMessage('Delete failed: ' + (err && err.message ? err.message : String(err)), true);
+                }
+            })();
+        });
+
+        // Boot: try restoring session from localStorage
+        (async function boot() {
+            const ok = await ensureSignedIn();
+            updateButtons();
+            if (ok) {
+                spmStatus.textContent = 'Loading saved projects…';
+                spmRefreshBtn.disabled = false;
+                await refreshAll();
+            }
+        })();
+    </script>
+</body>
+</html>
+

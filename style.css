@@ -27,6 +27,13 @@
     margin: 10px 20px 15px;
 }
 
+.top-bar-nav-links {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
 .top-drive-controls {
     display: flex;
     gap: 8px;

@@ -97,6 +97,19 @@
             margin-right: auto;
         }
         .cg-summary strong { color: #f1f5f9; }
+        .cg-queue-banner {
+            text-align: center;
+            font-size: 0.88rem;
+            color: #e0e7ff;
+            margin: 0 auto 14px;
+            padding: 10px 14px;
+            max-width: 44rem;
+            background: rgba(99,102,241,0.18);
+            border: 1px solid rgba(165,180,252,0.35);
+            border-radius: 10px;
+            line-height: 1.45;
+        }
+        .cg-queue-banner[hidden] { display: none !important; }
 
         .cg-grid-wrap {
             background: rgba(255,255,255,0.06);
@@ -254,7 +267,7 @@
         <div class="cg-wrap">
             <header class="cg-header no-print">
                 <h1>Print 9-up sheet</h1>
-                <p class="cg-sub">Add images, open <strong>Print setup</strong> for size and bleed, then print or download a print-ready PDF. Load art from a <strong>Card Maker</strong> cloud save if you already signed in there.</p>
+                <p class="cg-sub">Add images, open <strong>Print setup</strong> for size and bleed, then print or download a print-ready PDF. Load art from a <strong>Card Maker</strong> cloud save—or choose saves in <strong>Saved Projects Manager</strong> and use <strong>Open in print grid</strong> to queue them here (same Google sign-in).</p>
             </header>
 
             <div class="cg-toolbar no-print">
@@ -267,6 +280,7 @@
             </div>
 
             <p class="cg-summary no-print" id="fitInfo" aria-live="polite"></p>
+            <p class="cg-queue-banner no-print" id="cgQueueBanner" hidden role="status"></p>
 
             <div class="cg-grid-wrap">
                 <div class="cg-grid-container trim-bleed" id="gridContainer"></div>
@@ -404,6 +418,7 @@
         const printSetupModal = document.getElementById('printSetupModal');
 
         const SLOTS = 9;
+        const PRINT_IMPORT_STORAGE_KEY = 'cardmaker_print_import_v1';
         const PAGE_W_IN = 8.5;
         const PAGE_H_IN = 11;
         const MARGIN_X = 0;
@@ -890,6 +905,81 @@
             }
         }
 
+        function setQueueBanner(text, visible) {
+            const b = document.getElementById('cgQueueBanner');
+            if (!b) return;
+            if (visible && text) {
+                b.hidden = false;
+                b.textContent = text;
+            } else {
+                b.hidden = true;
+                b.textContent = '';
+            }
+        }
+
+        async function consumePrintImportFromSavedProjects() {
+            /* localStorage: sessionStorage is per-tab, so a tab opened from Saved Projects Manager could not see the queue */
+            const raw = localStorage.getItem(PRINT_IMPORT_STORAGE_KEY);
+            if (!raw) {
+                setQueueBanner('', false);
+                return;
+            }
+            let data;
+            try {
+                data = JSON.parse(raw);
+            } catch (e) {
+                localStorage.removeItem(PRINT_IMPORT_STORAGE_KEY);
+                setQueueBanner('', false);
+                return;
+            }
+            const ids = data && Array.isArray(data.fileIds) ? data.fileIds.map(String).filter(Boolean) : [];
+            if (!ids.length) {
+                localStorage.removeItem(PRINT_IMPORT_STORAGE_KEY);
+                setQueueBanner('', false);
+                return;
+            }
+
+            const token = readStoredDriveToken();
+            if (!token) {
+                setQueueBanner(
+                    'You have ' + ids.length + ' card(s) queued from Saved Projects Manager. Connect Google: open Print setup, use Browse Card Maker saves & sign in (same account), then refresh this page—or sign in there and return here.',
+                    true
+                );
+                return;
+            }
+
+            const nLoad = Math.min(ids.length, SLOTS);
+            setQueueBanner('Loading ' + nLoad + ' save(s) from Saved Projects Manager…', true);
+
+            const useIds = ids.slice(0, SLOTS);
+            const urls = [];
+            for (let i = 0; i < useIds.length; i++) {
+                try {
+                    const json = await fetchDriveFileJson(token, useIds[i]);
+                    const url = await compositeImageFromCardMakerSave(json);
+                    if (url) urls.push(url);
+                } catch (e) {
+                    console.error('Print import', useIds[i], e);
+                }
+            }
+
+            localStorage.removeItem(PRINT_IMPORT_STORAGE_KEY);
+
+            if (urls.length === 0) {
+                setQueueBanner('Could not load the selected saves. Stay signed in and try again from Saved Projects Manager.', true);
+                updateFitInfo();
+                return;
+            }
+
+            uploadedUrls = urls;
+            repeatBtn.disabled = uploadedUrls.length === 0;
+            setGridFromUrls(uploadedUrls, false);
+            updateFitInfo();
+            let msg = 'Loaded ' + urls.length + ' full card image(s) from Saved Projects Manager (slots 1–' + urls.length + ').';
+            if (ids.length > SLOTS) msg += ' Only the first ' + SLOTS + ' of ' + ids.length + ' selected were used.';
+            setQueueBanner(msg, true);
+        }
+
         async function refreshGridLoadModalList() {
             const token = readStoredDriveToken();
             const listEl = document.getElementById('gridLoadModalList');
@@ -1018,6 +1108,7 @@
                     persistDriveToken(tokenResponse);
                     setGridLoadModalMessage('Signed in.', false);
                     refreshGridLoadModalList();
+                    consumePrintImportFromSavedProjects().catch(function (e) { console.error(e); });
                 } else {
                     setGridLoadModalMessage('Sign-in failed.', true);
                 }
@@ -1184,6 +1275,8 @@
             if (!ok) return;
             prefetchGridDriveCache();
         })();
+
+        consumePrintImportFromSavedProjects().catch(function (e) { console.error(e); });
     </script>
 </body>
 </html>

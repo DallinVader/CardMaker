@@ -11,7 +11,10 @@
             <h1>Card Maker</h1>
         </div>
         <div class="top-bar-under">
-            <a href="card-grid.html" class="top-bar-btn">Print the cards</a>
+            <div class="top-bar-nav-links">
+                <a href="card-grid.html" class="top-bar-btn">Print the cards</a>
+                <a href="saved-projects.html" class="top-bar-btn">View all saved cards</a>
+            </div>
             <div class="top-drive-controls">
                 <button type="button" id="googleSignInBtn" class="top-bar-btn top-drive-btn" onclick="handleGoogleDriveAuthClick()">Sign in with Google</button>
                 <button type="button" id="driveManageBtn" class="top-bar-btn top-drive-btn top-drive-btn-primary" onclick="openDriveProjectsModal()" disabled>Saved projects…</button>
@@ -1360,6 +1363,38 @@
             setDriveStatus('Loaded "' + displaySaveLabel(file.name) + '".');
         }
 
+        /**
+         * Open a save by Drive file id when arriving from Saved Projects Manager:
+         * index.html?openDriveFile=DRIVE_FILE_ID
+         */
+        async function maybeOpenDriveFileFromQuery() {
+            var params;
+            try {
+                params = new URLSearchParams(window.location.search || '');
+            } catch (e) {
+                return;
+            }
+            var fileId = params.get('openDriveFile');
+            if (!fileId || !hasDriveConfig()) return;
+            if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) {
+                setDriveStatus('Sign in with Google to open this save (link from Saved Projects Manager).');
+                return;
+            }
+            try {
+                await loadProjectFromDriveByFile({ id: fileId, name: fileId + '.cardmaker.json' });
+                try {
+                    var u = new URL(window.location.href);
+                    u.searchParams.delete('openDriveFile');
+                    history.replaceState({}, '', u.pathname + u.search + u.hash);
+                } catch (e2) { /* ignore */ }
+            } catch (err) {
+                console.error(err);
+                var msg = err && err.message ? err.message : String(err);
+                setDriveStatus('Could not open linked save: ' + msg.slice(0, 120));
+                alert('Could not open this save from the link.\n\n' + msg);
+            }
+        }
+
         function clearDriveModalPreview() {
             const img = document.getElementById('driveModalPreviewImg');
             const ph = document.getElementById('driveModalPreviewPlaceholder');
@@ -1899,7 +1934,9 @@
             } else {
                 setDriveStatus('Not signed in. Click "Sign in with Google" to connect Drive.');
             }
-            tryRestoreDriveSession().catch(function (e) { console.error(e); });
+            tryRestoreDriveSession()
+                .then(function () { return maybeOpenDriveFileFromQuery(); })
+                .catch(function (e) { console.error(e); });
         } else {
             setDriveStatus('Set GOOGLE_CLIENT_ID in index.html first.');
         }
