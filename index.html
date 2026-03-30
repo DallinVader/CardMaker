@@ -293,6 +293,8 @@
         const GOOGLE_API_KEY = '';
         const GOOGLE_CLIENT_ID = '984239146057-o6ujksfj9qk8tmqm9c8msrpidgm6492r.apps.googleusercontent.com';
         const GOOGLE_DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+        // Required for appDataFolder (hidden app saves). Add this exact scope under
+        // Google Cloud → APIs & Services → OAuth consent screen → Scopes, or Drive calls return 403.
         const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
         const PROJECT_FILE_EXTENSION = '.cardmaker.json';
 
@@ -950,6 +952,8 @@
             });
         }
 
+        // Drive REST per https://developers.google.com/workspace/drive/api/guides/appdata
+        // and https://developers.google.com/workspace/drive/api/guides/manage-uploads
         const DRIVE_FILES_API = 'https://www.googleapis.com/drive/v3/files';
         const DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3/files';
 
@@ -961,63 +965,85 @@
             return h;
         }
 
-        async function driveListFiles(q, pageSize) {
+        function parseDriveError(text, status) {
+            try {
+                const j = JSON.parse(text);
+                if (j.error) {
+                    return (j.error.message || JSON.stringify(j.error)) +
+                        (j.error.errors && j.error.errors[0] && j.error.errors[0].reason
+                            ? ' (' + j.error.errors[0].reason + ')' : '');
+                }
+            } catch (e) { /* ignore */ }
+            return text || ('HTTP ' + status);
+        }
+
+        /** List appDataFolder files (same shape as official curl sample). */
+        async function listAppDataFolderFiles() {
             const u = new URL(DRIVE_FILES_API);
             u.searchParams.set('spaces', 'appDataFolder');
-            u.searchParams.set('fields', 'files(id,name,modifiedTime)');
-            u.searchParams.set('pageSize', String(pageSize || 100));
-            u.searchParams.set('orderBy', 'modifiedTime desc');
-            if (q) u.searchParams.set('q', q);
+            u.searchParams.set('fields', 'files(id,name,mimeType,modifiedTime)');
+            u.searchParams.set('pageSize', '100');
             const res = await fetch(u.toString(), { headers: driveAuthHeaders() });
             const text = await res.text();
             if (!res.ok) {
-                throw new Error(text || ('Drive list failed: ' + res.status));
+                throw new Error(parseDriveError(text, res.status));
             }
             const data = JSON.parse(text);
             return data.files || [];
         }
 
         async function findDriveProjectByName(fileName) {
-            const escaped = fileName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-            const query = "name = '" + escaped + "' and trashed = false and 'appDataFolder' in parents";
-            const files = await driveListFiles(query, 1);
-            return files.length > 0 ? files[0] : null;
+            const files = await listAppDataFolderFiles();
+            for (let i = 0; i < files.length; i++) {
+                if (files[i].name === fileName) return files[i];
+            }
+            return null;
         }
 
-        async function uploadProjectToDrive(fileName, jsonContent, existingFileId) {
-            const metadata = {
-                name: fileName,
-                mimeType: 'application/json'
-            };
-            if (!existingFileId) {
-                metadata.parents = ['appDataFolder'];
-            }
-            const boundary = 'cardmaker_' + Date.now();
-            const crlf = '\r\n';
-            const multipartBody =
-                '--' + boundary + crlf +
-                'Content-Type: application/json; charset=UTF-8' + crlf + crlf +
-                JSON.stringify(metadata) + crlf +
-                '--' + boundary + crlf +
-                'Content-Type: application/json' + crlf + crlf +
-                jsonContent + crlf +
-                '--' + boundary + '--';
-
-            const url = existingFileId
-                ? DRIVE_UPLOAD_API + '/' + encodeURIComponent(existingFileId) + '?uploadType=multipart'
-                : DRIVE_UPLOAD_API + '?uploadType=multipart';
-            const method = existingFileId ? 'PATCH' : 'POST';
-
-            const res = await fetch(url, {
-                method: method,
-                headers: driveAuthHeaders({
-                    'Content-Type': 'multipart/related; boundary=' + boundary
-                }),
-                body: multipartBody
+        /** Create metadata-only file in appDataFolder: POST /drive/v3/files */
+        async function driveCreateAppDataMetadata(fileName) {
+            const u = new URL(DRIVE_FILES_API);
+            u.searchParams.set('fields', 'id,name');
+            const res = await fetch(u.toString(), {
+                method: 'POST',
+                headers: driveAuthHeaders({ 'Content-Type': 'application/json; charset=UTF-8' }),
+                body: JSON.stringify({
+                    name: fileName,
+                    mimeType: 'application/json',
+                    parents: ['appDataFolder']
+                })
             });
             const text = await res.text();
             if (!res.ok) {
-                throw new Error(text || ('Drive upload failed: ' + res.status));
+                throw new Error(parseDriveError(text, res.status));
+            }
+            return JSON.parse(text);
+        }
+
+        /** Upload/replace file bytes: PATCH /upload/drive/v3/files/{id}?uploadType=media (simple upload, under 5MB). */
+        async function driveUploadMedia(fileId, jsonContent) {
+            const u = new URL(DRIVE_UPLOAD_API + '/' + encodeURIComponent(fileId));
+            u.searchParams.set('uploadType', 'media');
+            const res = await fetch(u.toString(), {
+                method: 'PATCH',
+                headers: driveAuthHeaders({ 'Content-Type': 'application/json; charset=UTF-8' }),
+                body: jsonContent
+            });
+            const text = await res.text();
+            if (!res.ok) {
+                throw new Error(parseDriveError(text, res.status));
+            }
+        }
+
+        async function uploadProjectToDrive(fileName, jsonContent, existingFileId) {
+            if (existingFileId) {
+                await driveUploadMedia(existingFileId, jsonContent);
+            } else {
+                const created = await driveCreateAppDataMetadata(fileName);
+                if (!created || !created.id) {
+                    throw new Error('Drive create returned no file id.');
+                }
+                await driveUploadMedia(created.id, jsonContent);
             }
         }
 
@@ -1045,7 +1071,14 @@
         }
 
         async function listDriveProjects() {
-            return driveListFiles("trashed = false and name contains 'cardmaker'", 100);
+            const files = await listAppDataFolderFiles();
+            return files.filter(function (f) {
+                return f.name && f.name.indexOf('cardmaker') !== -1;
+            }).sort(function (a, b) {
+                const ta = new Date(a.modifiedTime || 0).getTime();
+                const tb = new Date(b.modifiedTime || 0).getTime();
+                return tb - ta;
+            });
         }
 
         async function loadProjectFromDrive() {
