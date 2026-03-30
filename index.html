@@ -19,7 +19,7 @@
             </div>
         </div>
         <div class="top-drive-status-wrap">
-            <small id="driveStatusText">Not signed in. Add your Google API keys in code first.</small>
+            <small id="driveStatusText">Checking Google Drive setup...</small>
         </div>
         
         <div class="main-container">
@@ -298,6 +298,7 @@
         let gapiClientInitialized = false;
         let gisTokenClient = null;
         let driveAccessToken = null;
+        let googleScriptsReady = false;
 
         // Collapsible sections functionality
         function toggleSection(header) {
@@ -742,18 +743,25 @@
                 setDriveStatus('Google scripts are still loading. Try again in a moment.');
                 return false;
             }
+            googleScriptsReady = true;
 
             if (!gapiClientInitialized) {
-                await new Promise(function (resolve, reject) {
-                    gapi.load('client', {
-                        callback: resolve,
-                        onerror: reject
+                try {
+                    await new Promise(function (resolve, reject) {
+                        gapi.load('client', {
+                            callback: resolve,
+                            onerror: function () { reject(new Error('gapi.load failed')); }
+                        });
                     });
-                });
-                await gapi.client.init({
-                    apiKey: GOOGLE_API_KEY,
-                    discoveryDocs: [GOOGLE_DISCOVERY_DOC]
-                });
+                    await gapi.client.init({
+                        apiKey: GOOGLE_API_KEY,
+                        discoveryDocs: [GOOGLE_DISCOVERY_DOC]
+                    });
+                } catch (error) {
+                    console.error(error);
+                    setDriveStatus('Google API init failed. Check API key restrictions/origins.');
+                    return false;
+                }
                 gapiClientInitialized = true;
             }
 
@@ -761,7 +769,12 @@
                 gisTokenClient = google.accounts.oauth2.initTokenClient({
                     client_id: GOOGLE_CLIENT_ID,
                     scope: DRIVE_SCOPE,
-                    callback: function () {}
+                    callback: function () {},
+                    error_callback: function (err) {
+                        console.error('GIS error:', err);
+                        setDriveStatus('Google sign-in popup was closed/blocked or config is invalid.');
+                        alert('Google sign-in failed. If no popup appears, allow popups for this site and verify localhost/GitHub origin in OAuth settings.');
+                    }
                 });
             }
 
@@ -769,20 +782,33 @@
         }
 
         async function handleGoogleSignIn() {
-            const ready = await initGoogleDriveClient();
-            if (!ready) return;
-            setDriveStatus('Opening Google sign-in...');
-            gisTokenClient.callback = function (tokenResponse) {
-                if (tokenResponse && tokenResponse.access_token) {
-                    driveAccessToken = tokenResponse.access_token;
-                    gapi.client.setToken({ access_token: driveAccessToken });
-                    setDriveStatus('Signed in. You can now save/load projects.');
-                    updateDriveButtons();
-                } else {
-                    setDriveStatus('Sign-in failed. Please try again.');
+            try {
+                const ready = await initGoogleDriveClient();
+                if (!ready) {
+                    if (!googleScriptsReady) {
+                        alert('Google libraries are not ready yet. Reload and try again. If local, use http://localhost (not file://).');
+                    }
+                    return;
                 }
-            };
-            gisTokenClient.requestAccessToken({ prompt: 'consent' });
+                setDriveStatus('Opening Google sign-in...');
+                gisTokenClient.callback = function (tokenResponse) {
+                    if (tokenResponse && tokenResponse.access_token) {
+                        driveAccessToken = tokenResponse.access_token;
+                        gapi.client.setToken({ access_token: driveAccessToken });
+                        setDriveStatus('Signed in. You can now save/load projects.');
+                        updateDriveButtons();
+                    } else {
+                        console.error('Token response:', tokenResponse);
+                        setDriveStatus('Sign-in failed. Check OAuth origin settings.');
+                        alert('Sign-in failed. Ensure this exact origin is in OAuth Authorized JavaScript origins:\n' + window.location.origin);
+                    }
+                };
+                gisTokenClient.requestAccessToken({ prompt: 'consent' });
+            } catch (error) {
+                console.error(error);
+                setDriveStatus('Sign-in failed due to runtime error.');
+                alert('Google sign-in error: ' + (error && error.message ? error.message : 'Unknown error'));
+            }
         }
 
         function buildProjectState() {
@@ -1318,6 +1344,11 @@
         updateExportSizeDisplayFromSlider();
         updateExportBleedHint();
         updateDriveButtons();
+        if (hasDriveConfig()) {
+            setDriveStatus('Not signed in. Click "Sign in with Google" to connect Drive.');
+        } else {
+            setDriveStatus('Set GOOGLE_API_KEY and GOOGLE_CLIENT_ID in index.html first.');
+        }
         
         // Download the final card at the selected format (optional black bleed within selected size)
         function downloadCard() {
