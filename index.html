@@ -89,6 +89,15 @@
                             <button onclick="openFullscreen()" title="Ctrl+F">Fullscreen Card</button>
                             <button onclick="resetEverything()" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: white;" title="Ctrl+R">Reset All</button>
                         </div>
+                        <div class="input-group" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(200, 200, 220, 0.3);">
+                            <label>Cloud Save (Google Drive):</label>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                <button type="button" id="googleSignInBtn" onclick="handleGoogleSignIn()">Sign in with Google</button>
+                                <button type="button" id="saveDriveBtn" onclick="saveProjectToDrive()" disabled>Save Project</button>
+                                <button type="button" id="loadDriveBtn" onclick="loadProjectFromDrive()" disabled>Load Project</button>
+                            </div>
+                            <small id="driveStatusText">Not signed in. Add your Google API keys in code first.</small>
+                        </div>
                         <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(200, 200, 220, 0.3); font-size: 11px; color: #718096;">
                             <strong>Keyboard Shortcuts:</strong><br>
                             <kbd>Ctrl+D</kbd> Download | <kbd>Ctrl+F</kbd> Fullscreen | <kbd>Ctrl+R</kbd> Reset<br>
@@ -278,7 +287,19 @@
             </div>
         </div>
 
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
+        const GOOGLE_API_KEY = 'AIzaSyCLYzoygZZT698a_H7fUxJddioxuTRE8oM';
+        const GOOGLE_CLIENT_ID = '984239146057-o6ujksfj9qk8tmqm9c8msrpidgm6492r.apps.googleusercontent.com';
+        const GOOGLE_DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+        const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+        const PROJECT_FILE_EXTENSION = '.cardmaker.json';
+
+        let gapiClientInitialized = false;
+        let gisTokenClient = null;
+        let driveAccessToken = null;
+
         // Collapsible sections functionality
         function toggleSection(header) {
             const section = header.parentElement;
@@ -694,6 +715,325 @@
             redrawCanvas();
         }
 
+        function setDriveStatus(message) {
+            const statusEl = document.getElementById('driveStatusText');
+            if (statusEl) statusEl.textContent = message;
+        }
+
+        function hasDriveConfig() {
+            return GOOGLE_API_KEY && GOOGLE_CLIENT_ID &&
+                !GOOGLE_API_KEY.startsWith('REPLACE_') &&
+                !GOOGLE_CLIENT_ID.startsWith('REPLACE_');
+        }
+
+        function updateDriveButtons() {
+            const signedIn = !!driveAccessToken;
+            const saveBtn = document.getElementById('saveDriveBtn');
+            const loadBtn = document.getElementById('loadDriveBtn');
+            if (saveBtn) saveBtn.disabled = !signedIn;
+            if (loadBtn) loadBtn.disabled = !signedIn;
+        }
+
+        async function initGoogleDriveClient() {
+            if (!hasDriveConfig()) {
+                setDriveStatus('Set GOOGLE_API_KEY and GOOGLE_CLIENT_ID in index.html first.');
+                return false;
+            }
+            if (!window.gapi || !window.google || !google.accounts || !google.accounts.oauth2) {
+                setDriveStatus('Google scripts are still loading. Try again in a moment.');
+                return false;
+            }
+
+            if (!gapiClientInitialized) {
+                await new Promise(function (resolve, reject) {
+                    gapi.load('client', {
+                        callback: resolve,
+                        onerror: reject
+                    });
+                });
+                await gapi.client.init({
+                    apiKey: GOOGLE_API_KEY,
+                    discoveryDocs: [GOOGLE_DISCOVERY_DOC]
+                });
+                gapiClientInitialized = true;
+            }
+
+            if (!gisTokenClient) {
+                gisTokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: GOOGLE_CLIENT_ID,
+                    scope: DRIVE_SCOPE,
+                    callback: function () {}
+                });
+            }
+
+            return true;
+        }
+
+        async function handleGoogleSignIn() {
+            const ready = await initGoogleDriveClient();
+            if (!ready) return;
+            setDriveStatus('Opening Google sign-in...');
+            gisTokenClient.callback = function (tokenResponse) {
+                if (tokenResponse && tokenResponse.access_token) {
+                    driveAccessToken = tokenResponse.access_token;
+                    gapi.client.setToken({ access_token: driveAccessToken });
+                    setDriveStatus('Signed in. You can now save/load projects.');
+                    updateDriveButtons();
+                } else {
+                    setDriveStatus('Sign-in failed. Please try again.');
+                }
+            };
+            gisTokenClient.requestAccessToken({ prompt: 'consent' });
+        }
+
+        function buildProjectState() {
+            return {
+                version: 1,
+                updatedAt: new Date().toISOString(),
+                fields: {
+                    ArtHight: document.getElementById('ArtHight').value,
+                    ArtHightPos: document.getElementById('ArtHightPos').value,
+                    ArtWidthPos: document.getElementById('ArtWidthPos').value,
+                    Title: document.getElementById('Title').value,
+                    TitleFontSize: document.getElementById('TitleFontSize').value,
+                    TitleCenterAlign: document.getElementById('TitleCenterAlign').checked,
+                    DamageID: document.getElementById('DamageID').value,
+                    DefenseID: document.getElementById('DefenseID').value,
+                    Type: document.getElementById('Type').value,
+                    TypeFontSize: document.getElementById('TypeFontSize').value,
+                    Subtype: document.getElementById('Subtype').value,
+                    SubtypeFontSize: document.getElementById('SubtypeFontSize').value,
+                    TreasureCost: document.getElementById('TreasureCost').value,
+                    TreasureFontSize: document.getElementById('TreasureFontSize').value,
+                    MainDisciption: document.getElementById('MainDisciption').value,
+                    MainDisciptionFontSize: document.getElementById('MainDisciptionFontSize').value,
+                    MainDescriptionCenterAlign: document.getElementById('MainDescriptionCenterAlign').checked,
+                    SubDisciption: document.getElementById('SubDisciption').value,
+                    SubDisciptionFontSize: document.getElementById('SubDisciptionFontSize').value,
+                    SubDescriptionCenterAlign: document.getElementById('SubDescriptionCenterAlign').checked,
+                    QoteDiscription: document.getElementById('QoteDiscription').value,
+                    QoteDiscriptionFontSize: document.getElementById('QoteDiscriptionFontSize').value,
+                    QuoteCenterAlign: document.getElementById('QuoteCenterAlign').checked,
+                    downloadFormat: document.getElementById('downloadFormat').value,
+                    exportIncludeBleed: document.getElementById('exportIncludeBleed').checked,
+                    exportWidth: document.getElementById('exportWidth').value,
+                    exportWidthInput: document.getElementById('exportWidthInput').value,
+                    jpegQuality: document.getElementById('jpegQuality').value,
+                    showDamageStats: IsSwitchedOn
+                },
+                images: {
+                    cardBaseSrc: MainImage && MainImage.src ? MainImage.src : '',
+                    artSrc: ArtImage && ArtImage.src ? ArtImage.src : ''
+                }
+            };
+        }
+
+        function setImageSource(target, src, onDone) {
+            if (!src) {
+                onDone();
+                return;
+            }
+            const img = new Image();
+            img.onload = function () {
+                img.hy = target.hy || 0;
+                img.wx = target.wx || 0;
+                img.h = target.h || 116;
+                onDone(img);
+            };
+            img.onerror = function () {
+                onDone();
+            };
+            img.src = src;
+        }
+
+        function applyProjectState(state) {
+            if (!state || !state.fields) {
+                alert('Invalid project file.');
+                return;
+            }
+            const f = state.fields;
+
+            function setIfExists(id, value) {
+                const el = document.getElementById(id);
+                if (!el || value === undefined || value === null) return;
+                if (typeof value === 'boolean') {
+                    el.checked = value;
+                } else {
+                    el.value = value;
+                }
+            }
+
+            setIfExists('ArtHight', f.ArtHight);
+            setIfExists('ArtHightPos', f.ArtHightPos);
+            setIfExists('ArtWidthPos', f.ArtWidthPos);
+            setIfExists('Title', f.Title);
+            setIfExists('TitleFontSize', f.TitleFontSize);
+            setIfExists('TitleCenterAlign', f.TitleCenterAlign);
+            setIfExists('DamageID', f.DamageID);
+            setIfExists('DefenseID', f.DefenseID);
+            setIfExists('Type', f.Type);
+            setIfExists('TypeFontSize', f.TypeFontSize);
+            setIfExists('Subtype', f.Subtype);
+            setIfExists('SubtypeFontSize', f.SubtypeFontSize);
+            setIfExists('TreasureCost', f.TreasureCost);
+            setIfExists('TreasureFontSize', f.TreasureFontSize);
+            setIfExists('MainDisciption', f.MainDisciption);
+            setIfExists('MainDisciptionFontSize', f.MainDisciptionFontSize);
+            setIfExists('MainDescriptionCenterAlign', f.MainDescriptionCenterAlign);
+            setIfExists('SubDisciption', f.SubDisciption);
+            setIfExists('SubDisciptionFontSize', f.SubDisciptionFontSize);
+            setIfExists('SubDescriptionCenterAlign', f.SubDescriptionCenterAlign);
+            setIfExists('QoteDiscription', f.QoteDiscription);
+            setIfExists('QoteDiscriptionFontSize', f.QoteDiscriptionFontSize);
+            setIfExists('QuoteCenterAlign', f.QuoteCenterAlign);
+            setIfExists('downloadFormat', f.downloadFormat);
+            setIfExists('exportIncludeBleed', f.exportIncludeBleed);
+            setIfExists('exportWidth', f.exportWidth);
+            setIfExists('exportWidthInput', f.exportWidthInput);
+            setIfExists('jpegQuality', f.jpegQuality);
+
+            IsSwitchedOn = !!f.showDamageStats;
+            const damageCheckbox = document.querySelector('input[type="checkbox"][onclick="ToggelSwitch()"]');
+            if (damageCheckbox) damageCheckbox.checked = IsSwitchedOn;
+
+            const images = state.images || {};
+            setImageSource(MainImage, images.cardBaseSrc, function (img) {
+                if (img) MainImage = img;
+                setImageSource(ArtImage, images.artSrc, function (artImg) {
+                    if (artImg) {
+                        ArtImage = artImg;
+                        document.body.style.backgroundImage = "url('" + ArtImage.src + "')";
+                    }
+                    ImageSizeNoRedraw();
+                    updateFontSizeDisplay();
+                    updateQualityDisplay();
+                    toggleQualitySlider();
+                    updateExportSizeDisplayFromSlider();
+                    updateExportBleedHint();
+                    redrawCanvas();
+                });
+            });
+        }
+
+        async function findDriveProjectByName(fileName) {
+            const escaped = fileName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const query = "name = '" + escaped + "' and trashed = false and '" + "appDataFolder" + "' in parents";
+            const response = await gapi.client.drive.files.list({
+                spaces: 'appDataFolder',
+                q: query,
+                fields: 'files(id, name, modifiedTime)',
+                pageSize: 1
+            });
+            const files = response.result.files || [];
+            return files.length > 0 ? files[0] : null;
+        }
+
+        async function uploadProjectToDrive(fileName, jsonContent, existingFileId) {
+            const metadata = {
+                name: fileName,
+                mimeType: 'application/json'
+            };
+            if (!existingFileId) {
+                metadata.parents = ['appDataFolder'];
+            }
+            const boundary = 'cardmaker_boundary_' + Date.now();
+            const delimiter = '\r\n--' + boundary + '\r\n';
+            const closeDelimiter = '\r\n--' + boundary + '--';
+            const body =
+                delimiter + 'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+                JSON.stringify(metadata) +
+                delimiter + 'Content-Type: application/json\r\n\r\n' +
+                jsonContent +
+                closeDelimiter;
+
+            const path = existingFileId
+                ? '/upload/drive/v3/files/' + existingFileId
+                : '/upload/drive/v3/files';
+
+            await gapi.client.request({
+                path: path,
+                method: existingFileId ? 'PATCH' : 'POST',
+                params: { uploadType: 'multipart' },
+                headers: { 'Content-Type': 'multipart/related; boundary=' + boundary },
+                body: body
+            });
+        }
+
+        async function saveProjectToDrive() {
+            if (!driveAccessToken) {
+                alert('Sign in with Google first.');
+                return;
+            }
+            const projectName = prompt('Project name:', 'my-card-project');
+            if (!projectName) return;
+
+            const fileName = projectName.trim() + PROJECT_FILE_EXTENSION;
+            const payload = JSON.stringify(buildProjectState());
+            setDriveStatus('Saving "' + fileName + '"...');
+            try {
+                const existing = await findDriveProjectByName(fileName);
+                await uploadProjectToDrive(fileName, payload, existing ? existing.id : null);
+                setDriveStatus('Saved "' + fileName + '" to Google Drive.');
+            } catch (error) {
+                console.error(error);
+                setDriveStatus('Save failed. Check API setup and authorized origins.');
+                alert('Could not save to Google Drive.');
+            }
+        }
+
+        async function listDriveProjects() {
+            const response = await gapi.client.drive.files.list({
+                spaces: 'appDataFolder',
+                q: "trashed = false and name contains '" + PROJECT_FILE_EXTENSION + "'",
+                fields: 'files(id, name, modifiedTime)',
+                pageSize: 100,
+                orderBy: 'modifiedTime desc'
+            });
+            return response.result.files || [];
+        }
+
+        async function loadProjectFromDrive() {
+            if (!driveAccessToken) {
+                alert('Sign in with Google first.');
+                return;
+            }
+            setDriveStatus('Loading project list...');
+            try {
+                const files = await listDriveProjects();
+                if (files.length === 0) {
+                    setDriveStatus('No saved projects found in Google Drive app data.');
+                    alert('No saved projects found.');
+                    return;
+                }
+
+                const names = files.map(function (f, i) { return (i + 1) + '. ' + f.name; }).join('\n');
+                const pick = prompt('Choose a project number to load:\n\n' + names, '1');
+                if (!pick) return;
+                const idx = parseInt(pick, 10) - 1;
+                if (isNaN(idx) || idx < 0 || idx >= files.length) {
+                    alert('Invalid selection.');
+                    return;
+                }
+
+                const file = files[idx];
+                setDriveStatus('Loading "' + file.name + '"...');
+                const response = await gapi.client.drive.files.get({
+                    fileId: file.id,
+                    alt: 'media'
+                });
+                const content = typeof response.body === 'string'
+                    ? response.body
+                    : JSON.stringify(response.result || {});
+                const state = JSON.parse(content);
+                applyProjectState(state);
+                setDriveStatus('Loaded "' + file.name + '".');
+            } catch (error) {
+                console.error(error);
+                setDriveStatus('Load failed. Check API setup and authorized origins.');
+                alert('Could not load from Google Drive.');
+            }
+        }
+
         // Card base/frame file upload
         document.getElementById("CardBase").addEventListener("change", function (event) {
             let file = event.target.files[0];
@@ -978,6 +1318,7 @@
         document.getElementById('downloadFormat').addEventListener('change', toggleQualitySlider);
         updateExportSizeDisplayFromSlider();
         updateExportBleedHint();
+        updateDriveButtons();
         
         // Download the final card at the selected format (optional black bleed within selected size)
         function downloadCard() {

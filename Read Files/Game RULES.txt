@@ -1,0 +1,76 @@
+﻿* RULES
+   * Game Setup
+• Each player shuffles their deck and draws 8 cards.
+• Each player places their Commander into play before the game begins.
+• The player who lost the previous game goes first. Or if this is the first round flip a coin 
+   * Decks and Drawing
+• Draw 1 card at the start of your turn.
+• Decks must contain at least 60 cards and a maximum of 100 cards. and no more than 4 copies of the same card.
+• Cards may be played during your turn unless stated otherwise.
+• If you search your deck, shuffle it afterward.
+• Discarded cards are placed face up in a Discard Pile that any player may view.
+   * Treasury
+• The Treasury stores your Wealth cards and is placed behind your cards in play.
+• You may convert 1 Wealth card from your hand to the Treasury each turn.
+• Spend 4 Wealth to draw 1 card.
+• Some cards may generate additional Wealth.
+   * Commanders (needs editing/clarification)
+• Your Commander is your leader. If its Defense reaches 0, you lose the game.
+• Commanders recover to full Defense at the start of your turn.
+• Commanders can be targeted unless a card says otherwise.
+• Each player may only have one Commander in play.
+   * Attack and Defense
+• Cards may have Attack (left) and Defense (right).
+• Attack deals damage to another card’s Defense.
+• When Defense reaches 0, the card is discarded.
+• Defense does not automatically reset unless stated.
+• Track lost Defense using dice or tokens.
+• Commanders are the only cards that recover Defense automatically each turn.
+   * Exhausted
+• At the start of your turn, ready all your Exhausted cards by turning them upright.
+• Exhausted cards cannot Protect, Assault, or use activated effects.
+• Exhausted cards are turned sideways.
+• Exhausted Units defend at half damage (rounded up).
+   * Units
+• Units are placed on the battlefield in front of your Treasury.
+• Units cannot Assault the turn they enter play.
+• Units may defend even while Exhausted.
+• Exhausted Units deal half damage (rounded up) when defending.
+• Units are discarded when their Defense reaches 0.
+   * Protecting
+• Ready Units with Attack or Defense may Protect another card with Attack or Defense.
+• The protecting Unit takes the damage instead and becomes Exhausted.
+   * Assaulting
+• Units may Assault Units, Holdings, Commanders, or other cards with Defense.
+• The attacker deals damage equal to its Attack.
+• The attacker also takes damage equal to the defender’s Attack.
+• After Assaulting, the Unit becomes Exhausted.
+   * Spells
+• Spells resolve immediately and are then discarded.
+• Spells that say “Play at any time” may be played during any player’s turn.
+• Targets must be chosen when the spell is played.
+   * Equipment
+• Equipment attaches to a Unit or Holding.
+• Multiple Equipment may be attached unless stated otherwise.
+• If the attached card leaves play, the Equipment is discarded.
+   * Enchantments
+• Enchantments attach to a card and remain until destroyed or the card leaves play.
+• Multiple Enchantments may be attached unless stated otherwise.
+   * Tactics
+• Tactics give global effects to your cards.
+• You may only have 1 Tactic in play at a time.
+• Playing a new Tactic replaces the old one.
+   * Holdings
+• Spend 1 Wealth to add a Unit to a Holding.
+• Holdings may contain any number of Units unless stated otherwise.
+• Units inside may defend the Holding.
+• When a Holding is defeated, the attacker may discard or capture it. Captured Holdings should remain facing the original owner to avoid mixing cards.
+   * Attachments
+• Equipment and Enchantments are attachments.
+• Attachments remain until destroyed or the attached card leaves play.
+   * Death Effects
+• Effects triggered when a card is killed resolve before the card enters the Discard Pile.
+• If multiple effects trigger, the active player resolves theirs first.
+   * Targeting
+• Cards that require a target must choose a valid one when played.
+• If the target becomes invalid before resolution, the effect fails.
