@@ -42,7 +42,18 @@
                         <span class="drive-modal-label" style="margin:0;">Your saves</span>
                         <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="driveModalRefreshBtn">Refresh list</button>
                     </div>
-                    <div id="driveModalList" class="drive-modal-list"></div>
+                    <div class="drive-modal-saves-split">
+                        <div id="driveModalList" class="drive-modal-list" role="list"></div>
+                        <aside class="drive-modal-preview-aside" aria-label="Card preview">
+                            <div class="drive-modal-preview-label">Preview</div>
+                            <div class="drive-modal-preview-body">
+                                <p id="driveModalPreviewPlaceholder" class="drive-modal-preview-placeholder">Click a save on the left to see the card.</p>
+                                <p id="driveModalPreviewError" class="drive-modal-preview-error" hidden></p>
+                                <div id="driveModalPreviewLoading" class="drive-modal-preview-loading" hidden>Loading preview…</div>
+                                <img id="driveModalPreviewImg" class="drive-modal-preview-img" alt="" hidden />
+                            </div>
+                        </aside>
+                    </div>
                 </div>
 
                 <p id="driveModalMessage" class="drive-modal-message" role="status" aria-live="polite"></p>
@@ -315,6 +326,7 @@
 
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="card-render.js"></script>
     <script>
         // Optional: not used for Drive save/load (OAuth only). Restricted API keys often break gapi if passed to init.
         const GOOGLE_API_KEY = '';
@@ -333,6 +345,7 @@
         let googleScriptsReady = false;
         /** @type {Array<{id:string,name:string,modifiedTime?:string}>} */
         let driveModalFilesCache = [];
+        let driveModalPreviewRequestId = 0;
 
         // Collapsible sections functionality
         function toggleSection(header) {
@@ -1127,7 +1140,7 @@
         async function listAppDataFolderFiles() {
             const u = new URL(DRIVE_FILES_API);
             u.searchParams.set('spaces', 'appDataFolder');
-            u.searchParams.set('fields', 'files(id,name,mimeType,modifiedTime)');
+            u.searchParams.set('fields', 'files(id,name,mimeType,modifiedTime,size)');
             u.searchParams.set('pageSize', '100');
             const res = await fetch(u.toString(), { headers: driveAuthHeaders() });
             const text = await res.text();
@@ -1221,6 +1234,15 @@
             }
         }
 
+        function formatFileSize(bytes) {
+            if (bytes === undefined || bytes === null || bytes === '') return '—';
+            var n = typeof bytes === 'string' ? parseInt(bytes, 10) : Number(bytes);
+            if (!isFinite(n) || n < 0) return '—';
+            if (n < 1000) return n + ' B';
+            if (n < 1000 * 1000) return (n / 1000).toFixed(n < 10000 ? 1 : 0).replace(/\.0$/, '') + ' KB';
+            return (n / (1000 * 1000)).toFixed(n < 10000000 ? 2 : 1).replace(/\.?0+$/, '') + ' MB';
+        }
+
         function escapeHtml(s) {
             return String(s)
                 .replace(/&/g, '&amp;')
@@ -1239,10 +1261,16 @@
             container.innerHTML = files.map(function (f, i) {
                 const name = escapeHtml(f.name);
                 const when = escapeHtml(formatDriveListDate(f.modifiedTime));
-                return '<div class="drive-modal-item">' +
-                    '<div class="drive-modal-item-info">' +
+                var sizeStr = formatFileSize(f.size);
+                var sizeSpan = sizeStr === '—' ? '' : ('<span class="drive-modal-item-size">' + escapeHtml(sizeStr) + '</span>');
+                var previewAria = escapeHtml('Preview ' + (f.name || ''));
+                return '<div class="drive-modal-item" data-drive-row-idx="' + i + '">' +
+                    '<div class="drive-modal-item-info drive-modal-item-preview-hit" role="button" tabindex="0" data-drive-preview data-drive-idx="' + i + '" aria-label="' + previewAria + '">' +
                         '<span class="drive-modal-item-name" title="' + name + '">' + name + '</span>' +
-                        '<span class="drive-modal-item-date">' + when + '</span>' +
+                        '<div class="drive-modal-item-meta">' +
+                            '<span class="drive-modal-item-date">' + when + '</span>' +
+                            sizeSpan +
+                        '</div>' +
                     '</div>' +
                     '<div class="drive-modal-item-actions">' +
                         '<button type="button" class="drive-modal-btn drive-modal-btn-small drive-modal-btn-load" data-drive-load data-drive-idx="' + i + '">Load</button>' +
@@ -1255,6 +1283,7 @@
         async function refreshDriveModalList() {
             const container = document.getElementById('driveModalList');
             if (!container) return;
+            clearDriveModalPreview();
             container.innerHTML = '<div class="drive-modal-loading">Loading your saves…</div>';
             try {
                 const files = await listDriveProjects();
@@ -1263,6 +1292,7 @@
             } catch (err) {
                 console.error(err);
                 driveModalFilesCache = [];
+                clearDriveModalPreview();
                 container.innerHTML = '<div class="drive-modal-empty is-error">Could not load the list. Check your connection and try Refresh list.</div>';
                 throw err;
             }
@@ -1279,6 +1309,7 @@
             modal.setAttribute('aria-hidden', 'false');
             document.body.style.overflow = 'hidden';
             setDriveModalMessage('');
+            clearDriveModalPreview();
             try {
                 await refreshDriveModalList();
             } catch (err) {
@@ -1294,17 +1325,102 @@
             document.body.style.overflow = '';
         }
 
-        async function loadProjectFromDriveByFile(file) {
-            setDriveStatus('Loading "' + file.name + '"...');
+        async function fetchDriveProjectJsonByFile(file) {
             const mediaUrl = DRIVE_FILES_API + '/' + encodeURIComponent(file.id) + '?alt=media';
             const mediaRes = await fetch(mediaUrl, { headers: driveAuthHeaders() });
             const content = await mediaRes.text();
             if (!mediaRes.ok) {
                 throw new Error(content || ('Download failed: ' + mediaRes.status));
             }
-            const state = JSON.parse(content);
+            return JSON.parse(content);
+        }
+
+        async function loadProjectFromDriveByFile(file) {
+            setDriveStatus('Loading "' + file.name + '"...');
+            const state = await fetchDriveProjectJsonByFile(file);
             applyProjectState(state);
             setDriveStatus('Loaded "' + file.name + '".');
+        }
+
+        function clearDriveModalPreview() {
+            const img = document.getElementById('driveModalPreviewImg');
+            const ph = document.getElementById('driveModalPreviewPlaceholder');
+            const err = document.getElementById('driveModalPreviewError');
+            const load = document.getElementById('driveModalPreviewLoading');
+            if (img) {
+                img.removeAttribute('src');
+                img.hidden = true;
+            }
+            if (ph) {
+                ph.textContent = 'Click a save on the left to see the card.';
+                ph.hidden = false;
+            }
+            if (err) err.hidden = true;
+            if (load) load.hidden = true;
+            document.querySelectorAll('.drive-modal-item.is-preview-selected').forEach(function (el) {
+                el.classList.remove('is-preview-selected');
+            });
+        }
+
+        function setDriveModalPreviewRowSelected(idx) {
+            document.querySelectorAll('.drive-modal-item').forEach(function (el) {
+                var rowIdx = el.getAttribute('data-drive-row-idx');
+                el.classList.toggle('is-preview-selected', rowIdx === String(idx));
+            });
+        }
+
+        async function showDriveModalPreview(idx) {
+            if (isNaN(idx) || !driveModalFilesCache[idx]) return;
+            var file = driveModalFilesCache[idx];
+            var req = ++driveModalPreviewRequestId;
+
+            var img = document.getElementById('driveModalPreviewImg');
+            var ph = document.getElementById('driveModalPreviewPlaceholder');
+            var errEl = document.getElementById('driveModalPreviewError');
+            var load = document.getElementById('driveModalPreviewLoading');
+            if (!img || !ph || !load) return;
+
+            setDriveModalPreviewRowSelected(idx);
+            ph.hidden = true;
+            if (errEl) errEl.hidden = true;
+            img.hidden = true;
+            img.removeAttribute('src');
+            load.hidden = false;
+
+            try {
+                if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) {
+                    throw new Error('Sign in with Google first.');
+                }
+                var state = await fetchDriveProjectJsonByFile(file);
+                if (req !== driveModalPreviewRequestId) return;
+
+                var dataUrl = null;
+                if (typeof window.renderCardMakerProjectToDataUrl === 'function') {
+                    dataUrl = await window.renderCardMakerProjectToDataUrl(state);
+                }
+                if (req !== driveModalPreviewRequestId) return;
+                if (!dataUrl && state.images) {
+                    var im = state.images;
+                    if (im.artSrc && String(im.artSrc).length > 20) dataUrl = im.artSrc;
+                    else if (im.cardBaseSrc && String(im.cardBaseSrc).length > 20) dataUrl = im.cardBaseSrc;
+                }
+                if (!dataUrl) {
+                    throw new Error('Could not build a preview for this save.');
+                }
+                img.src = dataUrl;
+                img.alt = 'Preview: ' + file.name;
+                img.hidden = false;
+                load.hidden = true;
+            } catch (e) {
+                if (req !== driveModalPreviewRequestId) return;
+                console.error(e);
+                load.hidden = true;
+                if (errEl) {
+                    errEl.textContent = (e && e.message) ? e.message : 'Preview failed.';
+                    errEl.hidden = false;
+                }
+                ph.hidden = true;
+            }
         }
 
         async function listDriveProjects() {
@@ -1339,7 +1455,21 @@
 
             if (list && !list.dataset.bound) {
                 list.dataset.bound = '1';
+                list.addEventListener('keydown', function (e) {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    var previewEl = e.target.closest('[data-drive-preview]');
+                    if (!previewEl) return;
+                    e.preventDefault();
+                    var pidx = parseInt(previewEl.getAttribute('data-drive-idx'), 10);
+                    showDriveModalPreview(pidx);
+                });
                 list.addEventListener('click', function (e) {
+                    var previewEl = e.target.closest('[data-drive-preview]');
+                    if (previewEl) {
+                        var pidx = parseInt(previewEl.getAttribute('data-drive-idx'), 10);
+                        showDriveModalPreview(pidx);
+                        return;
+                    }
                     const loadEl = e.target.closest('[data-drive-load]');
                     const delEl = e.target.closest('[data-drive-delete]');
                     if (!loadEl && !delEl) return;

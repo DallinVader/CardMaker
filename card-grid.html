@@ -146,6 +146,7 @@
             }
             .cg-page { min-height: 11in; }
             .no-print { display: none !important; }
+            .drive-modal { display: none !important; }
             .cg-wrap { max-width: none; padding: 0; }
             .cg-grid-wrap { background: transparent; border: none; box-shadow: none; padding: 0; border-radius: 0; }
             .cg-grid-container {
@@ -246,13 +247,13 @@
 </head>
 <body class="cg-print-body">
     <div class="cg-page">
-        <div class="cg-wrap no-print">
-            <header class="cg-header">
+        <div class="cg-wrap">
+            <header class="cg-header no-print">
                 <h1>Print 9-up sheet</h1>
                 <p class="cg-sub">Add images, open <strong>Print setup</strong> for size and bleed, then print or download a print-ready PDF. Load art from a <strong>Card Maker</strong> cloud save if you already signed in there.</p>
             </header>
 
-            <div class="cg-toolbar">
+            <div class="cg-toolbar no-print">
                 <label class="cg-upload-label" for="fileUpload">Choose images</label>
                 <input type="file" id="fileUpload" accept="image/*" multiple>
                 <button type="button" class="cg-btn cg-btn-setup" id="openSetupBtn">Print setup</button>
@@ -390,6 +391,15 @@
             gridDriveStatus.classList.toggle('is-error', !!isError);
         }
 
+        function formatFileSize(bytes) {
+            if (bytes === undefined || bytes === null || bytes === '') return '—';
+            const n = typeof bytes === 'string' ? parseInt(bytes, 10) : Number(bytes);
+            if (!isFinite(n) || n < 0) return '—';
+            if (n < 1000) return n + ' B';
+            if (n < 1000 * 1000) return (n / 1000).toFixed(n < 10000 ? 1 : 0).replace(/\.0$/, '') + ' KB';
+            return (n / (1000 * 1000)).toFixed(n < 10000000 ? 2 : 1).replace(/\.?0+$/, '') + ' MB';
+        }
+
         function readStoredDriveToken() {
             try {
                 const raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
@@ -477,7 +487,7 @@
         async function listAppDataFolderFiles(token) {
             const u = new URL(DRIVE_FILES_API);
             u.searchParams.set('spaces', 'appDataFolder');
-            u.searchParams.set('fields', 'files(id,name,modifiedTime)');
+            u.searchParams.set('fields', 'files(id,name,modifiedTime,size)');
             u.searchParams.set('pageSize', '100');
             const res = await fetch(u.toString(), { headers: driveAuthHeaders(token) });
             const text = await res.text();
@@ -686,7 +696,8 @@
                 gridDriveFilesCache.forEach(function (f) {
                     const opt = document.createElement('option');
                     opt.value = f.id;
-                    opt.textContent = f.name || f.id;
+                    const sz = formatFileSize(f.size);
+                    opt.textContent = (f.name || f.id) + (sz === '—' ? '' : ' (' + sz + ')');
                     gridSavedProjectSelect.appendChild(opt);
                 });
                 setGridDriveStatus(gridDriveFilesCache.length + ' save(s) found.', false);
