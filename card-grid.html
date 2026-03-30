@@ -436,6 +436,16 @@
                 .replace(/'/g, '&#39;');
         }
 
+        function displaySaveLabel(fileName) {
+            if (!fileName) return '';
+            var n = String(fileName);
+            var ext = '.cardmaker.json';
+            if (n.toLowerCase().endsWith(ext)) {
+                return n.slice(0, -ext.length);
+            }
+            return n;
+        }
+
         function formatDriveListDate(iso) {
             if (!iso) return '—';
             try {
@@ -608,7 +618,7 @@
                 if (!dataUrl) throw new Error('Could not build a preview for this save.');
 
                 img.src = dataUrl;
-                img.alt = 'Preview: ' + file.name;
+                img.alt = 'Preview: ' + displaySaveLabel(file.name);
                 img.hidden = false;
                 load.hidden = true;
             } catch (e) {
@@ -631,14 +641,15 @@
                 return;
             }
             container.innerHTML = gridDriveFilesCache.map(function (f, i) {
-                const name = escapeHtml(f.name);
+                const nameFull = escapeHtml(f.name);
+                const nameShort = escapeHtml(displaySaveLabel(f.name));
                 const when = escapeHtml(formatDriveListDate(f.modifiedTime));
                 const sizeStr = formatFileSize(f.size);
                 const sizeSpan = sizeStr === '—' ? '' : ('<span class="drive-modal-item-size">' + escapeHtml(sizeStr) + '</span>');
-                const previewAria = escapeHtml('Preview ' + (f.name || ''));
+                const previewAria = escapeHtml('Preview ' + displaySaveLabel(f.name));
                 return '<div class="drive-modal-item drive-modal-item--grid-load" data-grid-load-row-idx="' + i + '">' +
                     '<div class="drive-modal-item-info drive-modal-item-preview-hit" role="button" tabindex="0" data-grid-load-preview data-grid-load-idx="' + i + '" aria-label="' + previewAria + '">' +
-                    '<span class="drive-modal-item-name" title="' + name + '">' + name + '</span>' +
+                    '<span class="drive-modal-item-name" title="' + nameFull + '">' + nameShort + '</span>' +
                     '<div class="drive-modal-item-meta">' +
                     '<span class="drive-modal-item-date">' + when + '</span>' +
                     sizeSpan +
@@ -1036,7 +1047,7 @@
                 const json = await fetchDriveFileJson(token, file.id);
                 const url = await compositeImageFromCardMakerSave(json);
                 applySaveImageToGrid(url, mode);
-                setGridLoadModalMessage('Applied “' + file.name + '” to the grid.', false);
+                setGridLoadModalMessage('Applied “' + displaySaveLabel(file.name) + '” to the grid.', false);
                 closeGridDriveLoadModal();
             } catch (e) {
                 setGridLoadModalMessage((e && e.message) ? e.message : 'Could not read that save.', true);

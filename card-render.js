@@ -6,16 +6,60 @@
     var CANVAS_W = 2500;
     var CANVAS_H = 3500;
 
+    /**
+     * Loads pixels in a way that keeps an offscreen canvas exportable (toDataURL).
+     * Remote http(s) URLs use CORS fetch + ImageBitmap when possible; data/blob URLs use Image.
+     */
     function loadImage(src) {
         return new Promise(function (resolve) {
             if (!src || String(src).length < 8) {
                 resolve(null);
                 return;
             }
-            var img = new Image();
-            img.onload = function () { resolve(img); };
-            img.onerror = function () { resolve(null); };
-            img.src = src;
+            var s = String(src);
+            if (/^\/\//.test(s)) {
+                s = (typeof location !== 'undefined' && location.protocol ? location.protocol : 'https:') + s;
+            }
+            if (/^data:/i.test(s) || /^blob:/i.test(s)) {
+                var d = new Image();
+                d.onload = function () { resolve(d); };
+                d.onerror = function () { resolve(null); };
+                d.src = s;
+                return;
+            }
+            if (/^https?:\/\//i.test(s)) {
+                if (typeof fetch === 'function' && typeof createImageBitmap === 'function') {
+                    fetch(s, { mode: 'cors', credentials: 'omit' })
+                        .then(function (r) {
+                            if (!r.ok) throw new Error('HTTP ' + r.status);
+                            return r.blob();
+                        })
+                        .then(function (blob) {
+                            return createImageBitmap(blob);
+                        })
+                        .then(function (bmp) {
+                            resolve(bmp);
+                        })
+                        .catch(function () {
+                            var img = new Image();
+                            img.crossOrigin = 'anonymous';
+                            img.onload = function () { resolve(img); };
+                            img.onerror = function () { resolve(null); };
+                            img.src = s;
+                        });
+                    return;
+                }
+                var imgHttp = new Image();
+                imgHttp.crossOrigin = 'anonymous';
+                imgHttp.onload = function () { resolve(imgHttp); };
+                imgHttp.onerror = function () { resolve(null); };
+                imgHttp.src = s;
+                return;
+            }
+            var rel = new Image();
+            rel.onload = function () { resolve(rel); };
+            rel.onerror = function () { resolve(null); };
+            rel.src = s;
         });
     }
 
@@ -67,28 +111,38 @@
         var ExtraWidthP = parseInt(f.ArtWidthPos, 10) || 0;
         var artSize = parseInt(f.ArtHight, 10) || 100;
 
-        if (artImg && artImg.width) {
-            var mgWidth = artImg.width * (artSize / 100);
-            var mgHeight = artImg.height * (artSize / 100);
-            ctx.drawImage(artImg, (CANVAS_W - mgWidth - ExtraWidthP) / 2, (CANVAS_H - mgHeight - ExtraHightP) / 8, mgWidth, mgHeight);
+        if (artImg) {
+            var aw = artImg.width || (artImg.naturalWidth && artImg.naturalWidth);
+            if (aw) {
+                var mgWidth = aw * (artSize / 100);
+                var mgHeight = (artImg.height || artImg.naturalHeight) * (artSize / 100);
+                ctx.drawImage(artImg, (CANVAS_W - mgWidth - ExtraWidthP) / 2, (CANVAS_H - mgHeight - ExtraHightP) / 8, mgWidth, mgHeight);
+            }
         }
 
-        if (mainImg && mainImg.width) {
-            var aspectRatio = mainImg.width / mainImg.height;
-            var imgWidth = CANVAS_W;
-            var imgHeight = imgWidth / aspectRatio;
-            if (imgHeight > CANVAS_H) {
-                imgHeight = CANVAS_H;
-                imgWidth = imgHeight * aspectRatio;
+        if (mainImg) {
+            var mw = mainImg.width || mainImg.naturalWidth;
+            var mh = mainImg.height || mainImg.naturalHeight;
+            if (mw && mh) {
+                var aspectRatio = mw / mh;
+                var imgWidth = CANVAS_W;
+                var imgHeight = imgWidth / aspectRatio;
+                if (imgHeight > CANVAS_H) {
+                    imgHeight = CANVAS_H;
+                    imgWidth = imgHeight * aspectRatio;
+                }
+                ctx.drawImage(mainImg, (CANVAS_W - imgWidth) / 2, (CANVAS_H - imgHeight) / 8, imgWidth, imgHeight);
             }
-            ctx.drawImage(mainImg, (CANVAS_W - imgWidth) / 2, (CANVAS_H - imgHeight) / 8, imgWidth, imgHeight);
         }
 
         var showDamage = !!f.showDamageStats;
-        if (showDamage && mainImg && mainImg.width) {
+        var mainW = mainImg && (mainImg.width || mainImg.naturalWidth);
+        var mainH = mainImg && (mainImg.height || mainImg.naturalHeight);
+        if (showDamage && mainImg && mainW && mainH) {
             var damageImg = await loadImage('Damage.png');
-            if (damageImg && damageImg.width) {
-                var aspectRatios = mainImg.width / mainImg.height;
+            var dw = damageImg && (damageImg.width || damageImg.naturalWidth);
+            if (dw) {
+                var aspectRatios = mainW / mainH;
                 var DimgWidth = CANVAS_W;
                 var DimgHeight = DimgWidth / aspectRatios;
                 if (DimgHeight > CANVAS_H) {
@@ -146,7 +200,12 @@
             ctx.fillText(subLines[i], subDescriptionX, (CANVAS_H / 1.9) + (100 * (i + 1)));
         }
 
-        return canvas.toDataURL('image/png');
+        try {
+            return canvas.toDataURL('image/png');
+        } catch (e) {
+            console.warn('card-render: toDataURL failed (tainted or blocked canvas)', e);
+            return null;
+        }
     }
 
     window.renderCardMakerProjectToDataUrl = renderCardMakerProjectToDataUrl;
