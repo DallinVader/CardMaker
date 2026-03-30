@@ -3,235 +3,350 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Card Grid – Print 9 Cards</title>
+    <title>Print cards – Card Maker</title>
+    <link rel="stylesheet" href="style.css">
     <style>
-        * { box-sizing: border-box; }
-        body {
-            font-family: system-ui, sans-serif;
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 1rem;
-            background: #f0f0f0;
+        .cg-page {
             min-height: 100vh;
-            display: grid;
-            grid-template-rows: auto auto 1fr;
-            justify-items: center;
+            margin: 0;
+            padding: 0 0 28px;
+            background: linear-gradient(155deg, #0f172a 0%, #1e293b 45%, #0f3460 100%);
+            color: #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
-        h1 { margin-top: 0; }
-        .controls {
+        .cg-wrap {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 20px 18px 0;
+        }
+        .cg-header {
+            text-align: center;
+            margin-bottom: 18px;
+        }
+        .cg-header h1 {
+            font-family: Medieval, serif;
+            font-size: clamp(1.6rem, 4vw, 2.1rem);
+            letter-spacing: 0.06em;
+            margin: 0 0 8px;
+            color: #f8fafc;
+            text-shadow: 0 2px 12px rgba(0,0,0,0.35);
+        }
+        .cg-sub {
+            margin: 0;
+            font-size: 0.95rem;
+            color: #94a3b8;
+            line-height: 1.45;
+            max-width: 42rem;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .cg-toolbar {
             display: flex;
-            gap: 0.75rem;
-            align-items: center;
             flex-wrap: wrap;
-            margin-bottom: 1rem;
-        }
-        .size-controls {
-            display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
-            padding: 0.4rem 0.55rem;
-            background: #fff;
-            border: 1px solid #ccc;
-            border-radius: 6px;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 12px;
         }
-        .size-controls input[type="number"] {
-            width: 5.5rem;
-            padding: 0.35rem 0.4rem;
-            border: 1px solid #aaa;
-            border-radius: 4px;
-        }
-        .size-controls select {
-            padding: 0.35rem 0.4rem;
-            border: 1px solid #aaa;
-            border-radius: 4px;
-            background: #fff;
-        }
-        .fit-note {
-            font-size: 0.85rem;
-            color: #333;
-            background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            padding: 0.35rem 0.55rem;
-        }
-        .controls label {
-            padding: 0.5rem 1rem;
-            background: #333;
+        .cg-toolbar label.cg-upload-label {
+            padding: 10px 18px;
+            background: linear-gradient(135deg, #2d5a27 0%, #1e3d1a 100%);
             color: #fff;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
+            font-weight: 600;
+            font-size: 0.92rem;
+            border: 1px solid rgba(255,255,255,0.15);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
-        .controls input[type="file"] { display: none; }
-        .controls button {
-            padding: 0.5rem 1rem;
+        .cg-toolbar input[type="file"] { display: none; }
+        .cg-btn {
+            padding: 10px 16px;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 1rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
+            font-weight: 600;
+            font-size: 0.92rem;
+            font-family: inherit;
+            transition: transform 0.12s, box-shadow 0.12s;
         }
-        .btn-print { background: #2c7; color: #fff; }
-        .btn-pdf { background: #07c; color: #fff; }
-        .btn-print:hover, .btn-pdf:hover { opacity: 0.9; }
-        .btn-back {
-            background: #1a202c;
+        .cg-btn:hover { transform: translateY(-1px); }
+        .cg-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+	    .cg-btn-setup {
+            background: linear-gradient(135deg, #5b4ba2 0%, #667eea 100%);
+            color: #fff;
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.35);
+        }
+        .cg-btn-print { background: #16a34a; color: #fff; }
+        .cg-btn-pdf { background: #0284c7; color: #fff; }
+        .cg-btn-back {
+            background: #334155;
             color: #fff;
         }
-        .btn-back::before {
-            content: '←';
-            font-size: 1.1rem;
+        .cg-btn-back::before { content: '← '; }
+        .cg-summary {
+            text-align: center;
+            font-size: 0.82rem;
+            color: #cbd5e1;
+            margin: 0 0 16px;
+            padding: 8px 12px;
+            background: rgba(0,0,0,0.22);
+            border-radius: 8px;
+            max-width: 42rem;
+            margin-left: auto;
+            margin-right: auto;
         }
-        .btn-back:hover { opacity: 0.9; }
-        .btn-repeat {
-            background: #5b4;
-            color: #fff;
+        .cg-summary strong { color: #f1f5f9; }
+
+        .cg-grid-wrap {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 14px;
+            padding: 14px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.25);
         }
-        .btn-repeat:hover { opacity: 0.9; }
-        .btn-repeat:disabled {
-            opacity: 0.45;
-            cursor: not-allowed;
-        }
-        .btn-bleed {
-            background: #b8860b;
-            color: #fff;
-            border: 2px solid rgba(255,255,255,0.35);
-        }
-        .btn-bleed[aria-pressed="false"] {
-            background: #555;
-            border-color: rgba(255,255,255,0.2);
-        }
-        .btn-bleed:hover { opacity: 0.92; }
-        .grid-container {
+        .cg-grid-container {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 12px;
             background: #fff;
             padding: 12px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 10px;
             width: 100%;
-            align-self: center;
         }
-        .grid-item {
+        .cg-grid-container.trim-bleed .cg-grid-item {
+            background-size: 110% auto;
+        }
+        .cg-grid-container.no-bleed .cg-grid-item {
+            background-size: cover;
+        }
+        .cg-grid-item {
             aspect-ratio: var(--card-ratio, 2.5 / 3.5);
-            border: 1px solid #ccc;
-            border-radius: 4px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
             overflow: hidden;
             display: flex;
             justify-content: center;
             align-items: center;
-            background: #eee;
+            background: #e2e8f0;
             background-position: center;
         }
-        /* 2.75×3.75" Card Maker PNG: crop to 2.5×3.5" trim */
-        .grid-container.trim-bleed .grid-item {
-            background-size: 110% auto;
+        .cg-grid-item.empty::before {
+            content: 'Slot ' attr(data-index);
+            color: #94a3b8;
+            font-size: 0.78rem;
         }
-        .grid-container.no-bleed .grid-item {
-            background-size: cover;
-        }
-        .grid-item.empty::before {
-            content: 'Card ' attr(data-index);
-            color: #999;
-            font-size: 0.9rem;
-        }
-        .no-print { margin-bottom: 0.5rem; }
 
         @media print {
-            @page {
-                size: letter;
-                margin: 0; /* let cards fill the page edge-to-edge */
-            }
-            html, body {
-                margin: 0;
-                padding: 0;
-                background: #fff;
-                max-width: none;
-                min-height: 11in;
-                height: 100%;
-            }
-            body {
+            @page { size: letter; margin: 0; }
+            html, body, .cg-page {
+                margin: 0 !important;
                 padding: 0 !important;
+                background: #fff !important;
+            }
+            .cg-page { min-height: 11in; }
+            .no-print { display: none !important; }
+            .cg-wrap { max-width: none; padding: 0; }
+            .cg-grid-wrap { background: transparent; border: none; box-shadow: none; padding: 0; border-radius: 0; }
+            .cg-grid-container {
+                gap: 0;
+                padding: 0;
+                margin: 0;
+                border-radius: 0;
+                width: calc(var(--print-cols, 3) * var(--card-w, 2.5in));
+                grid-template-columns: repeat(var(--print-cols, 3), var(--card-w, 2.5in));
+                grid-auto-rows: var(--card-h, 3.5in);
+            }
+            .cg-grid-item {
+                width: var(--card-w, 2.5in);
+                height: var(--card-h, 3.5in);
+                margin: 0;
+                border: none;
+                border-radius: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .cg-grid-item.page-break {
+                break-after: page;
+                page-break-after: always;
+            }
+            body.cg-print-body {
                 display: flex;
                 flex-direction: column;
                 justify-content: center;
                 align-items: center;
                 min-height: 11in;
             }
-            .no-print { display: none !important; }
-            .grid-container {
-                gap: 0;
-                padding: 0;
-                margin: 0;
-                box-shadow: none;
-                border-radius: 0;
-                width: calc(var(--print-cols, 3) * var(--card-w, 2.5in));
-                flex-shrink: 0;
-                align-self: center;
-                grid-template-columns: repeat(var(--print-cols, 3), var(--card-w, 2.5in));
-                grid-auto-rows: var(--card-h, 3.5in);
-            }
-            .grid-item {
-                width: var(--card-w, 2.5in);
-                height: var(--card-h, 3.5in);
-                margin: 0;
-                border: none;
-                border-radius: 0;
-                background-position: center;
-                overflow: hidden;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            .grid-item.page-break {
-                break-after: page;
-                page-break-after: always;
-            }
-            .grid-container.trim-bleed .grid-item {
-                background-size: 110% auto;
-            }
-            .grid-container.no-bleed .grid-item {
-                background-size: cover;
-            }
         }
+
+        #printSetupModal .drive-modal-panel {
+            max-width: 480px;
+            max-height: min(90vh, 720px);
+        }
+        .cg-setup-section {
+            margin-bottom: 16px;
+        }
+        .cg-setup-section h3 {
+            margin: 0 0 10px;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #667eea;
+        }
+        .cg-size-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .cg-size-row select, .cg-size-row input[type="number"] {
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 2px solid rgba(102, 126, 234, 0.25);
+            font-size: 14px;
+        }
+        .cg-size-row input[type="number"] { width: 5rem; }
+        .cg-toggle-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+        }
+        .cg-toggle-row label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #334155;
+            cursor: pointer;
+        }
+        .cg-drive-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-top: 8px;
+        }
+        .cg-drive-row select {
+            flex: 1;
+            min-width: 200px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 2px solid rgba(102, 126, 234, 0.25);
+        }
+        .cg-drive-status {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 8px;
+        }
+        .cg-drive-status.is-error { color: #b91c1c; font-weight: 600; }
     </style>
 </head>
-<body>
-    <h1 class="no-print">Upload 9 Cards</h1>
-    <div class="controls no-print">
-        <label for="fileUpload">Choose images (up to 9)</label>
-        <input type="file" id="fileUpload" accept="image/*" multiple>
-        <div class="size-controls" title="Set exact printed card size in inches">
-            <label for="sizePreset">Card size:</label>
-            <select id="sizePreset">
-                <option value="custom">Custom</option>
-                <option value="2.5x3.5" selected>2.5 x 3.5 in (Poker)</option>
-                <option value="2.62x3.62">Poker With Bleed (2.62 x 3.62 in)</option>
-                <option value="2.75x3.75">2.75 x 3.75 in</option>
-                <option value="3x4">3 x 4 in</option>
-                <option value="3.5x5">3.5 x 5 in</option>
-            </select>
-            <input type="number" id="cardWidthIn" step="0.01" min="1" max="8" value="2.5" aria-label="Card width in inches">
-            <span>x</span>
-            <input type="number" id="cardHeightIn" step="0.01" min="1" max="10" value="3.5" aria-label="Card height in inches">
-            <span>in</span>
-        </div>
-        <div class="fit-note" id="fitInfo" aria-live="polite"></div>
-        <button type="button" class="btn-bleed" id="bleedToggleBtn" aria-pressed="true" title="Turn on if images are Card Maker exports with black bleed (2.75×3.75). Turn off for trim-only PNGs.">Bleed: yes</button>
-        <button type="button" class="btn-print" id="printBtn">Print / Save as PDF</button>
-        <button type="button" class="btn-pdf" id="downloadPdfBtn">Print-Ready PDF</button>
-        <button type="button" class="btn-repeat" id="repeatBtn" disabled title="Fill all 9 slots by cycling your uploaded images">Repeat</button>
-        <label style="background:#fff;color:#222;border:1px solid #bbb;padding:0.42rem 0.6rem;">
-            <input type="checkbox" id="duplexBacksToggle" checked> Include duplex backs
-        </label>
-        <button type="button" class="btn-back" onclick="window.location.href='index.html'">Back to Card Maker</button>
-    </div>
-    <div class="grid-container" id="gridContainer"></div>
+<body class="cg-print-body">
+    <div class="cg-page">
+        <div class="cg-wrap no-print">
+            <header class="cg-header">
+                <h1>Print 9-up sheet</h1>
+                <p class="cg-sub">Add images, open <strong>Print setup</strong> for size and bleed, then print or download a print-ready PDF. Load art from a <strong>Card Maker</strong> cloud save if you already signed in there.</p>
+            </header>
 
+            <div class="cg-toolbar">
+                <label class="cg-upload-label" for="fileUpload">Choose images</label>
+                <input type="file" id="fileUpload" accept="image/*" multiple>
+                <button type="button" class="cg-btn cg-btn-setup" id="openSetupBtn">Print setup</button>
+                <button type="button" class="cg-btn cg-btn-print" id="printBtn">Print</button>
+                <button type="button" class="cg-btn cg-btn-pdf" id="downloadPdfBtn">Print-ready PDF</button>
+                <button type="button" class="cg-btn cg-btn-back" onclick="window.location.href='index.html'">Card Maker</button>
+            </div>
+
+            <p class="cg-summary no-print" id="fitInfo" aria-live="polite"></p>
+
+            <div class="cg-grid-wrap">
+                <div class="cg-grid-container trim-bleed" id="gridContainer"></div>
+            </div>
+        </div>
+
+        <!-- Same grid for print-only (duplicate id avoided: print uses gridContainer inside visible wrap) -->
+    </div>
+
+    <div id="printSetupModal" class="drive-modal" aria-hidden="true">
+        <div class="drive-modal-backdrop" onclick="closePrintSetupModal()"></div>
+        <div class="drive-modal-panel" role="dialog" aria-modal="true" aria-labelledby="printSetupTitle">
+            <button type="button" class="drive-modal-close" onclick="closePrintSetupModal()" aria-label="Close">&times;</button>
+            <h2 id="printSetupTitle" class="drive-modal-title">Print setup</h2>
+            <p class="drive-modal-hint">Card size, bleed, and PDF options. Your grid updates as you change these.</p>
+
+            <div class="cg-setup-section">
+                <h3>Card size</h3>
+                <div class="cg-size-row">
+                    <label for="sizePreset">Preset</label>
+                    <select id="sizePreset">
+                        <option value="custom">Custom</option>
+                        <option value="2.5x3.5" selected>2.5 × 3.5 in (poker)</option>
+                        <option value="2.62x3.62">2.62 × 3.62 in (poker + bleed)</option>
+                        <option value="2.75x3.75">2.75 × 3.75 in</option>
+                        <option value="3x4">3 × 4 in</option>
+                        <option value="3.5x5">3.5 × 5 in</option>
+                    </select>
+                </div>
+                <div class="cg-size-row">
+                    <label for="cardWidthIn">W × H (in)</label>
+                    <input type="number" id="cardWidthIn" step="0.01" min="1" max="8" value="2.5" aria-label="Width inches">
+                    <span>×</span>
+                    <input type="number" id="cardHeightIn" step="0.01" min="1" max="10" value="3.5" aria-label="Height inches">
+                </div>
+            </div>
+
+            <div class="cg-setup-section">
+                <h3>Layout</h3>
+                <div class="cg-toggle-row">
+                    <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="bleedToggleBtn" aria-pressed="true">Bleed crop: on</button>
+                    <label>
+                        <input type="checkbox" id="duplexBacksToggle" checked>
+                        Duplex backs in PDF
+                    </label>
+                </div>
+                <p class="drive-modal-hint" style="margin-bottom:0;">Bleed on matches Card Maker exports with extra margin (2.75×3.75″ art cropped to card size).</p>
+            </div>
+
+            <div class="cg-setup-section">
+                <h3>Grid fill</h3>
+                <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="repeatBtn" disabled>Repeat images across all 9 slots</button>
+                <p class="drive-modal-hint" style="margin:8px 0 0;">Uses the images you picked with <strong>Choose images</strong>.</p>
+            </div>
+
+            <div class="cg-setup-section">
+                <h3>Load from Card Maker save</h3>
+                <p class="drive-modal-hint" style="margin-top:0;">Uses the <strong>art image</strong> stored in a cloud project (same Google sign-in as Card Maker). Sign in on the editor first, or connect here.</p>
+                <div class="cg-drive-row">
+                    <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="gridDriveSignInBtn">Connect Google</button>
+                    <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="gridDriveRefreshBtn">Refresh saves</button>
+                </div>
+                <select id="gridSavedProjectSelect" aria-label="Saved project">
+                    <option value="">— Select a save —</option>
+                </select>
+                <div class="cg-toggle-row" style="margin-top:10px;">
+                    <label><input type="radio" name="gridSaveFill" value="all" checked> Fill all 9 slots</label>
+                    <label><input type="radio" name="gridSaveFill" value="first"> First empty slot only</label>
+                </div>
+                <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="gridApplySaveBtn" style="margin-top:10px;">Apply to grid</button>
+                <p class="cg-drive-status" id="gridDriveStatus"></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
+        const GOOGLE_CLIENT_ID = '984239146057-o6ujksfj9qk8tmqm9c8msrpidgm6492r.apps.googleusercontent.com';
+        const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+        const DRIVE_TOKEN_STORAGE_KEY = 'cardmaker_drive_session_v1';
+        const DRIVE_TOKEN_EXPIRY_BUFFER_MS = 120000;
+        const DRIVE_FILES_API = 'https://www.googleapis.com/drive/v3/files';
+
         const fileUpload = document.getElementById('fileUpload');
         const gridContainer = document.getElementById('gridContainer');
         const printBtn = document.getElementById('printBtn');
@@ -243,23 +358,218 @@
         const cardHeightInInput = document.getElementById('cardHeightIn');
         const fitInfo = document.getElementById('fitInfo');
         const duplexBacksToggle = document.getElementById('duplexBacksToggle');
+        const openSetupBtn = document.getElementById('openSetupBtn');
+        const gridDriveSignInBtn = document.getElementById('gridDriveSignInBtn');
+        const gridDriveRefreshBtn = document.getElementById('gridDriveRefreshBtn');
+        const gridSavedProjectSelect = document.getElementById('gridSavedProjectSelect');
+        const gridApplySaveBtn = document.getElementById('gridApplySaveBtn');
+        const gridDriveStatus = document.getElementById('gridDriveStatus');
+        const printSetupModal = document.getElementById('printSetupModal');
+
         const SLOTS = 9;
         const PAGE_W_IN = 8.5;
         const PAGE_H_IN = 11;
-        // Keep margins at zero to maximize one-page fit.
         const MARGIN_X = 0;
         const MARGIN_Y = 0;
         const PRINTABLE_W_IN = PAGE_W_IN - (MARGIN_X * 2);
         const PRINTABLE_H_IN = PAGE_H_IN - (MARGIN_Y * 2);
 
-        /** Match Card Maker export: trim/bleed crop vs full fit for trim-only images */
         let cardHasBleed = true;
-
-        /** @type {string[]} data URLs from the last file selection (order preserved) */
         let uploadedUrls = [];
         let cardWidthIn = 2.5;
         let cardHeightIn = 3.5;
         let printableLayout = { cols: 3, rows: 3, cardsPerPage: 9 };
+        let gisTokenClient = null;
+        /** @type {{id:string,name:string}[]} */
+        let gridDriveFilesCache = [];
+
+        function setGridDriveStatus(msg, isError) {
+            if (!gridDriveStatus) return;
+            gridDriveStatus.textContent = msg || '';
+            gridDriveStatus.classList.toggle('is-error', !!isError);
+        }
+
+        function readStoredDriveToken() {
+            try {
+                const raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
+                if (!raw) return null;
+                const data = JSON.parse(raw);
+                if (!data || !data.access_token || !data.expires_at) return null;
+                if (Date.now() >= data.expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
+                    localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
+                    return null;
+                }
+                return data.access_token;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function persistDriveToken(tokenResponse) {
+            const expiresInSec = parseInt(tokenResponse.expires_in || '3600', 10);
+            const expiresAt = Date.now() + expiresInSec * 1000 - DRIVE_TOKEN_EXPIRY_BUFFER_MS;
+            localStorage.setItem(DRIVE_TOKEN_STORAGE_KEY, JSON.stringify({
+                access_token: tokenResponse.access_token,
+                expires_at: expiresAt
+            }));
+        }
+
+        function waitForGoogleScripts(maxWaitMs) {
+            const step = 80;
+            let elapsed = 0;
+            return new Promise(function (resolve) {
+                function tick() {
+                    if (window.google && google.accounts && google.accounts.oauth2) {
+                        resolve(true);
+                        return;
+                    }
+                    elapsed += step;
+                    if (elapsed >= maxWaitMs) {
+                        resolve(false);
+                        return;
+                    }
+                    setTimeout(tick, step);
+                }
+                tick();
+            });
+        }
+
+        function ensureGridTokenClient() {
+            if (gisTokenClient) return true;
+            if (!window.google || !google.accounts || !google.accounts.oauth2) return false;
+            gisTokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: GOOGLE_CLIENT_ID,
+                scope: DRIVE_SCOPE,
+                callback: function () {},
+                error_callback: function (err) {
+                    console.error('GIS error:', err);
+                    setGridDriveStatus('Sign-in popup blocked or OAuth origin mismatch.', true);
+                }
+            });
+            return true;
+        }
+
+        function openPrintSetupModal() {
+            if (!printSetupModal) return;
+            printSetupModal.classList.add('is-open');
+            printSetupModal.setAttribute('aria-hidden', 'false');
+        }
+
+        function closePrintSetupModal() {
+            if (!printSetupModal) return;
+            printSetupModal.classList.remove('is-open');
+            printSetupModal.setAttribute('aria-hidden', 'true');
+        }
+
+        function driveAuthHeaders(token) {
+            return { Authorization: 'Bearer ' + token };
+        }
+
+        function parseDriveError(text, status) {
+            try {
+                const j = JSON.parse(text);
+                if (j.error) return j.error.message || JSON.stringify(j.error);
+            } catch (e) { /* ignore */ }
+            return text || ('HTTP ' + status);
+        }
+
+        async function listAppDataFolderFiles(token) {
+            const u = new URL(DRIVE_FILES_API);
+            u.searchParams.set('spaces', 'appDataFolder');
+            u.searchParams.set('fields', 'files(id,name,modifiedTime)');
+            u.searchParams.set('pageSize', '100');
+            const res = await fetch(u.toString(), { headers: driveAuthHeaders(token) });
+            const text = await res.text();
+            if (!res.ok) throw new Error(parseDriveError(text, res.status));
+            const data = JSON.parse(text);
+            return data.files || [];
+        }
+
+        function listCardMakerProjects(token) {
+            return listAppDataFolderFiles(token).then(function (files) {
+                return files.filter(function (f) {
+                    return f.name && f.name.indexOf('cardmaker') !== -1;
+                }).sort(function (a, b) {
+                    return new Date(b.modifiedTime || 0) - new Date(a.modifiedTime || 0);
+                });
+            });
+        }
+
+        async function fetchDriveFileJson(token, fileId) {
+            const mediaUrl = DRIVE_FILES_API + '/' + encodeURIComponent(fileId) + '?alt=media';
+            const res = await fetch(mediaUrl, { headers: driveAuthHeaders(token) });
+            const txt = await res.text();
+            if (!res.ok) throw new Error(parseDriveError(txt, res.status));
+            return JSON.parse(txt);
+        }
+
+        function imageUrlFromCardMakerSave(parsed) {
+            if (!parsed || typeof parsed !== 'object') return null;
+            const im = parsed.images || {};
+            if (im.artSrc && String(im.artSrc).length > 20) return im.artSrc;
+            if (im.cardBaseSrc && String(im.cardBaseSrc).length > 20) return im.cardBaseSrc;
+            return null;
+        }
+
+        function urlForCssBackground(url) {
+            if (!url) return '';
+            if (/["')\\]/.test(url)) return '';
+            return 'url(' + url + ')';
+        }
+
+        function setGridFromUrls(urls, repeat) {
+            const items = gridContainer.querySelectorAll('.cg-grid-item');
+            for (let i = 0; i < SLOTS; i++) {
+                const item = items[i];
+                if (repeat && urls.length > 0) {
+                    const url = urls[i % urls.length];
+                    item.classList.remove('empty');
+                    item.style.backgroundImage = urlForCssBackground(url);
+                } else if (i < urls.length) {
+                    item.classList.remove('empty');
+                    item.style.backgroundImage = urlForCssBackground(urls[i]);
+                } else {
+                    item.classList.add('empty');
+                    item.style.backgroundImage = '';
+                }
+            }
+            updatePageBreakMarkers();
+        }
+
+        function applySaveImageToGrid(imageUrl, fillMode) {
+            if (!imageUrl) {
+                setGridDriveStatus('That save has no art or frame image stored.', true);
+                return;
+            }
+            const items = gridContainer.querySelectorAll('.cg-grid-item');
+            const fillAll = fillMode === 'all';
+            if (fillAll) {
+                for (let i = 0; i < SLOTS; i++) {
+                    items[i].classList.remove('empty');
+                    items[i].style.backgroundImage = urlForCssBackground(imageUrl);
+                }
+                uploadedUrls = [imageUrl];
+                repeatBtn.disabled = false;
+                setGridDriveStatus('Filled all slots from save.', false);
+                return;
+            }
+            let placed = false;
+            for (let i = 0; i < SLOTS; i++) {
+                if (items[i].classList.contains('empty')) {
+                    items[i].classList.remove('empty');
+                    items[i].style.backgroundImage = urlForCssBackground(imageUrl);
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) {
+                items[0].classList.remove('empty');
+                items[0].style.backgroundImage = urlForCssBackground(imageUrl);
+            }
+            if (uploadedUrls.length === 0) uploadedUrls = [imageUrl];
+            repeatBtn.disabled = uploadedUrls.length === 0;
+            setGridDriveStatus('Placed save image in the first empty slot (or slot 1 if full).', false);
+        }
 
         function getNumericInputValue(inputEl, fallback, min, max) {
             let n = parseFloat(inputEl.value);
@@ -278,12 +588,12 @@
             const root = document.documentElement;
             root.style.setProperty('--card-w', cardWidthIn + 'in');
             root.style.setProperty('--card-h', cardHeightIn + 'in');
-            root.style.setProperty('--card-ratio', (cardWidthIn / cardHeightIn).toString());
-            root.style.setProperty('--print-cols', printableLayout.cols.toString());
+            root.style.setProperty('--card-ratio', String(cardWidthIn / cardHeightIn));
+            root.style.setProperty('--print-cols', String(printableLayout.cols));
         }
 
         function updatePageBreakMarkers() {
-            const items = gridContainer.querySelectorAll('.grid-item');
+            const items = gridContainer.querySelectorAll('.cg-grid-item');
             items.forEach(function (item, index) {
                 item.classList.remove('page-break');
                 if ((index + 1) % printableLayout.cardsPerPage === 0 && index < items.length - 1) {
@@ -295,9 +605,9 @@
         function updateFitInfo() {
             const pages = Math.ceil(SLOTS / printableLayout.cardsPerPage);
             fitInfo.textContent =
-                printableLayout.cols + ' x ' + printableLayout.rows + ' cards/page at ' +
-                cardWidthIn.toFixed(2) + ' x ' + cardHeightIn.toFixed(2) +
-                ' in (' + printableLayout.cardsPerPage + '/page, ~' + pages + ' page(s) for 9 cards, max-fit mode)';
+                printableLayout.cols + ' × ' + printableLayout.rows + ' cards/page at ' +
+                cardWidthIn.toFixed(2) + ' × ' + cardHeightIn.toFixed(2) +
+                ' in (' + printableLayout.cardsPerPage + '/page, ~' + pages + ' page(s) for 9 cards)';
         }
 
         function applyCardSize(widthIn, heightIn, syncPreset) {
@@ -322,7 +632,7 @@
             gridContainer.classList.add(cardHasBleed ? 'trim-bleed' : 'no-bleed');
             if (bleedToggleBtn) {
                 bleedToggleBtn.setAttribute('aria-pressed', cardHasBleed ? 'true' : 'false');
-                bleedToggleBtn.textContent = cardHasBleed ? 'Bleed: yes' : 'Bleed: no';
+                bleedToggleBtn.textContent = cardHasBleed ? 'Bleed crop: on' : 'Bleed crop: off';
             }
         }
 
@@ -339,39 +649,50 @@
             });
         }
 
-        function setGridFromUrls(urls, repeat) {
-            const items = gridContainer.querySelectorAll('.grid-item');
-            for (let i = 0; i < SLOTS; i++) {
-                const item = items[i];
-                if (repeat) {
-                    const url = urls[i % urls.length];
-                    item.classList.remove('empty');
-                    item.style.backgroundImage = 'url(' + url + ')';
-                } else if (i < urls.length) {
-                    item.classList.remove('empty');
-                    item.style.backgroundImage = 'url(' + urls[i] + ')';
-                } else {
-                    item.classList.add('empty');
-                    item.style.backgroundImage = '';
-                }
-            }
-            updatePageBreakMarkers();
-        }
-
         function ensureSlots() {
-            const current = gridContainer.querySelectorAll('.grid-item').length;
             gridContainer.innerHTML = '';
             for (let i = 0; i < SLOTS; i++) {
                 const div = document.createElement('div');
-                div.className = 'grid-item empty';
-                div.dataset.index = i + 1;
+                div.className = 'cg-grid-item empty';
+                div.dataset.index = String(i + 1);
                 gridContainer.appendChild(div);
+            }
+        }
+
+        async function refreshGridDriveFileList() {
+            const token = readStoredDriveToken();
+            if (!token) {
+                setGridDriveStatus('Connect Google or sign in from Card Maker first.', true);
+                return;
+            }
+            setGridDriveStatus('Loading saves…', false);
+            try {
+                gridDriveFilesCache = await listCardMakerProjects(token);
+                gridSavedProjectSelect.innerHTML = '<option value="">— Select a save —</option>';
+                gridDriveFilesCache.forEach(function (f) {
+                    const opt = document.createElement('option');
+                    opt.value = f.id;
+                    opt.textContent = f.name || f.id;
+                    gridSavedProjectSelect.appendChild(opt);
+                });
+                setGridDriveStatus(gridDriveFilesCache.length + ' save(s) found.', false);
+            } catch (e) {
+                setGridDriveStatus((e && e.message) ? e.message : 'Could not list saves.', true);
             }
         }
 
         ensureSlots();
         syncBleedMode();
         applyCardSize(cardWidthIn, cardHeightIn, true);
+
+        if (openSetupBtn) {
+            openSetupBtn.addEventListener('click', openPrintSetupModal);
+        }
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && printSetupModal && printSetupModal.classList.contains('is-open')) {
+                closePrintSetupModal();
+            }
+        });
 
         sizePreset.addEventListener('change', function () {
             if (this.value === 'custom') return;
@@ -423,10 +744,56 @@
 
         repeatBtn.addEventListener('click', function () {
             if (uploadedUrls.length === 0) {
-                alert('Upload at least one image first.');
+                alert('Add at least one image first (upload or load from save).');
                 return;
             }
             setGridFromUrls(uploadedUrls, true);
+        });
+
+        gridDriveSignInBtn.addEventListener('click', async function () {
+            const scriptsOk = await waitForGoogleScripts(8000);
+            if (!scriptsOk || !ensureGridTokenClient()) {
+                setGridDriveStatus('Google scripts not ready. Use http://localhost, not file://.', true);
+                return;
+            }
+            setGridDriveStatus('Opening Google sign-in…', false);
+            gisTokenClient.callback = function (tokenResponse) {
+                if (tokenResponse && tokenResponse.access_token) {
+                    persistDriveToken(tokenResponse);
+                    setGridDriveStatus('Signed in. Refresh saves if the list is empty.', false);
+                    refreshGridDriveFileList();
+                } else {
+                    setGridDriveStatus('Sign-in failed.', true);
+                }
+            };
+            gisTokenClient.requestAccessToken({ prompt: 'consent' });
+        });
+
+        gridDriveRefreshBtn.addEventListener('click', function () {
+            refreshGridDriveFileList();
+        });
+
+        gridApplySaveBtn.addEventListener('click', async function () {
+            const fileId = gridSavedProjectSelect.value;
+            if (!fileId) {
+                setGridDriveStatus('Select a saved project first.', true);
+                return;
+            }
+            const token = readStoredDriveToken();
+            if (!token) {
+                setGridDriveStatus('Connect Google first.', true);
+                return;
+            }
+            const fillMode = document.querySelector('input[name="gridSaveFill"]:checked');
+            const mode = fillMode && fillMode.value === 'first' ? 'first' : 'all';
+            setGridDriveStatus('Loading save…', false);
+            try {
+                const json = await fetchDriveFileJson(token, fileId);
+                const url = imageUrlFromCardMakerSave(json);
+                applySaveImageToGrid(url, mode);
+            } catch (e) {
+                setGridDriveStatus((e && e.message) ? e.message : 'Could not read that save.', true);
+            }
         });
 
         printBtn.addEventListener('click', function () {
@@ -434,10 +801,12 @@
         });
 
         downloadPdfBtn.addEventListener('click', function () {
-            const items = gridContainer.querySelectorAll('.grid-item');
-            const hasAny = Array.from(items).some(el => el.style.backgroundImage && el.style.backgroundImage !== 'none');
+            const items = gridContainer.querySelectorAll('.cg-grid-item');
+            const hasAny = Array.from(items).some(function (el) {
+                return el.style.backgroundImage && el.style.backgroundImage !== 'none';
+            });
             if (!hasAny) {
-                alert('Upload at least one card image first.');
+                alert('Add at least one card image first.');
                 return;
             }
             downloadPdfBtn.disabled = true;
@@ -543,13 +912,20 @@
                 }
                 pdf.save('card-grid.pdf');
                 downloadPdfBtn.disabled = false;
-                downloadPdfBtn.textContent = 'Print-Ready PDF';
+                downloadPdfBtn.textContent = 'Print-ready PDF';
             }).catch(function () {
-                alert('Could not create PDF. Try "Print / Save as PDF" instead.');
+                alert('Could not create PDF. Try Print instead.');
                 downloadPdfBtn.disabled = false;
-                downloadPdfBtn.textContent = 'Print-Ready PDF';
+                downloadPdfBtn.textContent = 'Print-ready PDF';
             });
         });
+
+        (async function tryRestoreGridDriveList() {
+            if (!readStoredDriveToken()) return;
+            const ok = await waitForGoogleScripts(8000);
+            if (!ok) return;
+            refreshGridDriveFileList();
+        })();
     </script>
 </body>
 </html>
