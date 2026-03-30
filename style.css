@@ -21,7 +21,43 @@
 .top-bar-under {
     display: flex;
     justify-content: center;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
     margin: 10px 20px 15px;
+}
+
+.top-drive-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.top-drive-btn {
+    border: none;
+    cursor: pointer;
+    padding: 10px 14px;
+}
+
+.top-drive-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.top-drive-status-wrap {
+    display: flex;
+    justify-content: center;
+    margin: -6px 20px 12px;
+}
+
+#driveStatusText {
+    color: #e2e8f0;
+    background: rgba(0, 0, 0, 0.22);
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 12px;
 }
 
 .top-bar-btn {

@@ -12,6 +12,14 @@
         </div>
         <div class="top-bar-under">
             <a href="card-grid.html" class="top-bar-btn">Print the cards</a>
+            <div class="top-drive-controls">
+                <button type="button" id="googleSignInBtn" class="top-bar-btn top-drive-btn" onclick="handleGoogleSignIn()">Sign in with Google</button>
+                <button type="button" id="saveDriveBtn" class="top-bar-btn top-drive-btn" onclick="saveProjectToDrive()" disabled>Save Project</button>
+                <button type="button" id="loadDriveBtn" class="top-bar-btn top-drive-btn" onclick="loadProjectFromDrive()" disabled>Load Project</button>
+            </div>
+        </div>
+        <div class="top-drive-status-wrap">
+            <small id="driveStatusText">Not signed in. Add your Google API keys in code first.</small>
         </div>
         
         <div class="main-container">
@@ -88,15 +96,6 @@
                             <button onclick="downloadCard()" title="Ctrl+D">Download Card</button>
                             <button onclick="openFullscreen()" title="Ctrl+F">Fullscreen Card</button>
                             <button onclick="resetEverything()" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: white;" title="Ctrl+R">Reset All</button>
-                        </div>
-                        <div class="input-group" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(200, 200, 220, 0.3);">
-                            <label>Cloud Save (Google Drive):</label>
-                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                                <button type="button" id="googleSignInBtn" onclick="handleGoogleSignIn()">Sign in with Google</button>
-                                <button type="button" id="saveDriveBtn" onclick="saveProjectToDrive()" disabled>Save Project</button>
-                                <button type="button" id="loadDriveBtn" onclick="loadProjectFromDrive()" disabled>Load Project</button>
-                            </div>
-                            <small id="driveStatusText">Not signed in. Add your Google API keys in code first.</small>
                         </div>
                         <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(200, 200, 220, 0.3); font-size: 11px; color: #718096;">
                             <strong>Keyboard Shortcuts:</strong><br>
