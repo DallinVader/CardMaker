@@ -13,7 +13,7 @@
         <div class="top-bar-under">
             <a href="card-grid.html" class="top-bar-btn">Print the cards</a>
             <div class="top-drive-controls">
-                <button type="button" id="googleSignInBtn" class="top-bar-btn top-drive-btn" onclick="handleGoogleSignIn()">Sign in with Google</button>
+                <button type="button" id="googleSignInBtn" class="top-bar-btn top-drive-btn" onclick="handleGoogleDriveAuthClick()">Sign in with Google</button>
                 <button type="button" id="saveDriveBtn" class="top-bar-btn top-drive-btn" onclick="saveProjectToDrive()" disabled>Save Project</button>
                 <button type="button" id="loadDriveBtn" class="top-bar-btn top-drive-btn" onclick="loadProjectFromDrive()" disabled>Load Project</button>
             </div>
@@ -297,6 +297,8 @@
         // Google Cloud → APIs & Services → OAuth consent screen → Scopes, or Drive calls return 403.
         const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
         const PROJECT_FILE_EXTENSION = '.cardmaker.json';
+        const DRIVE_TOKEN_STORAGE_KEY = 'cardmaker_drive_session_v1';
+        const DRIVE_TOKEN_EXPIRY_BUFFER_MS = 120000;
 
         let gapiClientInitialized = false;
         let gisTokenClient = null;
@@ -740,17 +742,53 @@
             const signedIn = !!driveAccessToken;
             const saveBtn = document.getElementById('saveDriveBtn');
             const loadBtn = document.getElementById('loadDriveBtn');
+            const authBtn = document.getElementById('googleSignInBtn');
             if (saveBtn) saveBtn.disabled = !signedIn;
             if (loadBtn) loadBtn.disabled = !signedIn;
+            if (authBtn) {
+                authBtn.textContent = signedIn ? 'Sign out' : 'Sign in with Google';
+            }
         }
 
-        async function initGoogleDriveClient() {
+        function readPersistedDriveToken() {
+            try {
+                const raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
+                if (!raw) return null;
+                const data = JSON.parse(raw);
+                if (!data || !data.access_token || !data.expires_at) return null;
+                if (Date.now() >= data.expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
+                    localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
+                    return null;
+                }
+                return data;
+            } catch (e) {
+                localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
+                return null;
+            }
+        }
+
+        function persistDriveToken(tokenResponse) {
+            if (!tokenResponse || !tokenResponse.access_token) return;
+            const expiresInSec = typeof tokenResponse.expires_in === 'number' ? tokenResponse.expires_in : 3600;
+            const expiresAt = Date.now() + expiresInSec * 1000 - DRIVE_TOKEN_EXPIRY_BUFFER_MS;
+            localStorage.setItem(DRIVE_TOKEN_STORAGE_KEY, JSON.stringify({
+                access_token: tokenResponse.access_token,
+                expires_at: expiresAt
+            }));
+        }
+
+        function clearPersistedDriveToken() {
+            localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
+        }
+
+        /** @param {boolean} silent If true, do not alert on failure (e.g. session restore). */
+        async function initGoogleDriveClient(silent) {
             if (!hasDriveConfig()) {
-                setDriveStatus('Set GOOGLE_CLIENT_ID in index.html first.');
+                if (!silent) setDriveStatus('Set GOOGLE_CLIENT_ID in index.html first.');
                 return false;
             }
             if (!window.gapi || !window.google || !google.accounts || !google.accounts.oauth2) {
-                setDriveStatus('Google scripts are still loading. Try again in a moment.');
+                if (!silent) setDriveStatus('Google scripts are still loading. Try again in a moment.');
                 return false;
             }
             googleScriptsReady = true;
@@ -771,7 +809,9 @@
                     console.error(error);
                     const detail = formatGoogleInitError(error);
                     setDriveStatus('Google API init failed: ' + detail);
-                    alert('Google API init failed:\n\n' + detail + '\n\nIf this persists: enable Drive API on the same Google Cloud project as your OAuth client, wait a few minutes, hard refresh.');
+                    if (!silent) {
+                        alert('Google API init failed:\n\n' + detail + '\n\nIf this persists: enable Drive API on the same Google Cloud project as your OAuth client, wait a few minutes, hard refresh.');
+                    }
                     return false;
                 }
                 gapiClientInitialized = true;
@@ -793,9 +833,89 @@
             return true;
         }
 
+        function applyDriveAccessToken(accessToken) {
+            driveAccessToken = accessToken;
+            if (window.gapi && gapi.client) {
+                gapi.client.setToken({ access_token: accessToken });
+            }
+            updateDriveButtons();
+        }
+
+        function handleGoogleSignOut() {
+            clearPersistedDriveToken();
+            driveAccessToken = null;
+            if (window.gapi && gapi.client) {
+                gapi.client.setToken(null);
+            }
+            updateDriveButtons();
+            setDriveStatus('Signed out.');
+        }
+
+        function waitForGoogleScripts(maxWaitMs) {
+            const step = 80;
+            let elapsed = 0;
+            return new Promise(function (resolve) {
+                function tick() {
+                    if (window.gapi && window.google && google.accounts && google.accounts.oauth2) {
+                        resolve(true);
+                        return;
+                    }
+                    elapsed += step;
+                    if (elapsed >= maxWaitMs) {
+                        resolve(false);
+                        return;
+                    }
+                    setTimeout(tick, step);
+                }
+                tick();
+            });
+        }
+
+        async function tryRestoreDriveSession() {
+            if (!hasDriveConfig()) return;
+            const stored = readPersistedDriveToken();
+            if (!stored) return;
+            const scriptsOk = await waitForGoogleScripts(8000);
+            if (!scriptsOk) {
+                setDriveStatus('Not signed in. Click "Sign in with Google" to connect Drive.');
+                return;
+            }
+            const ready = await initGoogleDriveClient(true);
+            if (!ready) {
+                setDriveStatus('Not signed in. Click "Sign in with Google" to connect Drive.');
+                return;
+            }
+            applyDriveAccessToken(stored.access_token);
+            setDriveStatus('Signed in (saved on this device). Save/load works until the session expires; use Sign out to clear.');
+        }
+
+        /** Re-attach token from localStorage if gapi was reset (e.g. first save after restore race). */
+        async function ensureDriveTokenBeforeDriveOp() {
+            const stored = readPersistedDriveToken();
+            if (stored) {
+                if (!driveAccessToken || driveAccessToken !== stored.access_token) {
+                    const ready = await initGoogleDriveClient(true);
+                    if (!ready) return false;
+                    applyDriveAccessToken(stored.access_token);
+                } else if (window.gapi && gapi.client) {
+                    gapi.client.setToken({ access_token: driveAccessToken });
+                }
+                return true;
+            }
+            return !!driveAccessToken;
+        }
+
+        function handleGoogleDriveAuthClick() {
+            if (driveAccessToken) {
+                handleGoogleSignOut();
+                return;
+            }
+            handleGoogleSignIn();
+        }
+
         async function handleGoogleSignIn() {
             try {
-                const ready = await initGoogleDriveClient();
+                const ready = await initGoogleDriveClient(false);
                 if (!ready) {
                     if (!googleScriptsReady) {
                         alert('Google libraries are not ready yet. Reload and try again. If local, use http://localhost (not file://).');
@@ -805,10 +925,9 @@
                 setDriveStatus('Opening Google sign-in...');
                 gisTokenClient.callback = function (tokenResponse) {
                     if (tokenResponse && tokenResponse.access_token) {
-                        driveAccessToken = tokenResponse.access_token;
-                        gapi.client.setToken({ access_token: driveAccessToken });
-                        setDriveStatus('Signed in. You can now save/load projects.');
-                        updateDriveButtons();
+                        persistDriveToken(tokenResponse);
+                        applyDriveAccessToken(tokenResponse.access_token);
+                        setDriveStatus('Signed in. Session is saved on this device until it expires.');
                     } else {
                         console.error('Token response:', tokenResponse);
                         setDriveStatus('Sign-in failed. Check OAuth origin settings.');
@@ -1048,7 +1167,7 @@
         }
 
         async function saveProjectToDrive() {
-            if (!driveAccessToken) {
+            if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) {
                 alert('Sign in with Google first.');
                 return;
             }
@@ -1082,7 +1201,7 @@
         }
 
         async function loadProjectFromDrive() {
-            if (!driveAccessToken) {
+            if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) {
                 alert('Sign in with Google first.');
                 return;
             }
@@ -1409,7 +1528,12 @@
         updateExportBleedHint();
         updateDriveButtons();
         if (hasDriveConfig()) {
-            setDriveStatus('Not signed in. Click "Sign in with Google" to connect Drive.');
+            if (readPersistedDriveToken()) {
+                setDriveStatus('Restoring Google session…');
+            } else {
+                setDriveStatus('Not signed in. Click "Sign in with Google" to connect Drive.');
+            }
+            tryRestoreDriveSession().catch(function (e) { console.error(e); });
         } else {
             setDriveStatus('Set GOOGLE_CLIENT_ID in index.html first.');
         }
