@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<link rel="stylesheet" href="style.css">
 <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
         <title>Card Maker</title>
+        <link rel="stylesheet" href="style.css">
     </head>
     <body>
         <div class="top-bar">
@@ -341,6 +341,7 @@
         const PROJECT_FILE_EXTENSION = '.cardmaker.json';
         const DRIVE_TOKEN_STORAGE_KEY = 'cardmaker_drive_session_v1';
         const DRIVE_TOKEN_EXPIRY_BUFFER_MS = 120000;
+        const DRIVE_SESSION_MAX_MS = 12 * 60 * 60 * 1000;
 
         let gapiClientInitialized = false;
         let gisTokenClient = null;
@@ -799,7 +800,8 @@
                 if (!raw) return null;
                 const data = JSON.parse(raw);
                 if (!data || !data.access_token || !data.expires_at) return null;
-                if (Date.now() >= data.expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
+                const sessionEnd = data.session_expires_at != null ? data.session_expires_at : data.expires_at;
+                if (Date.now() >= sessionEnd - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
                     localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
                     return null;
                 }
@@ -813,11 +815,58 @@
         function persistDriveToken(tokenResponse) {
             if (!tokenResponse || !tokenResponse.access_token) return;
             const expiresInSec = typeof tokenResponse.expires_in === 'number' ? tokenResponse.expires_in : 3600;
-            const expiresAt = Date.now() + expiresInSec * 1000 - DRIVE_TOKEN_EXPIRY_BUFFER_MS;
+            const googleExpiresAt = Date.now() + expiresInSec * 1000 - DRIVE_TOKEN_EXPIRY_BUFFER_MS;
+            let sessionExpiresAt = Date.now() + DRIVE_SESSION_MAX_MS;
+            try {
+                const raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
+                if (raw) {
+                    const prev = JSON.parse(raw);
+                    if (prev && typeof prev.session_expires_at === 'number' &&
+                        Date.now() < prev.session_expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
+                        sessionExpiresAt = prev.session_expires_at;
+                    }
+                }
+            } catch (e) { /* ignore */ }
             localStorage.setItem(DRIVE_TOKEN_STORAGE_KEY, JSON.stringify({
                 access_token: tokenResponse.access_token,
-                expires_at: expiresAt
+                expires_at: googleExpiresAt,
+                session_expires_at: sessionExpiresAt
             }));
+        }
+
+        function isGoogleAccessTokenStale(data) {
+            return !!(data && Date.now() >= data.expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS);
+        }
+
+        function trySilentRefreshDriveToken() {
+            if (!gisTokenClient) return Promise.resolve(false);
+            return new Promise(function (resolve) {
+                let finished = false;
+                const t = setTimeout(function () {
+                    if (!finished) {
+                        finished = true;
+                        resolve(false);
+                    }
+                }, 12000);
+                gisTokenClient.callback = function (tr) {
+                    if (finished) return;
+                    finished = true;
+                    clearTimeout(t);
+                    if (tr && tr.access_token) {
+                        persistDriveToken(tr);
+                        applyDriveAccessToken(tr.access_token);
+                        resolve(true);
+                    } else {
+                        resolve(false);
+                    }
+                };
+                try {
+                    gisTokenClient.requestAccessToken({ prompt: '' });
+                } catch (e) {
+                    clearTimeout(t);
+                    resolve(false);
+                }
+            });
         }
 
         function clearPersistedDriveToken() {
@@ -929,12 +978,20 @@
                 return;
             }
             applyDriveAccessToken(stored.access_token);
-            setDriveStatus('Signed in (saved on this device). Save/load works until the session expires; use Sign out to clear.');
+            if (isGoogleAccessTokenStale(stored)) {
+                await trySilentRefreshDriveToken();
+            }
+            setDriveStatus('Signed in (saved on this device). Save/load works for up to 12 hours; use Sign out to clear sooner.');
         }
 
         /** Re-attach token from localStorage if gapi was reset (e.g. first save after restore race). */
         async function ensureDriveTokenBeforeDriveOp() {
-            const stored = readPersistedDriveToken();
+            let stored = readPersistedDriveToken();
+            if (stored && isGoogleAccessTokenStale(stored)) {
+                const ready = await initGoogleDriveClient(true);
+                if (ready) await trySilentRefreshDriveToken();
+                stored = readPersistedDriveToken();
+            }
             if (stored) {
                 if (!driveAccessToken || driveAccessToken !== stored.access_token) {
                     const ready = await initGoogleDriveClient(true);
@@ -970,7 +1027,7 @@
                     if (tokenResponse && tokenResponse.access_token) {
                         persistDriveToken(tokenResponse);
                         applyDriveAccessToken(tokenResponse.access_token);
-                        setDriveStatus('Signed in. Session is saved on this device until it expires.');
+                        setDriveStatus('Signed in. Session is saved on this device for up to 12 hours (or until you sign out).');
                     } else {
                         console.error('Token response:', tokenResponse);
                         setDriveStatus('Sign-in failed. Check OAuth origin settings.');

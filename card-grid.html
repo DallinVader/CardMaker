@@ -395,6 +395,7 @@
         const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
         const DRIVE_TOKEN_STORAGE_KEY = 'cardmaker_drive_session_v1';
         const DRIVE_TOKEN_EXPIRY_BUFFER_MS = 120000;
+        const DRIVE_SESSION_MAX_MS = 12 * 60 * 60 * 1000;
         const DRIVE_FILES_API = 'https://www.googleapis.com/drive/v3/files';
 
         const fileUpload = document.getElementById('fileUpload');
@@ -479,29 +480,81 @@
             return (n / (1000 * 1000)).toFixed(n < 10000000 ? 2 : 1).replace(/\.?0+$/, '') + ' MB';
         }
 
-        function readStoredDriveToken() {
+        function readStoredDriveRecord() {
             try {
                 const raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
                 if (!raw) return null;
                 const data = JSON.parse(raw);
                 if (!data || !data.access_token || !data.expires_at) return null;
-                if (Date.now() >= data.expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
+                const sessionEnd = data.session_expires_at != null ? data.session_expires_at : data.expires_at;
+                if (Date.now() >= sessionEnd - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
                     localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
                     return null;
                 }
-                return data.access_token;
+                return data;
             } catch (e) {
+                localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
                 return null;
             }
         }
 
+        function readStoredDriveToken() {
+            const d = readStoredDriveRecord();
+            return d ? d.access_token : null;
+        }
+
         function persistDriveToken(tokenResponse) {
             const expiresInSec = parseInt(tokenResponse.expires_in || '3600', 10);
-            const expiresAt = Date.now() + expiresInSec * 1000 - DRIVE_TOKEN_EXPIRY_BUFFER_MS;
+            const googleExpiresAt = Date.now() + expiresInSec * 1000 - DRIVE_TOKEN_EXPIRY_BUFFER_MS;
+            let sessionExpiresAt = Date.now() + DRIVE_SESSION_MAX_MS;
+            try {
+                const raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
+                if (raw) {
+                    const prev = JSON.parse(raw);
+                    if (prev && typeof prev.session_expires_at === 'number' &&
+                        Date.now() < prev.session_expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
+                        sessionExpiresAt = prev.session_expires_at;
+                    }
+                }
+            } catch (e) { /* ignore */ }
             localStorage.setItem(DRIVE_TOKEN_STORAGE_KEY, JSON.stringify({
                 access_token: tokenResponse.access_token,
-                expires_at: expiresAt
+                expires_at: googleExpiresAt,
+                session_expires_at: sessionExpiresAt
             }));
+        }
+
+        function isGoogleAccessTokenStale(data) {
+            return !!(data && Date.now() >= data.expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS);
+        }
+
+        async function maybeRefreshGridDriveTokenIfStale() {
+            const rec = readStoredDriveRecord();
+            if (!rec || !isGoogleAccessTokenStale(rec)) return;
+            const ok = await waitForGoogleScripts(3000);
+            if (!ok || !ensureGridTokenClient()) return;
+            await new Promise(function (resolve) {
+                let finished = false;
+                const t = setTimeout(function () {
+                    if (!finished) {
+                        finished = true;
+                        resolve();
+                    }
+                }, 12000);
+                gisTokenClient.callback = function (tr) {
+                    if (finished) return;
+                    finished = true;
+                    clearTimeout(t);
+                    if (tr && tr.access_token) persistDriveToken(tr);
+                    resolve();
+                };
+                try {
+                    gisTokenClient.requestAccessToken({ prompt: '' });
+                } catch (e) {
+                    clearTimeout(t);
+                    resolve();
+                }
+            });
         }
 
         function waitForGoogleScripts(maxWaitMs) {
@@ -614,6 +667,7 @@
             load.hidden = false;
 
             try {
+                await maybeRefreshGridDriveTokenIfStale();
                 const token = readStoredDriveToken();
                 if (!token) throw new Error('Connect Google first.');
 
@@ -939,6 +993,7 @@
                 return;
             }
 
+            await maybeRefreshGridDriveTokenIfStale();
             const token = readStoredDriveToken();
             if (!token) {
                 setQueueBanner(
@@ -981,6 +1036,7 @@
         }
 
         async function refreshGridLoadModalList() {
+            await maybeRefreshGridDriveTokenIfStale();
             const token = readStoredDriveToken();
             const listEl = document.getElementById('gridLoadModalList');
             if (!token) {
@@ -1011,6 +1067,7 @@
 
         async function prefetchGridDriveCache() {
             try {
+                await maybeRefreshGridDriveTokenIfStale();
                 const token = readStoredDriveToken();
                 if (!token) return;
                 gridDriveFilesCache = await listCardMakerProjects(token);
@@ -1126,6 +1183,7 @@
                 return;
             }
             const file = gridDriveFilesCache[gridLoadModalSelectedIdx];
+            await maybeRefreshGridDriveTokenIfStale();
             const token = readStoredDriveToken();
             if (!token) {
                 setGridLoadModalMessage('Connect Google first.', true);
@@ -1270,9 +1328,11 @@
         });
 
         (async function prefetchGridDriveCacheOnLoad() {
-            if (!readStoredDriveToken()) return;
+            if (!readStoredDriveRecord()) return;
             const ok = await waitForGoogleScripts(8000);
             if (!ok) return;
+            await maybeRefreshGridDriveTokenIfStale();
+            if (!readStoredDriveToken()) return;
             prefetchGridDriveCache();
         })();
 

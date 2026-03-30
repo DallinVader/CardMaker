@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Saved Projects Manager – Card Maker</title>
     <link rel="stylesheet" href="style.css">
     <style>
         body { background: #0b1220; color: #e2e8f0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
-        .spm-wrap { max-width: 1200px; margin: 0 auto; padding: 22px 18px 40px; }
+        .spm-wrap { max-width: 1200px; margin: 0 auto; padding: 22px max(18px, env(safe-area-inset-right)) 40px max(18px, env(safe-area-inset-left)); }
         .spm-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
-        .spm-title { font-family: Medieval, serif; font-size: 1.8rem; margin: 0; letter-spacing: .02em; color: #000; }
+        .spm-title { font-family: Medieval, serif; font-size: 1.8rem; margin: 0; letter-spacing: .02em; color: #e8edf5; }
         .spm-sub { margin: 10px 0 0; color: #94a3b8; font-size: 13px; line-height: 1.55; max-width: 62ch; }
 
         .spm-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: flex-end; }
@@ -125,7 +125,38 @@
             box-shadow: inset 3px 0 0 #818cf8;
         }
         tbody tr.spm-row-selected:hover { background: rgba(99,102,241,0.16); }
+        tbody tr[data-project-id] { cursor: help; }
         .spm-name { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 900; }
+
+        .spm-hover-preview {
+            position: fixed;
+            z-index: 10050;
+            pointer-events: none;
+            width: min(240px, 42vw);
+            max-height: min(340px, 52vh);
+            border-radius: 14px;
+            border: 2px solid rgba(129, 140, 248, 0.65);
+            box-shadow: 0 24px 56px rgba(0, 0, 0, 0.55);
+            background: #0f172a;
+            overflow: hidden;
+        }
+        .spm-hover-preview img {
+            display: block;
+            width: 100%;
+            height: auto;
+            vertical-align: top;
+        }
+        .spm-hover-preview.is-loading img { opacity: 0.35; }
+        .spm-hover-preview-fallback {
+            display: none;
+            padding: 18px 14px;
+            font-size: 12px;
+            line-height: 1.45;
+            color: #94a3b8;
+            text-align: center;
+        }
+        .spm-hover-preview.is-fallback .spm-hover-preview-fallback { display: block; }
+        .spm-hover-preview.is-fallback img { display: none; }
         .spm-muted { color: #cbd5e1; }
 
         .spm-rarity {
@@ -256,6 +287,55 @@
             color: #94a3b8;
             line-height: 1.45;
         }
+
+        .spm-multi-panel {
+            margin-bottom: 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(148,163,184,0.2);
+            background: rgba(15,23,42,0.35);
+            overflow: hidden;
+        }
+        .spm-multi-panel > summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 12px 16px;
+            font-weight: 800;
+            font-size: 12px;
+            letter-spacing: .07em;
+            text-transform: uppercase;
+            color: #cbd5e1;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .spm-multi-panel > summary::-webkit-details-marker { display: none; }
+        .spm-multi-panel > summary::after {
+            content: '▶';
+            font-size: 10px;
+            color: #93c5fd;
+            transition: transform 0.15s ease;
+        }
+        .spm-multi-panel[open] > summary::after {
+            transform: rotate(90deg);
+        }
+        .spm-multi-panel > summary:hover {
+            background: rgba(99,102,241,0.08);
+            color: #e2e8f0;
+        }
+        .spm-multi-panel-body {
+            padding: 0 14px 14px;
+            border-top: 1px solid rgba(148,163,184,0.12);
+        }
+        .spm-multi-panel-body .spm-filter-row {
+            margin-top: 14px;
+            margin-bottom: 12px;
+        }
+        .spm-multi-panel-body .spm-bulk-bar {
+            margin-bottom: 0;
+        }
+
         .spm-link-btn {
             display: inline-flex; align-items: center; justify-content: center;
             padding: 8px 10px; border-radius: 10px;
@@ -450,6 +530,183 @@
             cursor: not-allowed !important;
         }
 
+        .spm-search-wrap { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1 1 220px; }
+        .spm-search-wrap .spm-input { width: 100%; min-width: 0; max-width: 100%; }
+
+        @media (max-width: 900px) {
+            .spm-top {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .spm-controls {
+                justify-content: stretch;
+            }
+            .spm-controls .spm-btn {
+                flex: 1 1 calc(50% - 6px);
+                min-height: 44px;
+                justify-content: center;
+            }
+            .spm-panel { padding: 16px 14px 18px; }
+            .spm-stat-grid { grid-template-columns: 1fr; }
+            .spm-table-tools {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .spm-table-tools > div {
+                width: 100%;
+                justify-content: stretch !important;
+            }
+            .spm-multi-panel-body { padding: 0 10px 12px; }
+        }
+
+        @media (max-width: 720px) {
+            tbody tr[data-project-id] { cursor: default; }
+            .spm-wrap { padding-top: 16px; padding-bottom: max(28px, env(safe-area-inset-bottom)); }
+            .spm-title { font-size: 1.45rem; }
+            .spm-sub { font-size: 13px; max-width: none; }
+            .spm-table-scroll {
+                margin-top: 8px;
+                max-height: none;
+                -webkit-overflow-scrolling: touch;
+                overflow-x: visible;
+                border: none;
+                border-radius: 0;
+                background: transparent;
+            }
+            .spm-table-scroll table {
+                display: block;
+                background: transparent;
+                border-radius: 0;
+            }
+            .spm-table-scroll thead {
+                position: static;
+                display: none;
+            }
+            .spm-table-scroll tbody {
+                display: block;
+            }
+            .spm-table-scroll tbody tr {
+                display: block;
+                margin-bottom: 14px;
+                padding: 12px 14px;
+                border-radius: 14px;
+                border: 1px solid rgba(148, 163, 184, 0.22);
+                background: rgba(15, 23, 42, 0.55);
+                box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
+            }
+            .spm-table-scroll tbody tr.spm-row-selected {
+                box-shadow: inset 3px 0 0 #818cf8, 0 4px 18px rgba(0, 0, 0, 0.22);
+            }
+            .spm-table-scroll tbody td {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 8px 12px;
+                padding: 10px 0;
+                border-bottom: 1px dashed rgba(148, 163, 184, 0.18);
+                border-left: none;
+                border-right: none;
+                font-size: 14px;
+            }
+            .spm-table-scroll tbody tr > td:last-child {
+                border-bottom: none;
+                padding-bottom: 4px;
+            }
+            .spm-table-scroll tbody td[data-label]:not([data-label=""])::before {
+                content: attr(data-label);
+                flex: 0 0 7rem;
+                min-width: 6rem;
+                font-size: 10px;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: #94a3b8;
+                line-height: 1.3;
+            }
+            .spm-table-scroll tbody td.spm-check-cell {
+                border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+                padding-bottom: 12px;
+                margin-bottom: 4px;
+                justify-content: flex-start;
+            }
+            .spm-table-scroll tbody td.spm-check-cell::before {
+                display: none;
+                content: none;
+            }
+            .spm-table-scroll tbody td.spm-check-cell .spm-row-check {
+                width: 26px;
+                height: 26px;
+            }
+            .spm-table-scroll tbody td.spm-actions {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+                padding-top: 14px;
+            }
+            .spm-table-scroll tbody td.spm-actions::before {
+                flex: 0 0 100%;
+                min-width: 100%;
+                margin-bottom: 2px;
+            }
+            .spm-table-scroll .spm-actions {
+                white-space: normal;
+                flex-wrap: wrap;
+            }
+            .spm-table-scroll .spm-actions .spm-small-btn,
+            .spm-table-scroll .spm-actions .spm-link-btn {
+                flex: 1 1 auto;
+                min-height: 44px;
+                padding: 12px 14px;
+                font-size: 13px;
+                justify-content: center;
+            }
+            .spm-table-scroll tbody td .spm-rarity select {
+                min-height: 44px;
+                width: 100%;
+                max-width: 100%;
+            }
+            .spm-name {
+                max-width: none;
+                white-space: normal;
+                word-break: break-word;
+            }
+            .spm-table-empty-row td,
+            .spm-table-empty-row td.spm-table-empty-msg {
+                display: block !important;
+                text-align: center !important;
+                padding: 22px 14px !important;
+                border: none !important;
+                font-size: 14px;
+            }
+            .spm-table-empty-row td::before {
+                display: none !important;
+                content: none !important;
+            }
+            .spm-hover-preview {
+                display: none;
+            }
+            .spm-modal {
+                padding: max(8px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-right))
+                    max(8px, env(safe-area-inset-bottom));
+                align-items: flex-end;
+            }
+            .spm-modal-panel {
+                max-width: 100%;
+                max-height: min(100dvh - 12px, 100vh);
+                border-radius: 18px 18px 0 0;
+                padding: 20px 16px 18px;
+                padding-bottom: max(18px, env(safe-area-inset-bottom));
+            }
+            .spm-modal-actions {
+                justify-content: stretch;
+            }
+            .spm-modal-actions .spm-btn {
+                flex: 1;
+                min-height: 46px;
+                justify-content: center;
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -493,8 +750,8 @@
 
             <div class="spm-panel">
                 <div class="spm-table-tools">
-                    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
-                        <label style="font-weight:900; color:#e2e8f0; font-size:13px;">
+                    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;">
+                        <label class="spm-search-wrap" style="font-weight:900; color:#e2e8f0; font-size:13px;">
                             Search
                             <input class="spm-input" id="spmSearchInput" placeholder="name / type / subtype" />
                         </label>
@@ -521,47 +778,52 @@
                     </div>
                 </div>
 
-                <div class="spm-filter-row">
-                    <label> Type
-                        <select class="spm-select" id="spmFilterType"><option value="">All types</option></select>
-                    </label>
-                    <label> Subtype
-                        <select class="spm-select" id="spmFilterSubtype"><option value="">All subtypes</option></select>
-                    </label>
-                    <label> Rarity
-                        <select class="spm-select" id="spmFilterRarity"><option value="">All rarities</option></select>
-                    </label>
-                    <button type="button" class="spm-small-btn" id="spmClearFiltersBtn">Clear filters</button>
-                </div>
-
-                <div class="spm-bulk-bar" id="spmBulkBar">
-                    <div class="spm-bulk-head">
-                        <span class="spm-bulk-title">Selection</span>
-                        <span class="spm-bulk-badge" id="spmSelectedLabel" aria-live="polite">
-                            <span id="spmSelectedCount">0</span>
-                            <span class="spm-bulk-badge-sub" id="spmSelectedSub">cards selected</span>
-                        </span>
-                    </div>
-                    <div class="spm-bulk-actions">
-                        <div class="spm-bulk-field">
-                            <span>Apply rarity</span>
-                            <div class="spm-bulk-inline">
-                                <select class="spm-select" id="spmBulkRaritySelect">
-                                    <option value="">Choose…</option>
-                                    <option value="Common">Common</option>
-                                    <option value="Uncommon">Uncommon</option>
-                                    <option value="Rare">Rare</option>
-                                    <option value="Mythic">Mythic</option>
-                                    <option value="Legendary">Legendary</option>
-                                </select>
-                                <button type="button" class="spm-small-btn spm-bulk-apply-btn" id="spmBulkApplyBtn" disabled>Apply</button>
-                            </div>
+                <details class="spm-multi-panel">
+                    <summary>Filters &amp; multi-select</summary>
+                    <div class="spm-multi-panel-body">
+                        <div class="spm-filter-row">
+                            <label> Type
+                                <select class="spm-select" id="spmFilterType"><option value="">All types</option></select>
+                            </label>
+                            <label> Subtype
+                                <select class="spm-select" id="spmFilterSubtype"><option value="">All subtypes</option></select>
+                            </label>
+                            <label> Rarity
+                                <select class="spm-select" id="spmFilterRarity"><option value="">All rarities</option></select>
+                            </label>
+                            <button type="button" class="spm-small-btn" id="spmClearFiltersBtn">Clear filters</button>
                         </div>
-                        <button type="button" class="spm-small-btn spm-bulk-clear-btn" id="spmClearSelectionBtn">Clear selection</button>
-                        <button type="button" class="spm-small-btn spm-bulk-print-btn" id="spmOpenPrintGridBtn" disabled title="Opens Print 9-up sheet in a new tab">Open in print grid…</button>
+
+                        <div class="spm-bulk-bar" id="spmBulkBar">
+                            <div class="spm-bulk-head">
+                                <span class="spm-bulk-title">Selection</span>
+                                <span class="spm-bulk-badge" id="spmSelectedLabel" aria-live="polite">
+                                    <span id="spmSelectedCount">0</span>
+                                    <span class="spm-bulk-badge-sub" id="spmSelectedSub">cards selected</span>
+                                </span>
+                            </div>
+                            <div class="spm-bulk-actions">
+                                <div class="spm-bulk-field">
+                                    <span>Apply rarity</span>
+                                    <div class="spm-bulk-inline">
+                                        <select class="spm-select" id="spmBulkRaritySelect">
+                                            <option value="">Choose…</option>
+                                            <option value="Common">Common</option>
+                                            <option value="Uncommon">Uncommon</option>
+                                            <option value="Rare">Rare</option>
+                                            <option value="Mythic">Mythic</option>
+                                            <option value="Legendary">Legendary</option>
+                                        </select>
+                                        <button type="button" class="spm-small-btn spm-bulk-apply-btn" id="spmBulkApplyBtn" disabled>Apply</button>
+                                    </div>
+                                </div>
+                                <button type="button" class="spm-small-btn spm-bulk-clear-btn" id="spmClearSelectionBtn">Clear selection</button>
+                                <button type="button" class="spm-small-btn spm-bulk-print-btn" id="spmOpenPrintGridBtn" disabled title="Opens Print 9-up sheet in a new tab">Open in print grid…</button>
+                            </div>
+                            <p class="spm-bulk-meta" id="spmFilteredHint"></p>
+                        </div>
                     </div>
-                    <p class="spm-bulk-meta" id="spmFilteredHint"></p>
-                </div>
+                </details>
 
                 <div class="spm-table-scroll" style="max-height: 560px; overflow:auto;">
                     <table>
@@ -622,12 +884,19 @@
         </div>
     </div>
 
+    <div id="spmHoverPreview" class="spm-hover-preview" hidden aria-hidden="true">
+        <img alt="" decoding="async" />
+        <div class="spm-hover-preview-fallback">No preview available for this save.</div>
+    </div>
+
+    <script src="card-render.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
         const GOOGLE_CLIENT_ID = '984239146057-o6ujksfj9qk8tmqm9c8msrpidgm6492r.apps.googleusercontent.com';
         const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
         const DRIVE_TOKEN_STORAGE_KEY = 'cardmaker_drive_session_v1';
         const DRIVE_TOKEN_EXPIRY_BUFFER_MS = 120000;
+        const DRIVE_SESSION_MAX_MS = 12 * 60 * 60 * 1000;
         const DRIVE_FILES_API = 'https://www.googleapis.com/drive/v3/files';
         const DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3/files';
         const PROJECT_FILE_EXTENSION = '.cardmaker.json';
@@ -753,29 +1022,83 @@
             fill(spmFilterRarity, rarities, 'All rarities');
         }
 
-        function readStoredDriveToken() {
+        function readStoredDriveRecord() {
             try {
                 const raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
                 if (!raw) return null;
                 const data = JSON.parse(raw);
                 if (!data || !data.access_token || !data.expires_at) return null;
-                if (Date.now() >= data.expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
+                const sessionEnd = data.session_expires_at != null ? data.session_expires_at : data.expires_at;
+                if (Date.now() >= sessionEnd - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
                     localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
                     return null;
                 }
-                return data.access_token;
+                return data;
             } catch (e) {
+                localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
                 return null;
             }
         }
 
+        function readStoredDriveToken() {
+            const d = readStoredDriveRecord();
+            return d ? d.access_token : null;
+        }
+
         function persistDriveToken(tokenResponse) {
             const expiresInSec = parseInt(tokenResponse.expires_in || '3600', 10);
-            const expiresAt = Date.now() + expiresInSec * 1000 - DRIVE_TOKEN_EXPIRY_BUFFER_MS;
+            const googleExpiresAt = Date.now() + expiresInSec * 1000 - DRIVE_TOKEN_EXPIRY_BUFFER_MS;
+            let sessionExpiresAt = Date.now() + DRIVE_SESSION_MAX_MS;
+            try {
+                const raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
+                if (raw) {
+                    const prev = JSON.parse(raw);
+                    if (prev && typeof prev.session_expires_at === 'number' &&
+                        Date.now() < prev.session_expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
+                        sessionExpiresAt = prev.session_expires_at;
+                    }
+                }
+            } catch (e) { /* ignore */ }
             localStorage.setItem(DRIVE_TOKEN_STORAGE_KEY, JSON.stringify({
                 access_token: tokenResponse.access_token,
-                expires_at: expiresAt
+                expires_at: googleExpiresAt,
+                session_expires_at: sessionExpiresAt
             }));
+        }
+
+        function isGoogleAccessTokenStale(data) {
+            return !!(data && Date.now() >= data.expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS);
+        }
+
+        function trySilentRefreshGoogleToken() {
+            const client = initTokenClient();
+            if (!client) return Promise.resolve(false);
+            return new Promise(function (resolve) {
+                let finished = false;
+                const t = setTimeout(function () {
+                    if (!finished) {
+                        finished = true;
+                        resolve(false);
+                    }
+                }, 12000);
+                client.callback = function (tr) {
+                    if (finished) return;
+                    finished = true;
+                    clearTimeout(t);
+                    if (tr && tr.access_token) {
+                        persistDriveToken(tr);
+                        resolve(true);
+                    } else {
+                        resolve(false);
+                    }
+                };
+                try {
+                    client.requestAccessToken({ prompt: '' });
+                } catch (e) {
+                    clearTimeout(t);
+                    resolve(false);
+                }
+            });
         }
 
         function driveAuthHeaders(token, extra) {
@@ -838,13 +1161,21 @@
         }
 
         async function ensureSignedIn() {
-            if (driveAccessToken) return true;
+            let rec = readStoredDriveRecord();
+            if (rec && isGoogleAccessTokenStale(rec)) {
+                const waitOk = await waitForGoogleScripts(3000);
+                if (waitOk) await trySilentRefreshGoogleToken();
+            }
             const stored = readStoredDriveToken();
             if (stored) {
                 driveAccessToken = stored;
                 spmStatus.textContent = 'Signed in (saved on this device)';
                 updateButtons();
                 return true;
+            }
+            if (driveAccessToken) {
+                driveAccessToken = null;
+                updateButtons();
             }
             spmStatus.textContent = 'Not connected';
             return false;
@@ -1297,7 +1628,7 @@
         function renderTable(items) {
             if (!spmTableBody) return;
             if (!items || items.length === 0) {
-                spmTableBody.innerHTML = '<tr><td colspan="9" class="spm-muted">No projects match the current filters (or nothing loaded yet).</td></tr>';
+                spmTableBody.innerHTML = '<tr class="spm-table-empty-row"><td colspan="9" class="spm-muted spm-table-empty-msg">No projects match the current filters (or nothing loaded yet).</td></tr>';
                 return;
             }
             spmTableBody.innerHTML = items.map(function (p) {
@@ -1312,6 +1643,7 @@
                 const openHref = 'index.html?openDriveFile=' + encodeURIComponent(p.file.id);
                 const chk = selectedProjectIds.has(p.file.id) ? 'checked' : '';
                 const rowClass = selectedProjectIds.has(p.file.id) ? ' class="spm-row-selected"' : '';
+                const rowAttr = ' data-project-id="' + escapeHtml(p.file.id) + '"';
 
                 const selectOptions = RARITY_OPTIONS.map(function (opt) {
                     const val = opt;
@@ -1320,22 +1652,22 @@
                     return '<option value="' + escapeHtml(val) + '" ' + selected + '>' + escapeHtml(label) + '</option>';
                 }).join('');
 
-                return '<tr' + rowClass + '>' +
-                    '<td class="spm-check-cell"><input type="checkbox" class="spm-row-check" data-spm-row-check data-project-id="' + escapeHtml(p.file.id) + '" ' + chk + ' aria-label="Select ' + escapeHtml(nameShort) + '"/></td>' +
-                    '<td class="spm-name" title="' + escapeHtml(p.file.name) + '">' + escapeHtml(nameShort) + '</td>' +
-                    '<td class="spm-muted" title="' + szTitle + '">' + escapeHtml(sz) + '</td>' +
-                    '<td>' + escapeHtml(cost) + '</td>' +
-                    '<td>' + escapeHtml(typeValue) + '</td>' +
-                    '<td>' + escapeHtml(subtypeValue) + '</td>' +
-                    '<td>' +
+                return '<tr' + rowClass + rowAttr + '>' +
+                    '<td class="spm-check-cell" data-label=""><input type="checkbox" class="spm-row-check" data-spm-row-check data-project-id="' + escapeHtml(p.file.id) + '" ' + chk + ' aria-label="Select ' + escapeHtml(nameShort) + '"/></td>' +
+                    '<td class="spm-name" data-label="Save" title="' + escapeHtml(p.file.name) + '">' + escapeHtml(nameShort) + '</td>' +
+                    '<td class="spm-muted" data-label="Size" title="' + szTitle + '">' + escapeHtml(sz) + '</td>' +
+                    '<td data-label="Cost">' + escapeHtml(cost) + '</td>' +
+                    '<td data-label="Type">' + escapeHtml(typeValue) + '</td>' +
+                    '<td data-label="Subtype">' + escapeHtml(subtypeValue) + '</td>' +
+                    '<td data-label="Rarity">' +
                         '<div class="spm-rarity">' +
                             '<select data-rarity-set data-project-id="' + escapeHtml(p.file.id) + '">' +
                                 selectOptions +
                             '</select>' +
                         '</div>' +
                     '</td>' +
-                    '<td class="spm-muted">' + when + '</td>' +
-                    '<td class="spm-actions">' +
+                    '<td class="spm-muted" data-label="Updated">' + when + '</td>' +
+                    '<td class="spm-actions" data-label="Actions">' +
                         '<button type="button" class="spm-small-btn spm-btn-edit" data-spm-edit data-project-id="' + escapeHtml(p.file.id) + '">Edit</button>' +
                         '<a class="spm-link-btn" href="' + openHref + '" target="_blank" rel="noopener">Open</a>' +
                         '<button type="button" class="spm-small-btn spm-danger" data-spm-delete data-project-id="' + escapeHtml(p.file.id) + '">Delete</button>' +
@@ -1480,6 +1812,142 @@
             var tc = parseInt(spmTotalCount.textContent, 10);
             if (isFinite(tc) && tc > 0) spmTotalCount.textContent = String(tc - 1);
             recalculateSummaryFromProjects();
+        }
+
+        var lastSpmPreviewClientX = 0;
+        var lastSpmPreviewClientY = 0;
+        var spmHoverPreviewReq = 0;
+        var spmHoverDebounceTimer = null;
+        var spmHoverStableRowId = null;
+
+        function hideSpmHoverPreview() {
+            var el = document.getElementById('spmHoverPreview');
+            if (!el) return;
+            el.hidden = true;
+            el.setAttribute('aria-hidden', 'true');
+            el.classList.remove('is-fallback', 'is-loading');
+            var img = el.querySelector('img');
+            if (img) {
+                img.onload = null;
+                img.onerror = null;
+                img.removeAttribute('src');
+                img.alt = '';
+            }
+            spmHoverPreviewReq++;
+        }
+
+        function positionSpmHoverPreview(clientX, clientY) {
+            var el = document.getElementById('spmHoverPreview');
+            if (!el || el.hidden) return;
+            var pad = 16;
+            var w = el.offsetWidth || 200;
+            var h = el.offsetHeight || 260;
+            var x = clientX + pad;
+            var y = clientY + pad;
+            if (x + w > window.innerWidth - 10) x = clientX - w - pad;
+            if (y + h > window.innerHeight - 10) y = clientY - h - pad;
+            x = Math.max(10, Math.min(x, window.innerWidth - w - 10));
+            y = Math.max(10, Math.min(y, window.innerHeight - h - 10));
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+        }
+
+        async function resolveSpmProjectPreviewUrl(project) {
+            if (!project || !project.state || typeof project.state !== 'object') return null;
+            if (typeof window.renderCardMakerProjectToDataUrl === 'function') {
+                try {
+                    var url = await window.renderCardMakerProjectToDataUrl(project.state);
+                    if (url && String(url).length > 32) return url;
+                } catch (err) {
+                    console.warn('Card preview render:', err);
+                }
+            }
+            var im = project.state.images || {};
+            if (im.artSrc && String(im.artSrc).length > 20) return im.artSrc;
+            if (im.cardBaseSrc && String(im.cardBaseSrc).length > 20) return im.cardBaseSrc;
+            return null;
+        }
+
+        async function showSpmHoverPreviewForProject(projectId) {
+            var el = document.getElementById('spmHoverPreview');
+            if (!el) return;
+            var project = projects.find(function (p) { return p.file && p.file.id === projectId; });
+            var req = ++spmHoverPreviewReq;
+            el.hidden = false;
+            el.setAttribute('aria-hidden', 'false');
+            el.classList.add('is-loading');
+            el.classList.remove('is-fallback');
+            var img = el.querySelector('img');
+            var fallback = el.querySelector('.spm-hover-preview-fallback');
+            if (img) {
+                img.onload = null;
+                img.onerror = null;
+                img.removeAttribute('src');
+                img.alt = project ? displaySaveLabel(project.file.name) : '';
+            }
+            if (!project) {
+                hideSpmHoverPreview();
+                return;
+            }
+            positionSpmHoverPreview(lastSpmPreviewClientX, lastSpmPreviewClientY);
+            var url = await resolveSpmProjectPreviewUrl(project);
+            if (req !== spmHoverPreviewReq) return;
+            el.classList.remove('is-loading');
+            if (url && img) {
+                img.onload = function () {
+                    if (req !== spmHoverPreviewReq) return;
+                    positionSpmHoverPreview(lastSpmPreviewClientX, lastSpmPreviewClientY);
+                };
+                img.onerror = function () {
+                    if (req !== spmHoverPreviewReq) return;
+                    el.classList.add('is-fallback');
+                    if (fallback) fallback.textContent = 'Could not load preview image.';
+                    img.removeAttribute('src');
+                };
+                img.src = url;
+            } else {
+                el.classList.add('is-fallback');
+                if (fallback) fallback.textContent = 'No preview available for this save.';
+            }
+            positionSpmHoverPreview(lastSpmPreviewClientX, lastSpmPreviewClientY);
+        }
+
+        var spmFinePointerHover = typeof window.matchMedia !== 'function'
+            || window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+        if (spmTableBody && spmFinePointerHover) {
+            spmTableBody.addEventListener('mousemove', function (e) {
+                lastSpmPreviewClientX = e.clientX;
+                lastSpmPreviewClientY = e.clientY;
+                var tr = e.target.closest('tr[data-project-id]');
+                if (!tr) {
+                    spmHoverStableRowId = null;
+                    if (spmHoverDebounceTimer) {
+                        clearTimeout(spmHoverDebounceTimer);
+                        spmHoverDebounceTimer = null;
+                    }
+                    hideSpmHoverPreview();
+                    return;
+                }
+                var id = tr.getAttribute('data-project-id');
+                positionSpmHoverPreview(e.clientX, e.clientY);
+                if (id !== spmHoverStableRowId) {
+                    spmHoverStableRowId = id;
+                    if (spmHoverDebounceTimer) clearTimeout(spmHoverDebounceTimer);
+                    spmHoverDebounceTimer = setTimeout(function () {
+                        spmHoverDebounceTimer = null;
+                        showSpmHoverPreviewForProject(id);
+                    }, 140);
+                }
+            });
+            spmTableBody.addEventListener('mouseleave', function () {
+                spmHoverStableRowId = null;
+                if (spmHoverDebounceTimer) {
+                    clearTimeout(spmHoverDebounceTimer);
+                    spmHoverDebounceTimer = null;
+                }
+                hideSpmHoverPreview();
+            });
         }
 
         spmTableBody.addEventListener('change', function (e) {
