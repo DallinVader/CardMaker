@@ -319,7 +319,7 @@
 
             <div class="cg-setup-section">
                 <h3>Load from Card Maker save</h3>
-                <p class="drive-modal-hint" style="margin-top:0;">Uses the <strong>art image</strong> stored in a cloud project (same Google sign-in as Card Maker). Sign in on the editor first, or connect here.</p>
+                <p class="drive-modal-hint" style="margin-top:0;">Rebuilds the <strong>full card</strong> from your save (frame, art, text, and stats)—same layout as the Card Maker preview. Uses Google sign-in as in the editor.</p>
                 <div class="cg-drive-row">
                     <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="gridDriveSignInBtn">Connect Google</button>
                     <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="gridDriveRefreshBtn">Refresh saves</button>
@@ -338,6 +338,7 @@
     </div>
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="card-render.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
@@ -503,12 +504,25 @@
             return JSON.parse(txt);
         }
 
+        /** Fallback when full render is unavailable (e.g. missing fields). */
         function imageUrlFromCardMakerSave(parsed) {
             if (!parsed || typeof parsed !== 'object') return null;
             const im = parsed.images || {};
             if (im.artSrc && String(im.artSrc).length > 20) return im.artSrc;
             if (im.cardBaseSrc && String(im.cardBaseSrc).length > 20) return im.cardBaseSrc;
             return null;
+        }
+
+        async function compositeImageFromCardMakerSave(parsed) {
+            if (typeof window.renderCardMakerProjectToDataUrl === 'function' && parsed) {
+                try {
+                    const rendered = await window.renderCardMakerProjectToDataUrl(parsed);
+                    if (rendered && rendered.length > 32) return rendered;
+                } catch (e) {
+                    console.error('Card render failed:', e);
+                }
+            }
+            return imageUrlFromCardMakerSave(parsed);
         }
 
         function urlForCssBackground(url) {
@@ -538,7 +552,7 @@
 
         function applySaveImageToGrid(imageUrl, fillMode) {
             if (!imageUrl) {
-                setGridDriveStatus('That save has no art or frame image stored.', true);
+                setGridDriveStatus('Could not build an image from that save (missing images or invalid project).', true);
                 return;
             }
             const items = gridContainer.querySelectorAll('.cg-grid-item');
@@ -789,7 +803,7 @@
             setGridDriveStatus('Loading save…', false);
             try {
                 const json = await fetchDriveFileJson(token, fileId);
-                const url = imageUrlFromCardMakerSave(json);
+                const url = await compositeImageFromCardMakerSave(json);
                 applySaveImageToGrid(url, mode);
             } catch (e) {
                 setGridDriveStatus((e && e.message) ? e.message : 'Could not read that save.', true);
