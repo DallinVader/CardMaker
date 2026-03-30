@@ -14,12 +14,39 @@
             <a href="card-grid.html" class="top-bar-btn">Print the cards</a>
             <div class="top-drive-controls">
                 <button type="button" id="googleSignInBtn" class="top-bar-btn top-drive-btn" onclick="handleGoogleDriveAuthClick()">Sign in with Google</button>
-                <button type="button" id="saveDriveBtn" class="top-bar-btn top-drive-btn" onclick="saveProjectToDrive()" disabled>Save Project</button>
-                <button type="button" id="loadDriveBtn" class="top-bar-btn top-drive-btn" onclick="loadProjectFromDrive()" disabled>Load Project</button>
+                <button type="button" id="driveManageBtn" class="top-bar-btn top-drive-btn top-drive-btn-primary" onclick="openDriveProjectsModal()" disabled>Saved projects…</button>
             </div>
         </div>
         <div class="top-drive-status-wrap">
             <small id="driveStatusText">Checking Google Drive setup...</small>
+        </div>
+
+        <div id="driveProjectsModal" class="drive-modal" aria-hidden="true">
+            <div class="drive-modal-backdrop" onclick="closeDriveProjectsModal()" aria-hidden="true"></div>
+            <div class="drive-modal-panel" role="dialog" aria-modal="true" aria-labelledby="driveModalTitle">
+                <button type="button" class="drive-modal-close" onclick="closeDriveProjectsModal()" aria-label="Close">&times;</button>
+                <h2 id="driveModalTitle" class="drive-modal-title">Google Drive saves</h2>
+                <p class="drive-modal-hint">Projects are stored in your account’s <strong>hidden app data</strong> (not in My Drive). Same names update the existing save.</p>
+
+                <div class="drive-modal-section">
+                    <label class="drive-modal-label" for="driveSaveNameInput">Save current card</label>
+                    <div class="drive-save-row">
+                        <input type="text" id="driveSaveNameInput" class="drive-modal-input" placeholder="e.g. dragon-knight" autocomplete="off" maxlength="80">
+                        <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="driveModalSaveBtn">Save to Drive</button>
+                    </div>
+                    <small class="drive-modal-suffix">Saved as <code class="drive-code">name.cardmaker.json</code></small>
+                </div>
+
+                <div class="drive-modal-section drive-modal-section-grow">
+                    <div class="drive-list-toolbar">
+                        <span class="drive-modal-label" style="margin:0;">Your saves</span>
+                        <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="driveModalRefreshBtn">Refresh list</button>
+                    </div>
+                    <div id="driveModalList" class="drive-modal-list"></div>
+                </div>
+
+                <p id="driveModalMessage" class="drive-modal-message" role="status" aria-live="polite"></p>
+            </div>
         </div>
         
         <div class="main-container">
@@ -304,6 +331,8 @@
         let gisTokenClient = null;
         let driveAccessToken = null;
         let googleScriptsReady = false;
+        /** @type {Array<{id:string,name:string,modifiedTime?:string}>} */
+        let driveModalFilesCache = [];
 
         // Collapsible sections functionality
         function toggleSection(header) {
@@ -740,11 +769,9 @@
 
         function updateDriveButtons() {
             const signedIn = !!driveAccessToken;
-            const saveBtn = document.getElementById('saveDriveBtn');
-            const loadBtn = document.getElementById('loadDriveBtn');
+            const manageBtn = document.getElementById('driveManageBtn');
             const authBtn = document.getElementById('googleSignInBtn');
-            if (saveBtn) saveBtn.disabled = !signedIn;
-            if (loadBtn) loadBtn.disabled = !signedIn;
+            if (manageBtn) manageBtn.disabled = !signedIn;
             if (authBtn) {
                 authBtn.textContent = signedIn ? 'Sign out' : 'Sign in with Google';
             }
@@ -1166,27 +1193,118 @@
             }
         }
 
-        async function saveProjectToDrive() {
+        async function saveProjectToDriveWithName(projectName) {
+            const trimmed = (projectName || '').trim();
+            if (!trimmed) throw new Error('Enter a project name.');
+
+            const fileName = trimmed + PROJECT_FILE_EXTENSION;
+            const payload = JSON.stringify(buildProjectState());
+            setDriveStatus('Saving "' + fileName + '"...');
+            const existing = await findDriveProjectByName(fileName);
+            await uploadProjectToDrive(fileName, payload, existing ? existing.id : null);
+            setDriveStatus('Saved "' + fileName + '" to Google Drive.');
+        }
+
+        function setDriveModalMessage(text, isError) {
+            const el = document.getElementById('driveModalMessage');
+            if (!el) return;
+            el.textContent = text || '';
+            el.classList.toggle('is-error', !!isError);
+        }
+
+        function formatDriveListDate(iso) {
+            if (!iso) return '—';
+            try {
+                return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+            } catch (e) {
+                return iso;
+            }
+        }
+
+        function escapeHtml(s) {
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function renderDriveModalList(files) {
+            const container = document.getElementById('driveModalList');
+            if (!container) return;
+            if (!files || files.length === 0) {
+                container.innerHTML = '<div class="drive-modal-empty">No saves yet. Enter a name above and click <strong>Save to Drive</strong>.</div>';
+                return;
+            }
+            container.innerHTML = files.map(function (f, i) {
+                const name = escapeHtml(f.name);
+                const when = escapeHtml(formatDriveListDate(f.modifiedTime));
+                return '<div class="drive-modal-item">' +
+                    '<div class="drive-modal-item-info">' +
+                        '<span class="drive-modal-item-name" title="' + name + '">' + name + '</span>' +
+                        '<span class="drive-modal-item-date">' + when + '</span>' +
+                    '</div>' +
+                    '<div class="drive-modal-item-actions">' +
+                        '<button type="button" class="drive-modal-btn drive-modal-btn-small drive-modal-btn-load" data-drive-load data-drive-idx="' + i + '">Load</button>' +
+                        '<button type="button" class="drive-modal-btn drive-modal-btn-small drive-modal-btn-danger" data-drive-delete data-drive-idx="' + i + '">Delete</button>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+        }
+
+        async function refreshDriveModalList() {
+            const container = document.getElementById('driveModalList');
+            if (!container) return;
+            container.innerHTML = '<div class="drive-modal-loading">Loading your saves…</div>';
+            try {
+                const files = await listDriveProjects();
+                driveModalFilesCache = files;
+                renderDriveModalList(files);
+            } catch (err) {
+                console.error(err);
+                driveModalFilesCache = [];
+                container.innerHTML = '<div class="drive-modal-empty is-error">Could not load the list. Check your connection and try Refresh list.</div>';
+                throw err;
+            }
+        }
+
+        async function openDriveProjectsModal() {
             if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) {
                 alert('Sign in with Google first.');
                 return;
             }
-            const projectName = prompt('Project name:', 'my-card-project');
-            if (!projectName) return;
-
-            const fileName = projectName.trim() + PROJECT_FILE_EXTENSION;
-            const payload = JSON.stringify(buildProjectState());
-            setDriveStatus('Saving "' + fileName + '"...');
+            const modal = document.getElementById('driveProjectsModal');
+            if (!modal) return;
+            modal.classList.add('is-open');
+            modal.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+            setDriveModalMessage('');
             try {
-                const existing = await findDriveProjectByName(fileName);
-                await uploadProjectToDrive(fileName, payload, existing ? existing.id : null);
-                setDriveStatus('Saved "' + fileName + '" to Google Drive.');
-            } catch (error) {
-                console.error(error);
-                const msg = error && error.message ? error.message : String(error);
-                setDriveStatus('Save failed: ' + msg.slice(0, 200));
-                alert('Could not save to Google Drive.\n\n' + msg);
+                await refreshDriveModalList();
+            } catch (err) {
+                setDriveModalMessage((err && err.message) ? err.message : 'Failed to load saves.', true);
             }
+        }
+
+        function closeDriveProjectsModal() {
+            const modal = document.getElementById('driveProjectsModal');
+            if (!modal) return;
+            modal.classList.remove('is-open');
+            modal.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+        }
+
+        async function loadProjectFromDriveByFile(file) {
+            setDriveStatus('Loading "' + file.name + '"...');
+            const mediaUrl = DRIVE_FILES_API + '/' + encodeURIComponent(file.id) + '?alt=media';
+            const mediaRes = await fetch(mediaUrl, { headers: driveAuthHeaders() });
+            const content = await mediaRes.text();
+            if (!mediaRes.ok) {
+                throw new Error(content || ('Download failed: ' + mediaRes.status));
+            }
+            const state = JSON.parse(content);
+            applyProjectState(state);
+            setDriveStatus('Loaded "' + file.name + '".');
         }
 
         async function listDriveProjects() {
@@ -1200,47 +1318,146 @@
             });
         }
 
-        async function loadProjectFromDrive() {
-            if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) {
-                alert('Sign in with Google first.');
-                return;
-            }
-            setDriveStatus('Loading project list...');
-            try {
-                const files = await listDriveProjects();
-                if (files.length === 0) {
-                    setDriveStatus('No saved projects found in Google Drive app data.');
-                    alert('No saved projects found.');
-                    return;
-                }
-
-                const names = files.map(function (f, i) { return (i + 1) + '. ' + f.name; }).join('\n');
-                const pick = prompt('Choose a project number to load:\n\n' + names, '1');
-                if (!pick) return;
-                const idx = parseInt(pick, 10) - 1;
-                if (isNaN(idx) || idx < 0 || idx >= files.length) {
-                    alert('Invalid selection.');
-                    return;
-                }
-
-                const file = files[idx];
-                setDriveStatus('Loading "' + file.name + '"...');
-                const mediaUrl = DRIVE_FILES_API + '/' + encodeURIComponent(file.id) + '?alt=media';
-                const mediaRes = await fetch(mediaUrl, { headers: driveAuthHeaders() });
-                const content = await mediaRes.text();
-                if (!mediaRes.ok) {
-                    throw new Error(content || ('Download failed: ' + mediaRes.status));
-                }
-                const state = JSON.parse(content);
-                applyProjectState(state);
-                setDriveStatus('Loaded "' + file.name + '".');
-            } catch (error) {
-                console.error(error);
-                const msg = error && error.message ? error.message : String(error);
-                setDriveStatus('Load failed: ' + msg.slice(0, 200));
-                alert('Could not load from Google Drive.\n\n' + msg);
+        /**
+         * App Data folder files cannot be put in Trash; permanent delete only (Drive API files.delete).
+         * See https://developers.google.com/drive/api/guides/appdata
+         */
+        async function driveDeleteFilePermanently(fileId) {
+            const url = DRIVE_FILES_API + '/' + encodeURIComponent(fileId);
+            const res = await fetch(url, { method: 'DELETE', headers: driveAuthHeaders() });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(parseDriveError(text, res.status));
             }
         }
+
+        function initDriveProjectsModalUi() {
+            const list = document.getElementById('driveModalList');
+            const saveBtn = document.getElementById('driveModalSaveBtn');
+            const refreshBtn = document.getElementById('driveModalRefreshBtn');
+            const nameInput = document.getElementById('driveSaveNameInput');
+
+            if (list && !list.dataset.bound) {
+                list.dataset.bound = '1';
+                list.addEventListener('click', function (e) {
+                    const loadEl = e.target.closest('[data-drive-load]');
+                    const delEl = e.target.closest('[data-drive-delete]');
+                    if (!loadEl && !delEl) return;
+                    const idx = parseInt((loadEl || delEl).getAttribute('data-drive-idx'), 10);
+                    if (isNaN(idx) || !driveModalFilesCache[idx]) return;
+                    const file = driveModalFilesCache[idx];
+
+                    if (loadEl) {
+                        (async function () {
+                            try {
+                                if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) {
+                                    alert('Sign in with Google first.');
+                                    return;
+                                }
+                                await loadProjectFromDriveByFile(file);
+                                closeDriveProjectsModal();
+                            } catch (err) {
+                                console.error(err);
+                                const msg = err && err.message ? err.message : String(err);
+                                setDriveModalMessage('Load failed: ' + msg, true);
+                                setDriveStatus('Load failed: ' + msg.slice(0, 200));
+                                alert('Could not load from Google Drive.\n\n' + msg);
+                            }
+                        })();
+                    }
+
+                    if (delEl) {
+                        if (!confirm('Permanently delete “' + file.name + '”?\n\nThis removes that Card Maker save only. It cannot be recovered from Google Drive’s trash.')) {
+                            return;
+                        }
+                        (async function () {
+                            setDriveModalMessage('Deleting…', false);
+                            try {
+                                if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) {
+                                    alert('Sign in with Google first.');
+                                    return;
+                                }
+                                await driveDeleteFilePermanently(file.id);
+                                setDriveStatus('Deleted "' + file.name + '".');
+                                setDriveModalMessage('Deleted “' + file.name + '”.', false);
+                                await refreshDriveModalList();
+                            } catch (err) {
+                                console.error(err);
+                                const msg = err && err.message ? err.message : String(err);
+                                setDriveModalMessage('Delete failed: ' + msg, true);
+                                alert('Could not delete from Google Drive.\n\n' + msg);
+                            }
+                        })();
+                    }
+                });
+            }
+
+            if (saveBtn && !saveBtn.dataset.bound) {
+                saveBtn.dataset.bound = '1';
+                saveBtn.addEventListener('click', function () {
+                    (async function () {
+                        if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) {
+                            alert('Sign in with Google first.');
+                            return;
+                        }
+                        const name = nameInput && nameInput.value ? nameInput.value.trim() : '';
+                        if (!name) {
+                            setDriveModalMessage('Enter a project name before saving.', true);
+                            return;
+                        }
+                        setDriveModalMessage('Saving…', false);
+                        try {
+                            await saveProjectToDriveWithName(name);
+                            setDriveModalMessage('Saved “' + name + PROJECT_FILE_EXTENSION + '”.', false);
+                            if (nameInput) nameInput.value = '';
+                            await refreshDriveModalList();
+                        } catch (err) {
+                            console.error(err);
+                            const msg = err && err.message ? err.message : String(err);
+                            setDriveModalMessage('Save failed: ' + msg, true);
+                            alert('Could not save to Google Drive.\n\n' + msg);
+                        }
+                    })();
+                });
+            }
+
+            if (refreshBtn && !refreshBtn.dataset.bound) {
+                refreshBtn.dataset.bound = '1';
+                refreshBtn.addEventListener('click', function () {
+                    (async function () {
+                        if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) {
+                            alert('Sign in with Google first.');
+                            return;
+                        }
+                        setDriveModalMessage('Refreshing…', false);
+                        try {
+                            await refreshDriveModalList();
+                            setDriveModalMessage('List updated.', false);
+                        } catch (err) {
+                            setDriveModalMessage((err && err.message) ? err.message : 'Refresh failed.', true);
+                        }
+                    })();
+                });
+            }
+
+            if (nameInput && !nameInput.dataset.boundEnter) {
+                nameInput.dataset.boundEnter = '1';
+                nameInput.addEventListener('keydown', function (ev) {
+                    if (ev.key === 'Enter') {
+                        ev.preventDefault();
+                        if (saveBtn) saveBtn.click();
+                    }
+                });
+            }
+        }
+
+        document.addEventListener('keydown', function (ev) {
+            if (ev.key !== 'Escape') return;
+            const modal = document.getElementById('driveProjectsModal');
+            if (modal && modal.classList.contains('is-open')) {
+                closeDriveProjectsModal();
+            }
+        });
 
         // Card base/frame file upload
         document.getElementById("CardBase").addEventListener("change", function (event) {
@@ -1527,6 +1744,7 @@
         updateExportSizeDisplayFromSlider();
         updateExportBleedHint();
         updateDriveButtons();
+        initDriveProjectsModalUi();
         if (hasDriveConfig()) {
             if (readPersistedDriveToken()) {
                 setDriveStatus('Restoring Google session…');

@@ -482,6 +482,340 @@ canvas{
     background-color: white;
 }
 
+/* Google Drive saves modal */
+.top-drive-btn-primary {
+    background: linear-gradient(135deg, #5b4ba2 0%, #667eea 100%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.top-drive-btn-primary:hover:not(:disabled) {
+    box-shadow: 0 4px 14px rgba(102, 126, 234, 0.45);
+}
+
+.drive-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.drive-modal.is-open {
+    display: flex;
+}
+
+.drive-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.72);
+    backdrop-filter: blur(6px);
+}
+
+.drive-modal-panel {
+    position: relative;
+    width: 100%;
+    max-width: 520px;
+    max-height: min(88vh, 640px);
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.97) 100%);
+    border-radius: 16px;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+    padding: 22px 22px 16px;
+    z-index: 1;
+    overflow: hidden;
+}
+
+.drive-modal-close {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(226, 232, 240, 0.8);
+    color: #475569;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.drive-modal-close:hover {
+    background: #e2e8f0;
+    color: #1e293b;
+}
+
+.drive-modal-title {
+    font-family: Medieval, serif;
+    margin: 0 32px 8px 0;
+    font-size: 1.45rem;
+    color: #1e293b;
+    letter-spacing: 0.5px;
+}
+
+.drive-modal-hint {
+    margin: 0 0 18px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: #64748b;
+}
+
+.drive-modal-hint strong {
+    color: #475569;
+}
+
+.drive-modal-section {
+    margin-bottom: 16px;
+}
+
+.drive-modal-section-grow {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 8px;
+}
+
+.drive-modal-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #667eea;
+    margin-bottom: 8px;
+}
+
+.drive-save-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: stretch;
+}
+
+.drive-modal-input {
+    flex: 1;
+    min-width: 160px;
+    padding: 10px 12px;
+    border: 2px solid rgba(102, 126, 234, 0.28);
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    background: #fff;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.drive-modal-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+}
+
+.drive-modal-suffix {
+    display: block;
+    margin-top: 8px;
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+.drive-code {
+    font-family: ui-monospace, 'Cascadia Code', monospace;
+    font-size: 10px;
+    padding: 2px 6px;
+    background: #f1f5f9;
+    border-radius: 4px;
+    color: #475569;
+}
+
+.drive-list-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.drive-modal-list {
+    flex: 1;
+    min-height: 140px;
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.7);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(102, 126, 234, 0.45) rgba(241, 245, 249, 0.8);
+}
+
+.drive-modal-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.drive-modal-list::-webkit-scrollbar-thumb {
+    background: rgba(102, 126, 234, 0.4);
+    border-radius: 6px;
+}
+
+.drive-modal-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+    transition: background 0.12s ease;
+}
+
+.drive-modal-item:last-child {
+    border-bottom: none;
+}
+
+.drive-modal-item:hover {
+    background: rgba(102, 126, 234, 0.06);
+}
+
+.drive-modal-item-info {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.drive-modal-item-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.drive-modal-item-date {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.drive-modal-item-actions {
+    display: flex;
+    flex-shrink: 0;
+    gap: 8px;
+}
+
+.drive-modal-btn {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.drive-modal-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.drive-modal-btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.35);
+}
+
+.drive-modal-btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.45);
+}
+
+.drive-modal-btn-ghost {
+    background: rgba(255, 255, 255, 0.9);
+    color: #667eea;
+    border: 2px solid rgba(102, 126, 234, 0.35);
+    padding: 8px 12px;
+    font-size: 12px;
+}
+
+.drive-modal-btn-ghost:hover:not(:disabled) {
+    background: rgba(102, 126, 234, 0.08);
+}
+
+.drive-modal-btn-small {
+    padding: 7px 12px;
+    font-size: 12px;
+}
+
+.drive-modal-btn-load {
+    background: linear-gradient(135deg, #2d5a27 0%, #1e3d1a 100%);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(30, 61, 26, 0.25);
+}
+
+.drive-modal-btn-load:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.drive-modal-btn-danger {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
+}
+
+.drive-modal-btn-danger:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.drive-modal-empty,
+.drive-modal-loading {
+    padding: 28px 16px;
+    text-align: center;
+    font-size: 14px;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+.drive-modal-empty.is-error {
+    color: #b91c1c;
+}
+
+.drive-modal-message {
+    margin: 10px 0 0;
+    min-height: 1.25em;
+    font-size: 13px;
+    color: #475569;
+}
+
+.drive-modal-message.is-error {
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+@media (max-width: 520px) {
+    .drive-save-row {
+        flex-direction: column;
+    }
+
+    .drive-modal-btn-primary {
+        width: 100%;
+    }
+
+    .drive-modal-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .drive-modal-item-actions {
+        justify-content: flex-end;
+    }
+}
+
 /* Fullscreen Modal Styles */
 .fullscreen-modal {
     display: none;
