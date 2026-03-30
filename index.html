@@ -289,7 +289,8 @@
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
-        const GOOGLE_API_KEY = 'AIzaSyCLYzoygZZT698a_H7fUxJddioxuTRE8oM';
+        // Optional: not used for Drive save/load (OAuth only). Restricted API keys often break gapi if passed to init.
+        const GOOGLE_API_KEY = '';
         const GOOGLE_CLIENT_ID = '984239146057-o6ujksfj9qk8tmqm9c8msrpidgm6492r.apps.googleusercontent.com';
         const GOOGLE_DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
         const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
@@ -721,9 +722,16 @@
         }
 
         function hasDriveConfig() {
-            return GOOGLE_API_KEY && GOOGLE_CLIENT_ID &&
-                !GOOGLE_API_KEY.startsWith('REPLACE_') &&
+            return GOOGLE_CLIENT_ID &&
                 !GOOGLE_CLIENT_ID.startsWith('REPLACE_');
+        }
+
+        function formatGoogleInitError(err) {
+            if (!err) return 'Unknown error';
+            if (typeof err === 'string') return err;
+            if (err.message) return err.message;
+            if (err.result && err.result.error && err.result.error.message) return err.result.error.message;
+            try { return JSON.stringify(err); } catch (e) { return String(err); }
         }
 
         function updateDriveButtons() {
@@ -736,7 +744,7 @@
 
         async function initGoogleDriveClient() {
             if (!hasDriveConfig()) {
-                setDriveStatus('Set GOOGLE_API_KEY and GOOGLE_CLIENT_ID in index.html first.');
+                setDriveStatus('Set GOOGLE_CLIENT_ID in index.html first.');
                 return false;
             }
             if (!window.gapi || !window.google || !google.accounts || !google.accounts.oauth2) {
@@ -753,13 +761,15 @@
                             onerror: function () { reject(new Error('gapi.load failed')); }
                         });
                     });
+                    // Drive v3 + OAuth: do not pass apiKey. Browser-restricted keys often 403 the discovery load.
                     await gapi.client.init({
-                        apiKey: GOOGLE_API_KEY,
                         discoveryDocs: [GOOGLE_DISCOVERY_DOC]
                     });
                 } catch (error) {
                     console.error(error);
-                    setDriveStatus('Google API init failed. Check API key restrictions/origins.');
+                    const detail = formatGoogleInitError(error);
+                    setDriveStatus('Google API init failed: ' + detail);
+                    alert('Google API init failed:\n\n' + detail + '\n\nIf this persists: enable Drive API on the same Google Cloud project as your OAuth client, wait a few minutes, hard refresh.');
                     return false;
                 }
                 gapiClientInitialized = true;
@@ -1347,7 +1357,7 @@
         if (hasDriveConfig()) {
             setDriveStatus('Not signed in. Click "Sign in with Google" to connect Drive.');
         } else {
-            setDriveStatus('Set GOOGLE_API_KEY and GOOGLE_CLIENT_ID in index.html first.');
+            setDriveStatus('Set GOOGLE_CLIENT_ID in index.html first.');
         }
         
         // Download the final card at the selected format (optional black bleed within selected size)
