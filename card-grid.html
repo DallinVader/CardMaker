@@ -184,6 +184,16 @@
             max-width: 480px;
             max-height: min(90vh, 720px);
         }
+        #gridDriveLoadModal.drive-modal-nested {
+            z-index: 1200;
+        }
+        #gridDriveLoadModal .drive-modal-panel {
+            max-width: min(96vw, 880px);
+            max-height: min(90vh, 720px);
+        }
+        .drive-modal-item--grid-load {
+            justify-content: flex-start;
+        }
         .cg-setup-section {
             margin-bottom: 16px;
         }
@@ -237,12 +247,6 @@
             border-radius: 8px;
             border: 2px solid rgba(102, 126, 234, 0.25);
         }
-        .cg-drive-status {
-            font-size: 12px;
-            color: #64748b;
-            margin-top: 8px;
-        }
-        .cg-drive-status.is-error { color: #b91c1c; font-weight: 600; }
     </style>
 </head>
 <body class="cg-print-body">
@@ -320,21 +324,51 @@
 
             <div class="cg-setup-section">
                 <h3>Load from Card Maker save</h3>
-                <p class="drive-modal-hint" style="margin-top:0;">Rebuilds the <strong>full card</strong> from your save (frame, art, text, and stats)—same layout as the Card Maker preview. Uses Google sign-in as in the editor.</p>
-                <div class="cg-drive-row">
-                    <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="gridDriveSignInBtn">Connect Google</button>
-                    <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="gridDriveRefreshBtn">Refresh saves</button>
-                </div>
-                <select id="gridSavedProjectSelect" aria-label="Saved project">
-                    <option value="">— Select a save —</option>
-                </select>
-                <div class="cg-toggle-row" style="margin-top:10px;">
-                    <label><input type="radio" name="gridSaveFill" value="all" checked> Fill all 9 slots</label>
-                    <label><input type="radio" name="gridSaveFill" value="first"> First empty slot only</label>
-                </div>
-                <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="gridApplySaveBtn" style="margin-top:10px;">Apply to grid</button>
-                <p class="cg-drive-status" id="gridDriveStatus"></p>
+                <p class="drive-modal-hint" style="margin-top:0;">Open your cloud saves in a list with preview (same as Card Maker). Full card image—frame, art, text, and stats—is applied to the print grid.</p>
+                <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="openGridDriveLoadModalBtn">Browse Card Maker saves…</button>
             </div>
+        </div>
+    </div>
+
+    <div id="gridDriveLoadModal" class="drive-modal drive-modal-nested no-print" aria-hidden="true">
+        <div class="drive-modal-backdrop" onclick="closeGridDriveLoadModal()" aria-hidden="true"></div>
+        <div class="drive-modal-panel" role="dialog" aria-modal="true" aria-labelledby="gridDriveLoadTitle">
+            <button type="button" class="drive-modal-close" onclick="closeGridDriveLoadModal()" aria-label="Close">&times;</button>
+            <h2 id="gridDriveLoadTitle" class="drive-modal-title">Card Maker saves</h2>
+            <p class="drive-modal-hint">Projects live in your account’s <strong>hidden app data</strong> (same as the editor). Click a save to preview, then apply to the 9-up grid.</p>
+
+            <div class="cg-drive-row" style="margin-bottom:12px;">
+                <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="gridDriveSignInBtn">Connect Google</button>
+                <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="gridDriveRefreshBtn">Refresh list</button>
+            </div>
+
+            <div class="drive-modal-section drive-modal-section-grow" style="margin-bottom:12px;min-height:0;">
+                <div class="drive-list-toolbar">
+                    <span class="drive-modal-label" style="margin:0;">Your saves</span>
+                </div>
+                <div class="drive-modal-saves-split">
+                    <div id="gridLoadModalList" class="drive-modal-list" role="list"></div>
+                    <aside class="drive-modal-preview-aside" aria-label="Card preview">
+                        <div class="drive-modal-preview-label">Preview</div>
+                        <div class="drive-modal-preview-body">
+                            <p id="gridLoadPreviewPlaceholder" class="drive-modal-preview-placeholder">Click a save on the left to see the card.</p>
+                            <p id="gridLoadPreviewError" class="drive-modal-preview-error" hidden></p>
+                            <div id="gridLoadPreviewLoading" class="drive-modal-preview-loading" hidden>Loading preview…</div>
+                            <img id="gridLoadPreviewImg" class="drive-modal-preview-img" alt="" hidden />
+                        </div>
+                    </aside>
+                </div>
+            </div>
+
+            <div class="cg-toggle-row" style="margin-bottom:12px;">
+                <label><input type="radio" name="gridSaveFill" value="all" checked> Fill all 9 slots</label>
+                <label><input type="radio" name="gridSaveFill" value="first"> First empty slot only</label>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="gridLoadModalApplyBtn">Apply to grid</button>
+                <button type="button" class="drive-modal-btn drive-modal-btn-ghost" onclick="closeGridDriveLoadModal()">Cancel</button>
+            </div>
+            <p id="gridLoadModalMessage" class="drive-modal-message" role="status" aria-live="polite"></p>
         </div>
     </div>
 
@@ -363,9 +397,10 @@
         const openSetupBtn = document.getElementById('openSetupBtn');
         const gridDriveSignInBtn = document.getElementById('gridDriveSignInBtn');
         const gridDriveRefreshBtn = document.getElementById('gridDriveRefreshBtn');
-        const gridSavedProjectSelect = document.getElementById('gridSavedProjectSelect');
-        const gridApplySaveBtn = document.getElementById('gridApplySaveBtn');
-        const gridDriveStatus = document.getElementById('gridDriveStatus');
+        const gridLoadModalApplyBtn = document.getElementById('gridLoadModalApplyBtn');
+        const openGridDriveLoadModalBtn = document.getElementById('openGridDriveLoadModalBtn');
+        const gridDriveLoadModal = document.getElementById('gridDriveLoadModal');
+        const gridLoadModalMessage = document.getElementById('gridLoadModalMessage');
         const printSetupModal = document.getElementById('printSetupModal');
 
         const SLOTS = 9;
@@ -382,13 +417,32 @@
         let cardHeightIn = 3.5;
         let printableLayout = { cols: 3, rows: 3, cardsPerPage: 9 };
         let gisTokenClient = null;
-        /** @type {{id:string,name:string}[]} */
+        /** @type {{id:string,name:string,modifiedTime?:string,size?:string}[]} */
         let gridDriveFilesCache = [];
+        let gridLoadModalSelectedIdx = null;
+        let gridLoadModalPreviewRequestId = 0;
 
-        function setGridDriveStatus(msg, isError) {
-            if (!gridDriveStatus) return;
-            gridDriveStatus.textContent = msg || '';
-            gridDriveStatus.classList.toggle('is-error', !!isError);
+        function setGridLoadModalMessage(text, isError) {
+            if (!gridLoadModalMessage) return;
+            gridLoadModalMessage.textContent = text || '';
+            gridLoadModalMessage.classList.toggle('is-error', !!isError);
+        }
+
+        function escapeHtml(s) {
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatDriveListDate(iso) {
+            if (!iso) return '—';
+            try {
+                return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+            } catch (e) {
+                return iso;
+            }
         }
 
         function formatFileSize(bytes) {
@@ -454,7 +508,7 @@
                 callback: function () {},
                 error_callback: function (err) {
                     console.error('GIS error:', err);
-                    setGridDriveStatus('Sign-in popup blocked or OAuth origin mismatch.', true);
+                    setGridLoadModalMessage('Sign-in popup blocked or OAuth origin mismatch.', true);
                 }
             });
             return true;
@@ -470,6 +524,148 @@
             if (!printSetupModal) return;
             printSetupModal.classList.remove('is-open');
             printSetupModal.setAttribute('aria-hidden', 'true');
+        }
+
+        function openGridDriveLoadModal() {
+            if (!gridDriveLoadModal) return;
+            gridDriveLoadModal.classList.add('is-open');
+            gridDriveLoadModal.setAttribute('aria-hidden', 'false');
+            clearGridLoadModalPreview();
+            gridLoadModalSelectedIdx = null;
+            setGridLoadModalMessage('');
+            refreshGridLoadModalList();
+        }
+
+        function closeGridDriveLoadModal() {
+            if (!gridDriveLoadModal) return;
+            gridDriveLoadModal.classList.remove('is-open');
+            gridDriveLoadModal.setAttribute('aria-hidden', 'true');
+        }
+
+        function clearGridLoadModalPreview() {
+            const img = document.getElementById('gridLoadPreviewImg');
+            const ph = document.getElementById('gridLoadPreviewPlaceholder');
+            const err = document.getElementById('gridLoadPreviewError');
+            const load = document.getElementById('gridLoadPreviewLoading');
+            if (img) {
+                img.removeAttribute('src');
+                img.hidden = true;
+            }
+            if (ph) {
+                ph.textContent = 'Click a save on the left to see the card.';
+                ph.hidden = false;
+            }
+            if (err) err.hidden = true;
+            if (load) load.hidden = true;
+            document.querySelectorAll('#gridLoadModalList .drive-modal-item.is-preview-selected').forEach(function (el) {
+                el.classList.remove('is-preview-selected');
+            });
+        }
+
+        function setGridLoadModalPreviewRowSelected(idx) {
+            document.querySelectorAll('#gridLoadModalList .drive-modal-item').forEach(function (el) {
+                const rowIdx = el.getAttribute('data-grid-load-row-idx');
+                el.classList.toggle('is-preview-selected', rowIdx === String(idx));
+            });
+        }
+
+        async function showGridLoadModalPreview(idx) {
+            if (isNaN(idx) || !gridDriveFilesCache[idx]) return;
+            const file = gridDriveFilesCache[idx];
+            const req = ++gridLoadModalPreviewRequestId;
+            gridLoadModalSelectedIdx = idx;
+
+            const img = document.getElementById('gridLoadPreviewImg');
+            const ph = document.getElementById('gridLoadPreviewPlaceholder');
+            const errEl = document.getElementById('gridLoadPreviewError');
+            const load = document.getElementById('gridLoadPreviewLoading');
+            if (!img || !ph || !load) return;
+
+            setGridLoadModalPreviewRowSelected(idx);
+            ph.hidden = true;
+            if (errEl) errEl.hidden = true;
+            img.hidden = true;
+            img.removeAttribute('src');
+            load.hidden = false;
+
+            try {
+                const token = readStoredDriveToken();
+                if (!token) throw new Error('Connect Google first.');
+
+                const state = await fetchDriveFileJson(token, file.id);
+                if (req !== gridLoadModalPreviewRequestId) return;
+
+                let dataUrl = null;
+                if (typeof window.renderCardMakerProjectToDataUrl === 'function') {
+                    dataUrl = await window.renderCardMakerProjectToDataUrl(state);
+                }
+                if (req !== gridLoadModalPreviewRequestId) return;
+                if (!dataUrl && state.images) {
+                    const im = state.images;
+                    if (im.artSrc && String(im.artSrc).length > 20) dataUrl = im.artSrc;
+                    else if (im.cardBaseSrc && String(im.cardBaseSrc).length > 20) dataUrl = im.cardBaseSrc;
+                }
+                if (!dataUrl) throw new Error('Could not build a preview for this save.');
+
+                img.src = dataUrl;
+                img.alt = 'Preview: ' + file.name;
+                img.hidden = false;
+                load.hidden = true;
+            } catch (e) {
+                if (req !== gridLoadModalPreviewRequestId) return;
+                console.error(e);
+                load.hidden = true;
+                if (errEl) {
+                    errEl.textContent = (e && e.message) ? e.message : 'Preview failed.';
+                    errEl.hidden = false;
+                }
+                ph.hidden = true;
+            }
+        }
+
+        function renderGridLoadModalList() {
+            const container = document.getElementById('gridLoadModalList');
+            if (!container) return;
+            if (!gridDriveFilesCache || gridDriveFilesCache.length === 0) {
+                container.innerHTML = '<div class="drive-modal-empty">No saves yet. Save a card in Card Maker, then click <strong>Refresh list</strong>.</div>';
+                return;
+            }
+            container.innerHTML = gridDriveFilesCache.map(function (f, i) {
+                const name = escapeHtml(f.name);
+                const when = escapeHtml(formatDriveListDate(f.modifiedTime));
+                const sizeStr = formatFileSize(f.size);
+                const sizeSpan = sizeStr === '—' ? '' : ('<span class="drive-modal-item-size">' + escapeHtml(sizeStr) + '</span>');
+                const previewAria = escapeHtml('Preview ' + (f.name || ''));
+                return '<div class="drive-modal-item drive-modal-item--grid-load" data-grid-load-row-idx="' + i + '">' +
+                    '<div class="drive-modal-item-info drive-modal-item-preview-hit" role="button" tabindex="0" data-grid-load-preview data-grid-load-idx="' + i + '" aria-label="' + previewAria + '">' +
+                    '<span class="drive-modal-item-name" title="' + name + '">' + name + '</span>' +
+                    '<div class="drive-modal-item-meta">' +
+                    '<span class="drive-modal-item-date">' + when + '</span>' +
+                    sizeSpan +
+                    '</div>' +
+                    '</div>' +
+                    '</div>';
+            }).join('');
+        }
+
+        function initGridLoadModalListUi() {
+            const list = document.getElementById('gridLoadModalList');
+            if (!list || list.dataset.bound) return;
+            list.dataset.bound = '1';
+            list.addEventListener('keydown', function (e) {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                const hit = e.target.closest('[data-grid-load-preview]');
+                if (!hit) return;
+                e.preventDefault();
+                const pidx = parseInt(hit.getAttribute('data-grid-load-idx'), 10);
+                showGridLoadModalPreview(pidx);
+            });
+            list.addEventListener('click', function (e) {
+                const hit = e.target.closest('[data-grid-load-preview]');
+                if (!hit) return;
+                const pidx = parseInt(hit.getAttribute('data-grid-load-idx'), 10);
+                showGridLoadModalPreview(pidx);
+            });
         }
 
         function driveAuthHeaders(token) {
@@ -562,7 +758,7 @@
 
         function applySaveImageToGrid(imageUrl, fillMode) {
             if (!imageUrl) {
-                setGridDriveStatus('Could not build an image from that save (missing images or invalid project).', true);
+                setGridLoadModalMessage('Could not build an image from that save (missing images or invalid project).', true);
                 return;
             }
             const items = gridContainer.querySelectorAll('.cg-grid-item');
@@ -574,7 +770,7 @@
                 }
                 uploadedUrls = [imageUrl];
                 repeatBtn.disabled = false;
-                setGridDriveStatus('Filled all slots from save.', false);
+                setGridLoadModalMessage('Filled all slots from save.', false);
                 return;
             }
             let placed = false;
@@ -592,7 +788,7 @@
             }
             if (uploadedUrls.length === 0) uploadedUrls = [imageUrl];
             repeatBtn.disabled = uploadedUrls.length === 0;
-            setGridDriveStatus('Placed save image in the first empty slot (or slot 1 if full).', false);
+            setGridLoadModalMessage('Placed save image in the first empty slot (or slot 1 if full).', false);
         }
 
         function getNumericInputValue(inputEl, fallback, min, max) {
@@ -683,27 +879,41 @@
             }
         }
 
-        async function refreshGridDriveFileList() {
+        async function refreshGridLoadModalList() {
             const token = readStoredDriveToken();
+            const listEl = document.getElementById('gridLoadModalList');
             if (!token) {
-                setGridDriveStatus('Connect Google or sign in from Card Maker first.', true);
+                if (listEl) {
+                    listEl.innerHTML = '<div class="drive-modal-empty">Connect Google (or sign in from Card Maker) to list your saves.</div>';
+                }
+                setGridLoadModalMessage('Connect Google to load saves.', true);
                 return;
             }
-            setGridDriveStatus('Loading saves…', false);
+            if (listEl) {
+                listEl.innerHTML = '<div class="drive-modal-loading">Loading your saves…</div>';
+            }
+            setGridLoadModalMessage('');
             try {
                 gridDriveFilesCache = await listCardMakerProjects(token);
-                gridSavedProjectSelect.innerHTML = '<option value="">— Select a save —</option>';
-                gridDriveFilesCache.forEach(function (f) {
-                    const opt = document.createElement('option');
-                    opt.value = f.id;
-                    const sz = formatFileSize(f.size);
-                    opt.textContent = (f.name || f.id) + (sz === '—' ? '' : ' (' + sz + ')');
-                    gridSavedProjectSelect.appendChild(opt);
-                });
-                setGridDriveStatus(gridDriveFilesCache.length + ' save(s) found.', false);
+                clearGridLoadModalPreview();
+                gridLoadModalSelectedIdx = null;
+                renderGridLoadModalList();
+                setGridLoadModalMessage(gridDriveFilesCache.length + ' save(s) found.', false);
             } catch (e) {
-                setGridDriveStatus((e && e.message) ? e.message : 'Could not list saves.', true);
+                gridDriveFilesCache = [];
+                if (listEl) {
+                    listEl.innerHTML = '<div class="drive-modal-empty is-error">Could not load the list. Check your connection and try Refresh list.</div>';
+                }
+                setGridLoadModalMessage((e && e.message) ? e.message : 'Could not list saves.', true);
             }
+        }
+
+        async function prefetchGridDriveCache() {
+            try {
+                const token = readStoredDriveToken();
+                if (!token) return;
+                gridDriveFilesCache = await listCardMakerProjects(token);
+            } catch (e) { /* ignore */ }
         }
 
         ensureSlots();
@@ -713,8 +923,18 @@
         if (openSetupBtn) {
             openSetupBtn.addEventListener('click', openPrintSetupModal);
         }
+        if (openGridDriveLoadModalBtn) {
+            openGridDriveLoadModalBtn.addEventListener('click', openGridDriveLoadModal);
+        }
+        initGridLoadModalListUi();
         document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && printSetupModal && printSetupModal.classList.contains('is-open')) {
+            if (e.key !== 'Escape') return;
+            if (gridDriveLoadModal && gridDriveLoadModal.classList.contains('is-open')) {
+                closeGridDriveLoadModal();
+                e.preventDefault();
+                return;
+            }
+            if (printSetupModal && printSetupModal.classList.contains('is-open')) {
                 closePrintSetupModal();
             }
         });
@@ -778,46 +998,48 @@
         gridDriveSignInBtn.addEventListener('click', async function () {
             const scriptsOk = await waitForGoogleScripts(8000);
             if (!scriptsOk || !ensureGridTokenClient()) {
-                setGridDriveStatus('Google scripts not ready. Use http://localhost, not file://.', true);
+                setGridLoadModalMessage('Google scripts not ready. Use http://localhost, not file://.', true);
                 return;
             }
-            setGridDriveStatus('Opening Google sign-in…', false);
+            setGridLoadModalMessage('Opening Google sign-in…', false);
             gisTokenClient.callback = function (tokenResponse) {
                 if (tokenResponse && tokenResponse.access_token) {
                     persistDriveToken(tokenResponse);
-                    setGridDriveStatus('Signed in. Refresh saves if the list is empty.', false);
-                    refreshGridDriveFileList();
+                    setGridLoadModalMessage('Signed in.', false);
+                    refreshGridLoadModalList();
                 } else {
-                    setGridDriveStatus('Sign-in failed.', true);
+                    setGridLoadModalMessage('Sign-in failed.', true);
                 }
             };
             gisTokenClient.requestAccessToken({ prompt: 'consent' });
         });
 
         gridDriveRefreshBtn.addEventListener('click', function () {
-            refreshGridDriveFileList();
+            refreshGridLoadModalList();
         });
 
-        gridApplySaveBtn.addEventListener('click', async function () {
-            const fileId = gridSavedProjectSelect.value;
-            if (!fileId) {
-                setGridDriveStatus('Select a saved project first.', true);
+        gridLoadModalApplyBtn.addEventListener('click', async function () {
+            if (gridLoadModalSelectedIdx == null || !gridDriveFilesCache[gridLoadModalSelectedIdx]) {
+                setGridLoadModalMessage('Click a save above to preview and select it, then apply.', true);
                 return;
             }
+            const file = gridDriveFilesCache[gridLoadModalSelectedIdx];
             const token = readStoredDriveToken();
             if (!token) {
-                setGridDriveStatus('Connect Google first.', true);
+                setGridLoadModalMessage('Connect Google first.', true);
                 return;
             }
             const fillMode = document.querySelector('input[name="gridSaveFill"]:checked');
             const mode = fillMode && fillMode.value === 'first' ? 'first' : 'all';
-            setGridDriveStatus('Loading save…', false);
+            setGridLoadModalMessage('Loading save…', false);
             try {
-                const json = await fetchDriveFileJson(token, fileId);
+                const json = await fetchDriveFileJson(token, file.id);
                 const url = await compositeImageFromCardMakerSave(json);
                 applySaveImageToGrid(url, mode);
+                setGridLoadModalMessage('Applied “' + file.name + '” to the grid.', false);
+                closeGridDriveLoadModal();
             } catch (e) {
-                setGridDriveStatus((e && e.message) ? e.message : 'Could not read that save.', true);
+                setGridLoadModalMessage((e && e.message) ? e.message : 'Could not read that save.', true);
             }
         });
 
@@ -945,11 +1167,11 @@
             });
         });
 
-        (async function tryRestoreGridDriveList() {
+        (async function prefetchGridDriveCacheOnLoad() {
             if (!readStoredDriveToken()) return;
             const ok = await waitForGoogleScripts(8000);
             if (!ok) return;
-            refreshGridDriveFileList();
+            prefetchGridDriveCache();
         })();
     </script>
 </body>
