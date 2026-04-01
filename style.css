@@ -1182,8 +1182,8 @@ body.cm-page .top-drive-status-wrap {
     border-color: rgba(139, 92, 246, 0.55);
 }
 #CardRarity[data-rarity-tier="Legendary"] {
-    color: #f59e0b;
-    border-color: rgba(245, 158, 11, 0.6);
+    color: #d1bc43;
+    border-color: rgba(209, 188, 67, 0.65);
 }
 #CardRarity[data-rarity-tier="Mythic"] {
     color: #ef4444;

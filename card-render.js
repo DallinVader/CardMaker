@@ -200,7 +200,7 @@
             Uncommon: '#ffffff',
             Rare: '#3b82f6',
             Epic: '#8b5cf6',
-            Legendary: '#f59e0b',
+            Legendary: '#d1bc43',
             Mythic: '#ef4444',
             Fantastical: '#10b981'
         };
@@ -209,6 +209,33 @@
             return RARITY_HEX[k] || '#1e293b';
         }
         var RARITY_GEM_OVERLAY_ALPHA = 0.9;
+
+        function rarityGemStableNoise(ix, iy) {
+            var x = ix | 0;
+            var y = iy | 0;
+            var h = (x * 374761393 + y * 668265263) >>> 0;
+            h = Math.imul(h ^ (h >>> 15), 2246822519) >>> 0;
+            return (h & 65535) / 32767.5 - 1;
+        }
+
+        function applyRarityGemFilmGrain(tctx, tw, th) {
+            var id = tctx.getImageData(0, 0, tw, th);
+            var d = id.data;
+            var strength = Math.max(12, Math.min(30, Math.floor((tw + th) / 55)));
+            var iy, ix, i, n, b;
+            for (iy = 0; iy < th; iy++) {
+                for (ix = 0; ix < tw; ix++) {
+                    i = (iy * tw + ix) * 4;
+                    if (d[i + 3] < 10) continue;
+                    n = rarityGemStableNoise(ix, iy);
+                    b = n * strength;
+                    d[i]     = Math.max(0, Math.min(255, d[i] + b));
+                    d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + b));
+                    d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + b));
+                }
+            }
+            tctx.putImageData(id, 0, 0);
+        }
 
         function drawTintedRarityOverlay(ctx, img, x, y, w, h, color) {
             var tw = Math.max(1, Math.round(w));
@@ -223,6 +250,24 @@
             tctx.globalCompositeOperation = 'source-atop';
             tctx.fillStyle = color;
             tctx.fillRect(0, 0, tw, th);
+            tctx.globalCompositeOperation = 'source-over';
+            applyRarityGemFilmGrain(tctx, tw, th);
+            ctx.save();
+            ctx.globalAlpha = RARITY_GEM_OVERLAY_ALPHA;
+            ctx.drawImage(t, x, y);
+            ctx.restore();
+        }
+
+        function drawUntintedRarityGemWithGrain(ctx, img, x, y, w, h) {
+            var tw = Math.max(1, Math.round(w));
+            var th = Math.max(1, Math.round(h));
+            var t = document.createElement('canvas');
+            t.width = tw;
+            t.height = th;
+            var tctx = t.getContext('2d');
+            if (!tctx) return;
+            tctx.drawImage(img, 0, 0, tw, th);
+            applyRarityGemFilmGrain(tctx, tw, th);
             ctx.save();
             ctx.globalAlpha = RARITY_GEM_OVERLAY_ALPHA;
             ctx.drawImage(t, x, y);
@@ -248,10 +293,7 @@
             if (rw) {
                 var gemTier = String(f.Rarity || '').trim();
                 if (gemTier === 'Uncommon') {
-                    ctx.save();
-                    ctx.globalAlpha = RARITY_GEM_OVERLAY_ALPHA;
-                    ctx.drawImage(rarityImg, dImgX, dImgY, DimgWidth, DimgHeight);
-                    ctx.restore();
+                    drawUntintedRarityGemWithGrain(ctx, rarityImg, dImgX, dImgY, DimgWidth, DimgHeight);
                 } else {
                     drawTintedRarityOverlay(ctx, rarityImg, dImgX, dImgY, DimgWidth, DimgHeight, rarityHex(f.Rarity));
                 }
