@@ -330,6 +330,46 @@ body {
     transform: rotate(180deg);
 }
 
+/* Rarity tier colors (Card Maker sidebar) — Uncommon white on dark field for contrast */
+#CardRarity {
+    border-width: 2px;
+    border-style: solid;
+    font-weight: 800;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+}
+#CardRarity[data-rarity-tier="Common"] {
+    color: #78716c;
+    border-color: rgba(120, 113, 108, 0.5);
+}
+#CardRarity[data-rarity-tier="Uncommon"] {
+    color: #ffffff;
+    background: #1e293b;
+    border-color: rgba(255, 255, 255, 0.35);
+}
+#CardRarity[data-rarity-tier="Rare"] {
+    color: #3b82f6;
+    border-color: rgba(59, 130, 246, 0.55);
+}
+#CardRarity[data-rarity-tier="Epic"] {
+    color: #8b5cf6;
+    border-color: rgba(139, 92, 246, 0.55);
+}
+#CardRarity[data-rarity-tier="Legendary"] {
+    color: #f59e0b;
+    border-color: rgba(245, 158, 11, 0.6);
+}
+#CardRarity[data-rarity-tier="Mythic"] {
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.55);
+}
+#CardRarity[data-rarity-tier="Fantastical"] {
+    color: #10b981;
+    border-color: rgba(16, 185, 129, 0.55);
+}
+
 .control-section h2 {
     margin: 0;
     font-size: 18px;

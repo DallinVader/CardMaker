@@ -191,7 +191,7 @@
                     </div>
                 </div>
                 
-                <div class="control-section collapsed">
+                <div class="control-section">
                     <div class="section-header" onclick="toggleSection(this)">
                         <h2>Types</h2>
                     </div>
@@ -232,6 +232,28 @@
                                 <option value="Tool">Tool</option>
                                 <option value="Ship">Ship</option>
                             </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Rarity:</label>
+                            <select id="CardRarity" onchange="redrawCanvas()" title="Uncommon and higher show the rarity frame overlay (Rareity.png)">
+                                <option value="Common">Common</option>
+                                <option value="Uncommon">Uncommon</option>
+                                <option value="Rare">Rare</option>
+                                <option value="Epic">Epic</option>
+                                <option value="Legendary">Legendary</option>
+                                <option value="Mythic">Mythic</option>
+                                <option value="Fantastical">Fantastical</option>
+                            </select>
+                            <small>Uncommon and above enable the rarity image on the card (same placement as the damage panel art). Saved to Drive as <strong>Rarity</strong> for Saved Projects.</small>
+                        </div>
+                        <div class="input-group">
+                            <label>Set number:</label>
+                            <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+                                <input type="number" id="CardSetNumber" min="1" step="1" placeholder="1" value="1" oninput="redrawCanvas()" title="Card # in set (left side of 1 / 120)" style="width:4.5rem;">
+                                <span aria-hidden="true"> / </span>
+                                <input type="number" id="CardSetTotal" min="1" step="1" placeholder="120" value="120" oninput="redrawCanvas()" title="Set size (right side of 1 / 120)" style="width:4.5rem;">
+                            </div>
+                            <small>Displays as <strong>1 / 120</strong> (larger text) to the <strong>left</strong> of the rarity name. Defaults to 1 / 120; clear both fields to hide.</small>
                         </div>
                         <div class="input-group">
                             <label>Subtype Font Size: <span id="SubtypeFontSizeValue">80</span></label>
@@ -407,6 +429,53 @@
         const BLEED_SCALE = 1.1;
 
         let IsSwitchedOn = true;
+        const CARD_RARITY_ORDER = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic', 'Fantastical'];
+        const RARITY_HEX = {
+            Common: '#78716c',
+            Uncommon: '#ffffff',
+            Rare: '#3b82f6',
+            Epic: '#8b5cf6',
+            Legendary: '#f59e0b',
+            Mythic: '#ef4444',
+            Fantastical: '#10b981'
+        };
+        function rarityTextColor(value) {
+            const k = String(value || '').trim();
+            return RARITY_HEX[k] || '#1e293b';
+        }
+        function syncCardRarityUi() {
+            const sel = document.getElementById('CardRarity');
+            if (!sel) return;
+            sel.setAttribute('data-rarity-tier', String(sel.value || 'Common').trim());
+        }
+        /** Tint Rareity.png without touching pixels under transparent areas (offscreen composite). */
+        var RARITY_GEM_OVERLAY_ALPHA = 0.5;
+        function drawTintedRarityOverlay(ctx, img, x, y, w, h, color) {
+            var tw = Math.max(1, Math.round(w));
+            var th = Math.max(1, Math.round(h));
+            var t = document.createElement('canvas');
+            t.width = tw;
+            t.height = th;
+            var tctx = t.getContext('2d');
+            if (!tctx) return;
+            tctx.clearRect(0, 0, tw, th);
+            tctx.drawImage(img, 0, 0, tw, th);
+            tctx.globalCompositeOperation = 'source-atop';
+            tctx.fillStyle = color;
+            tctx.fillRect(0, 0, tw, th);
+            ctx.save();
+            ctx.globalAlpha = RARITY_GEM_OVERLAY_ALPHA;
+            ctx.drawImage(t, x, y);
+            ctx.restore();
+        }
+        function rarityShowsGem() {
+            const el = document.getElementById('CardRarity');
+            if (!el) return false;
+            const v = String(el.value || '').trim();
+            const idx = CARD_RARITY_ORDER.indexOf(v);
+            const uncommonIdx = CARD_RARITY_ORDER.indexOf('Uncommon');
+            return idx >= uncommonIdx && uncommonIdx >= 0;
+        }
         Dam = document.getElementById("DamageID");
         Def = document.getElementById("DefenseID");
 
@@ -638,6 +707,11 @@
         DamageImg.src = "Damage.png"
         DamageImg.hy = 0;
         DamageImg.wx = 0;
+        const RareityImg = new Image();
+        RareityImg.src = 'Rareity.png';
+        RareityImg.hy = 0;
+        RareityImg.wx = 0;
+        RareityImg.onload = function () { redrawCanvas(); };
         ArtImage = new Image();
         ArtImage.hy = 0;
         ArtImage.wx = 0;
@@ -717,12 +791,18 @@
             const damageCheckbox = document.querySelector('input[type="checkbox"][onclick="ToggelSwitch()"]');
             if (damageCheckbox) damageCheckbox.checked = true;
             IsSwitchedOn = true;
+            const rarityEl = document.getElementById('CardRarity');
+            if (rarityEl) rarityEl.value = 'Common';
             
             // Reset types
             document.getElementById("Type").value = '';
             document.getElementById("TypeFontSize").value = 100;
             document.getElementById("Subtype").value = '';
             document.getElementById("SubtypeFontSize").value = 80;
+            const sn = document.getElementById('CardSetNumber');
+            const st = document.getElementById('CardSetTotal');
+            if (sn) sn.value = '1';
+            if (st) st.value = '120';
             
             // Reset treasure cost
             document.getElementById("TreasureCost").value = 0;
@@ -1055,6 +1135,9 @@
                     TitleCenterAlign: document.getElementById('TitleCenterAlign').checked,
                     DamageID: document.getElementById('DamageID').value,
                     DefenseID: document.getElementById('DefenseID').value,
+                    Rarity: document.getElementById('CardRarity') ? document.getElementById('CardRarity').value : 'Common',
+                    CardSetNumber: document.getElementById('CardSetNumber') ? document.getElementById('CardSetNumber').value : '',
+                    CardSetTotal: document.getElementById('CardSetTotal') ? document.getElementById('CardSetTotal').value : '',
                     Type: document.getElementById('Type').value,
                     TypeFontSize: document.getElementById('TypeFontSize').value,
                     Subtype: document.getElementById('Subtype').value,
@@ -1134,10 +1217,30 @@
             setIfExists('TitleCenterAlign', f.TitleCenterAlign);
             setIfExists('DamageID', f.DamageID);
             setIfExists('DefenseID', f.DefenseID);
+            var cardRar = document.getElementById('CardRarity');
+            if (cardRar) {
+                if (f.Rarity !== undefined && f.Rarity !== null && String(f.Rarity).trim() !== '') {
+                    var rv = String(f.Rarity).trim();
+                    cardRar.value = rv;
+                    if (cardRar.value !== rv) cardRar.value = 'Common';
+                } else {
+                    cardRar.value = 'Common';
+                }
+            }
             setIfExists('Type', f.Type);
             setIfExists('TypeFontSize', f.TypeFontSize);
             setIfExists('Subtype', f.Subtype);
             setIfExists('SubtypeFontSize', f.SubtypeFontSize);
+            var elSetN = document.getElementById('CardSetNumber');
+            var elSetT = document.getElementById('CardSetTotal');
+            if (elSetN) {
+                elSetN.value = (f.CardSetNumber === undefined || f.CardSetNumber === null)
+                    ? '1' : String(f.CardSetNumber).trim();
+            }
+            if (elSetT) {
+                elSetT.value = (f.CardSetTotal === undefined || f.CardSetTotal === null)
+                    ? '120' : String(f.CardSetTotal).trim();
+            }
             setIfExists('TreasureCost', f.TreasureCost);
             setIfExists('TreasureFontSize', f.TreasureFontSize);
             setIfExists('MainDisciption', f.MainDisciption);
@@ -1751,6 +1854,7 @@
 
         // Redraw the canvas with all images and text
         function redrawCanvas() {
+        syncCardRarityUi();
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = 'black'; // Reset fillStyle to black at the start
         
@@ -1785,19 +1889,19 @@
             ctx.textBaseline = 'middle';
             ctx.fillStyle = 'black';
             
-            //Draw damage stats
-            if (IsSwitchedOn) {
-                const aspectRatios = MainImage.width / MainImage.height;
-                let DimgWidth = canvas.width;
-                let DimgHeight = imgWidth / aspectRatios;
-    
-                if (DimgHeight > canvas.height) {
-                    DimgHeight = canvas.height;
-                    DimgWidth = DimgHeight * aspectRatios;
-                }
-                ctx.drawImage(DamageImg, (canvas.width - DimgWidth) / 2, (canvas.height - DimgHeight) / 8, DimgWidth, DimgHeight);
-                
+            // Damage / rarity overlays (same scale & position as Damage.png)
+            const aspectRatios = MainImage.width / MainImage.height;
+            let DimgWidth = canvas.width;
+            let DimgHeight = DimgWidth / aspectRatios;
+            if (DimgHeight > canvas.height) {
+                DimgHeight = canvas.height;
+                DimgWidth = DimgHeight * aspectRatios;
+            }
+            const dImgX = (canvas.width - DimgWidth) / 2;
+            const dImgY = (canvas.height - DimgHeight) / 8;
 
+            if (IsSwitchedOn) {
+                ctx.drawImage(DamageImg, dImgX, dImgY, DimgWidth, DimgHeight);
                 document.fonts.load('10px Medieval').then(() => {
                     ctx.font = "175px Medieval"
                     ctx.textAlign = 'center';
@@ -1805,7 +1909,18 @@
                     ctx.fillText(Dam.value, canvas.width / 12.5, canvas.height / 12.5)
                     ctx.fillText(Def.value, canvas.width - (canvas.width / 12.5), canvas.height / 12.5)
                 })
-
+            }
+            if (rarityShowsGem() && RareityImg.complete && RareityImg.naturalWidth > 0) {
+                var crGem = document.getElementById('CardRarity');
+                var gemTier = crGem && crGem.value ? String(crGem.value).trim() : 'Uncommon';
+                if (gemTier === 'Uncommon') {
+                    ctx.save();
+                    ctx.globalAlpha = RARITY_GEM_OVERLAY_ALPHA;
+                    ctx.drawImage(RareityImg, dImgX, dImgY, DimgWidth, DimgHeight);
+                    ctx.restore();
+                } else {
+                    drawTintedRarityOverlay(ctx, RareityImg, dImgX, dImgY, DimgWidth, DimgHeight, rarityTextColor(gemTier));
+                }
             }
             
             ctx.font = TitleSize.value + "px Medieval"
@@ -1820,6 +1935,8 @@
             ctx.textAlign = 'center';
             ctx.fillText(Subtype.value, canvas.width - (canvas.width / 5), canvas.height /7.3)
 
+            ctx.fillStyle = 'black';
+
             ctx.font = TreasureFontSize.value + "px Medieval"
             ctx.textAlign = 'center';
             ctx.fillText(TreasureCost.value, canvas.width - (canvas.width / 6.9), canvas.height / 1.99)
@@ -1830,6 +1947,57 @@
             const quoteX = QuoteCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10);
             ctx.fillText(Quote.value, quoteX, canvas.height - (canvas.height / 13))
 
+            // Fixed band near bottom (same idea as cost at height/1.99, quote at height - height/13).
+            const rarityY = canvas.height - (canvas.height / 28);
+
+            const setNumIn = document.getElementById('CardSetNumber');
+            const setTotIn = document.getElementById('CardSetTotal');
+            let setSn = null;
+            let setSt = null;
+            if (setNumIn && setTotIn) {
+                const sn = parseInt(String(setNumIn.value).trim(), 10);
+                const st = parseInt(String(setTotIn.value).trim(), 10);
+                if (sn >= 1 && st >= 1) {
+                    setSn = sn;
+                    setSt = st;
+                }
+            }
+
+            const cardRarEl = document.getElementById('CardRarity');
+            const rarLabel = cardRarEl && cardRarEl.value ? String(cardRarEl.value).trim() : '';
+            if (setSn !== null || rarLabel) {
+                ctx.save();
+                const setDigitFontPx = 80;
+                const setSlashFontPx = 138;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#ffffff';
+                const leftPadX = canvas.width / 10;
+                const gapBetween = canvas.width * 0.022;
+                let rarityX = leftPadX;
+                if (setSn !== null) {
+                    let x = leftPadX;
+                    const sL = String(setSn);
+                    const sR = String(setSt);
+                    ctx.font = setDigitFontPx + 'px Medieval';
+                    ctx.fillText(sL, x, rarityY);
+                    x += ctx.measureText(sL).width + ctx.measureText(' ').width / 2;
+                    ctx.font = setSlashFontPx + 'px Medieval';
+                    ctx.fillText('/', x, rarityY);
+                    x += ctx.measureText('/').width;
+                    ctx.font = setDigitFontPx + 'px Medieval';
+                    x += ctx.measureText(' ').width / 2;
+                    ctx.fillText(sR, x, rarityY);
+                    x += ctx.measureText(sR).width;
+                    rarityX = x + gapBetween;
+                }
+                if (rarLabel) {
+                    ctx.font = '70px Medieval';
+                    ctx.fillText(rarLabel, rarityX, rarityY);
+                }
+                ctx.restore();
+            }
+            ctx.fillStyle = 'black';
 
             ctx.font = DiscriptionFontSize.value + "px Medieval"
             ctx.textAlign = MainDescriptionCenterAlign.checked ? 'center' : 'left';

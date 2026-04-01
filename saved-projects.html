@@ -7,10 +7,8 @@
     <link rel="stylesheet" href="style.css">
     <style>
         body { background: #0b1220; color: #e2e8f0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
-        .spm-wrap { max-width: 1200px; margin: 0 auto; padding: 22px max(18px, env(safe-area-inset-right)) 40px max(18px, env(safe-area-inset-left)); }
-        .spm-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
-        .spm-title { font-family: Medieval, serif; font-size: 1.8rem; margin: 0; letter-spacing: .02em; color: #e8edf5; }
-        .spm-sub { margin: 10px 0 0; color: #94a3b8; font-size: 13px; line-height: 1.55; max-width: 62ch; }
+        .spm-wrap { max-width: min(1960px, calc(100vw - 24px)); margin: 0 auto; padding: 22px max(18px, env(safe-area-inset-right)) 40px max(18px, env(safe-area-inset-left)); }
+        .spm-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 16px; margin-bottom: 22px; }
 
         .spm-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: flex-end; }
         .spm-btn { padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #e2e8f0; cursor: pointer; font-weight: 700; }
@@ -31,7 +29,8 @@
         .spm-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-color: rgba(255,255,255,0.18); }
         .spm-ghost { background: rgba(255,255,255,0.06); }
 
-        .spm-row { display: grid; grid-template-columns: 400px 1fr; gap: 22px; align-items: start; }
+        .spm-row { display: grid; grid-template-columns: minmax(280px, 320px) minmax(0, 1fr); gap: 24px; align-items: start; }
+        .spm-row > .spm-panel:last-child { min-width: 0; }
         @media (max-width: 980px) { .spm-row { grid-template-columns: 1fr; } }
 
         .spm-panel {
@@ -126,7 +125,7 @@
         }
         tbody tr.spm-row-selected:hover { background: rgba(99,102,241,0.16); }
         tbody tr[data-project-id] { cursor: help; }
-        .spm-name { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 900; }
+        .spm-name { max-width: min(640px, 50vw); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 900; }
 
         .spm-hover-preview {
             position: fixed;
@@ -195,6 +194,15 @@
             background: rgba(255,255,255,0.06) !important;
             color: #e2e8f0 !important;
         }
+
+        /* Rarity tier colors on table rows (matches Card Maker palette) */
+        td[data-rarity-tier="Common"] select[data-rarity-set] { color: #a8a29e !important; border-color: rgba(168,162,158,0.45) !important; }
+        td[data-rarity-tier="Uncommon"] select[data-rarity-set] { color: #ffffff !important; border-color: rgba(255,255,255,0.4) !important; }
+        td[data-rarity-tier="Rare"] select[data-rarity-set] { color: #3b82f6 !important; border-color: rgba(59,130,246,0.55) !important; }
+        td[data-rarity-tier="Epic"] select[data-rarity-set] { color: #8b5cf6 !important; border-color: rgba(139,92,246,0.55) !important; }
+        td[data-rarity-tier="Legendary"] select[data-rarity-set] { color: #f59e0b !important; border-color: rgba(245,158,11,0.55) !important; }
+        td[data-rarity-tier="Mythic"] select[data-rarity-set] { color: #ef4444 !important; border-color: rgba(239,68,68,0.55) !important; }
+        td[data-rarity-tier="Fantastical"] select[data-rarity-set] { color: #10b981 !important; border-color: rgba(16,185,129,0.55) !important; }
 
         .spm-message { margin-top: 18px; font-size: 13px; color: #94a3b8; line-height: 1.5; }
         .spm-message.is-error { color: #fca5a5; font-weight: 800; }
@@ -439,8 +447,25 @@
             background: rgba(2,6,23,0.72);
             cursor: pointer;
         }
+        .spm-modal-dialog {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: row;
+            align-items: stretch;
+            gap: 20px;
+            width: 100%;
+            max-width: min(920px, calc(100vw - 32px));
+            max-height: calc(100vh - 32px);
+            pointer-events: none;
+        }
+        .spm-modal-dialog > * {
+            pointer-events: auto;
+        }
         .spm-modal-panel {
             position: relative;
+            flex: 1 1 320px;
+            min-width: 0;
             width: 100%;
             max-width: 440px;
             max-height: calc(100vh - 32px);
@@ -451,6 +476,56 @@
             box-shadow: 0 24px 64px rgba(0,0,0,0.45);
             padding: 22px 22px 18px;
             color: #e2e8f0;
+        }
+        .spm-edit-preview-aside {
+            flex: 0 0 clamp(220px, 30vw, 320px);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 0;
+            max-height: calc(100vh - 32px);
+        }
+        .spm-edit-preview-head {
+            margin: 0;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #93c5fd;
+            flex-shrink: 0;
+        }
+        .spm-edit-preview-frame {
+            position: relative;
+            flex: 1 1 auto;
+            min-height: 180px;
+            border-radius: 16px;
+            border: 1px solid rgba(148,163,184,0.22);
+            background: rgba(15,23,42,0.75);
+            overflow: auto;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+        }
+        .spm-edit-preview-frame img {
+            display: block;
+            width: 100%;
+            height: auto;
+            vertical-align: top;
+        }
+        .spm-edit-preview-frame img.is-hidden {
+            display: none;
+        }
+        .spm-edit-preview-placeholder {
+            margin: 0;
+            padding: 20px 14px;
+            font-size: 13px;
+            line-height: 1.45;
+            text-align: center;
+            color: #94a3b8;
+            align-self: center;
+        }
+        .spm-edit-preview-placeholder[hidden] {
+            display: none !important;
         }
         .spm-modal-panel h2 {
             margin: 0 0 8px;
@@ -493,6 +568,12 @@
         .spm-modal-field input[type="number"] {
             max-width: 120px;
         }
+        .spm-edit-cardset-row .spm-input {
+            width: auto;
+            flex: 0 1 132px;
+            max-width: 132px;
+            min-width: 0;
+        }
         .spm-modal-suffix {
             display: block;
             margin-top: 6px;
@@ -530,7 +611,7 @@
             cursor: not-allowed !important;
         }
 
-        .spm-search-wrap { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1 1 220px; }
+        .spm-search-wrap { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1 1 340px; }
         .spm-search-wrap .spm-input { width: 100%; min-width: 0; max-width: 100%; }
 
         @media (max-width: 900px) {
@@ -562,8 +643,6 @@
         @media (max-width: 720px) {
             tbody tr[data-project-id] { cursor: default; }
             .spm-wrap { padding-top: 16px; padding-bottom: max(28px, env(safe-area-inset-bottom)); }
-            .spm-title { font-size: 1.45rem; }
-            .spm-sub { font-size: 13px; max-width: none; }
             .spm-table-scroll {
                 margin-top: 8px;
                 max-height: none;
@@ -690,12 +769,31 @@
                     max(8px, env(safe-area-inset-bottom));
                 align-items: flex-end;
             }
-            .spm-modal-panel {
+            .spm-modal-dialog {
+                flex-direction: column;
                 max-width: 100%;
                 max-height: min(100dvh - 12px, 100vh);
+                overflow: hidden;
+                gap: 14px;
+            }
+            .spm-edit-preview-aside {
+                flex: 0 0 auto;
+                max-height: min(38vh, 280px);
+                order: 2;
+            }
+            .spm-edit-preview-frame {
+                min-height: 140px;
+                max-height: min(36vh,260px);
+                overflow: auto;
+            }
+            .spm-modal-panel {
+                max-width: 100%;
+                max-height: none;
+                flex: 1 1 auto;
                 border-radius: 18px 18px 0 0;
                 padding: 20px 16px 18px;
                 padding-bottom: max(18px, env(safe-area-inset-bottom));
+                order: 1;
             }
             .spm-modal-actions {
                 justify-content: stretch;
@@ -712,10 +810,6 @@
 <body>
     <div class="spm-wrap">
         <div class="spm-top">
-            <div>
-                <h1 class="spm-title">Saved Projects Manager</h1>
-                <p class="spm-sub">Connect Google, load all Card Maker saves, then sort and edit rarity. Counts are computed from each save’s <code>Type</code>, <code>Subtype</code>, and optional <code>Rarity</code>.</p>
-            </div>
             <div class="spm-controls">
                 <a href="index.html" class="spm-btn spm-ghost">Card Maker</a>
                 <a href="card-grid.html" class="spm-btn spm-nav-print">Print</a>
@@ -753,7 +847,7 @@
                     <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;">
                         <label class="spm-search-wrap" style="font-weight:900; color:#e2e8f0; font-size:13px;">
                             Search
-                            <input class="spm-input" id="spmSearchInput" placeholder="name / type / subtype" />
+                            <input class="spm-input" id="spmSearchInput" placeholder="name / type / subtype / card #" />
                         </label>
                     </div>
                     <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:flex-end;">
@@ -771,8 +865,10 @@
                                 <option value="typeDesc">Type (Z→A)</option>
                                 <option value="subtypeAsc">Subtype (A→Z)</option>
                                 <option value="subtypeDesc">Subtype (Z→A)</option>
-                                <option value="rarityAsc">Rarity (Common→Legendary)</option>
-                                <option value="rarityDesc">Rarity (Legendary→Common)</option>
+                                <option value="cardSetAsc">Card # (low→high)</option>
+                                <option value="cardSetDesc">Card # (high→low)</option>
+                                <option value="rarityAsc">Rarity (low→high)</option>
+                                <option value="rarityDesc">Rarity (high→low)</option>
                             </select>
                         </label>
                     </div>
@@ -811,8 +907,10 @@
                                             <option value="Common">Common</option>
                                             <option value="Uncommon">Uncommon</option>
                                             <option value="Rare">Rare</option>
-                                            <option value="Mythic">Mythic</option>
+                                            <option value="Epic">Epic</option>
                                             <option value="Legendary">Legendary</option>
+                                            <option value="Mythic">Mythic</option>
+                                            <option value="Fantastical">Fantastical</option>
                                         </select>
                                         <button type="button" class="spm-small-btn spm-bulk-apply-btn" id="spmBulkApplyBtn" disabled>Apply</button>
                                     </div>
@@ -830,13 +928,14 @@
                         <thead>
                             <tr>
                                 <th class="spm-th-check" title="Select all rows in the current filtered list"><input type="checkbox" class="spm-row-check" id="spmSelectAll" aria-label="Select all visible rows" /></th>
-                                <th style="width: 200px;" class="spm-th-sortable" data-sort-base="name">Save <span class="spm-th-arrow" data-arrow-base="name">↕</span></th>
-                                <th style="width: 72px;">Size</th>
-                                <th style="width: 72px;" class="spm-th-sortable" data-sort-base="cost">Cost <span class="spm-th-arrow" data-arrow-base="cost">↕</span></th>
-                                <th style="width: 130px;" class="spm-th-sortable" data-sort-base="type">Type <span class="spm-th-arrow" data-arrow-base="type">↕</span></th>
-                                <th style="width: 140px;" class="spm-th-sortable" data-sort-base="subtype">Subtype <span class="spm-th-arrow" data-arrow-base="subtype">↕</span></th>
-                                <th style="width: 130px;" class="spm-th-sortable" data-sort-base="rarity">Rarity <span class="spm-th-arrow" data-arrow-base="rarity">↕</span></th>
-                                <th style="width: 140px;" class="spm-th-sortable" data-sort-base="updated">Updated <span class="spm-th-arrow" data-arrow-base="updated">↕</span></th>
+                                <th style="min-width: 280px;" class="spm-th-sortable" data-sort-base="name">Save <span class="spm-th-arrow" data-arrow-base="name">↕</span></th>
+                                <th style="width: 80px;">Size</th>
+                                <th style="width: 80px;" class="spm-th-sortable" data-sort-base="cost">Cost <span class="spm-th-arrow" data-arrow-base="cost">↕</span></th>
+                                <th style="min-width: 150px;" class="spm-th-sortable" data-sort-base="type">Type <span class="spm-th-arrow" data-arrow-base="type">↕</span></th>
+                                <th style="min-width: 160px;" class="spm-th-sortable" data-sort-base="subtype">Subtype <span class="spm-th-arrow" data-arrow-base="subtype">↕</span></th>
+                                <th style="min-width: 100px;" class="spm-th-sortable" data-sort-base="cardset">Card # <span class="spm-th-arrow" data-arrow-base="cardset">↕</span></th>
+                                <th style="min-width: 140px;" class="spm-th-sortable" data-sort-base="rarity">Rarity <span class="spm-th-arrow" data-arrow-base="rarity">↕</span></th>
+                                <th style="min-width: 160px;" class="spm-th-sortable" data-sort-base="updated">Updated <span class="spm-th-arrow" data-arrow-base="updated">↕</span></th>
                                 <th class="spm-th-actions" style="width: 198px;">Actions</th>
                             </tr>
                         </thead>
@@ -851,7 +950,8 @@
 
     <div id="spmEditModal" class="spm-modal" aria-hidden="true">
         <div class="spm-modal-backdrop" data-spm-edit-close></div>
-        <div class="spm-modal-panel" role="dialog" aria-modal="true" aria-labelledby="spmEditTitle">
+        <div class="spm-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="spmEditTitle">
+        <div class="spm-modal-panel">
             <button type="button" class="spm-modal-close" data-spm-edit-close aria-label="Close">&times;</button>
             <h2 id="spmEditTitle">Edit save</h2>
             <p class="spm-modal-hint">Rename the file on Drive and adjust card fields. The editor will see these values when you open this save.</p>
@@ -873,6 +973,15 @@
                 <input type="number" id="spmEditCost" class="spm-input" min="0" max="999" step="1" />
             </div>
             <div class="spm-modal-field">
+                <label>Card # in set</label>
+                <div class="spm-edit-cardset-row" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <input type="number" id="spmEditCardSetNumber" class="spm-input" min="1" step="1" placeholder="1" aria-label="Card number in set" />
+                    <span class="spm-muted" aria-hidden="true">/</span>
+                    <input type="number" id="spmEditCardSetTotal" class="spm-input" min="1" step="1" placeholder="120" aria-label="Set size (total cards)" />
+                </div>
+                <span class="spm-modal-suffix">Shown on the card as <code style="color:#93c5fd">n / total</code>. Leave both empty to hide. Use two integers ≥ 1.</span>
+            </div>
+            <div class="spm-modal-field">
                 <label for="spmEditRarity">Rarity</label>
                 <select id="spmEditRarity" class="spm-select"></select>
             </div>
@@ -881,6 +990,14 @@
                 <button type="button" class="spm-btn spm-ghost" data-spm-edit-close>Cancel</button>
                 <button type="button" class="spm-btn spm-primary" id="spmEditSaveBtn">Save changes</button>
             </div>
+        </div>
+        <aside class="spm-edit-preview-aside" aria-label="Card preview">
+            <p class="spm-edit-preview-head">Preview</p>
+            <div class="spm-edit-preview-frame">
+                <img id="spmEditPreviewImg" class="is-hidden" alt="" decoding="async" />
+                <p id="spmEditPreviewPlaceholder" class="spm-edit-preview-placeholder">Loading preview…</p>
+            </div>
+        </aside>
         </div>
     </div>
 
@@ -938,8 +1055,10 @@
             'Common',
             'Uncommon',
             'Rare',
+            'Epic',
+            'Legendary',
             'Mythic',
-            'Legendary'
+            'Fantastical'
         ];
 
         const TYPE_OPTIONS = ['Unit', 'Spell', 'Equipment', 'Holding', 'Wealth', 'Hero', 'Tactic'];
@@ -1328,7 +1447,7 @@
                     if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
                     return s;
                 }
-                var lines = [['Save name', 'File size', 'Cost', 'Type', 'Subtype', 'Rarity', 'Updated (local)', 'Drive file id'].map(csvCell).join(',')];
+                var lines = [['Save name', 'File size', 'Cost', 'Type', 'Subtype', 'Card #', 'Rarity', 'Updated (local)', 'Drive file id'].map(csvCell).join(',')];
                 rows.forEach(function (p) {
                     var name = displaySaveLabel(p.file.name);
                     var when = p.file.modifiedTime ? new Date(p.file.modifiedTime).toISOString() : '';
@@ -1338,6 +1457,7 @@
                         isFinite(p.costNumber) ? String(p.costNumber) : '',
                         p.fieldsType || '',
                         p.fieldsSubtype || '',
+                        p.cardSetLabel || '',
                         p.rarity || '',
                         when,
                         p.file.id
@@ -1425,6 +1545,9 @@
             return isFinite(n) ? n : NaN;
         }
 
+        /** Parallelism for downloading project JSON from Drive (images are inside JSON — more workers = list fills faster). */
+        const SPM_PROJECT_FETCH_CONCURRENCY = 14;
+
         /** Very small concurrency helper for loading many saves. */
         async function mapLimit(items, limit, fn) {
             const out = new Array(items.length);
@@ -1439,6 +1562,15 @@
             for (let w = 0; w < Math.min(limit, items.length); w++) workers.push(worker());
             await Promise.all(workers);
             return out;
+        }
+
+        var spmProgressRenderRaf = null;
+        function scheduleProjectsProgressRender() {
+            if (spmProgressRenderRaf != null) return;
+            spmProgressRenderRaf = requestAnimationFrame(function () {
+                spmProgressRenderRaf = null;
+                applyFiltersAndRender();
+            });
         }
 
         // Loaded projects cache
@@ -1458,6 +1590,67 @@
         function computeType(fields) { return fields && fields.Type ? String(fields.Type).trim() : ''; }
         function computeSubtype(fields) { return fields && fields.Subtype ? String(fields.Subtype).trim() : ''; }
         function computeCost(fields) { return parseNumberSafe(fields && fields.TreasureCost); }
+
+        /** Card set index from project fields (same semantics as Card Maker CardSetNumber / CardSetTotal). */
+        function computeCardSetKey(fields) {
+            var rawN = fields && fields.CardSetNumber;
+            var rawT = fields && fields.CardSetTotal;
+            var n = (rawN === undefined || rawN === null) ? NaN : parseInt(String(rawN).trim(), 10);
+            var t = (rawT === undefined || rawT === null) ? NaN : parseInt(String(rawT).trim(), 10);
+            if (!(n >= 1) || !(t >= 1)) {
+                return { n: NaN, t: NaN, label: '' };
+            }
+            return { n: n, t: t, label: n + ' / ' + t };
+        }
+
+        function buildProjectFromState(file, state) {
+            const fields = getFieldsFromState(state);
+            const costNumber = computeCost(fields);
+            const rarity = computeRarityValue(fields);
+            const fieldsType = computeType(fields);
+            const fieldsSubtype = computeSubtype(fields);
+            var cs = computeCardSetKey(fields);
+            return {
+                file: file,
+                state: state,
+                fieldsType: fieldsType,
+                fieldsSubtype: fieldsSubtype,
+                costNumber: costNumber,
+                rarity: rarity,
+                cardSetN: cs.n,
+                cardSetT: cs.t,
+                cardSetLabel: cs.label,
+                fields: fields
+            };
+        }
+
+        function makePlaceholderProject(file) {
+            return {
+                file: file,
+                _loading: true,
+                state: null,
+                fields: {},
+                fieldsType: '',
+                fieldsSubtype: '',
+                costNumber: NaN,
+                rarity: '',
+                cardSetN: NaN,
+                cardSetT: NaN,
+                cardSetLabel: ''
+            };
+        }
+
+        async function ensureProjectHydrated(projectId) {
+            var project = projects.find(function (p) { return p.file && p.file.id === projectId; });
+            if (!project) return null;
+            if (!project._loading && project.state && typeof project.state === 'object') return project;
+            var state = await fetchDriveProjectJson(projectId);
+            var i = projects.findIndex(function (p) { return p.file && p.file.id === projectId; });
+            if (i < 0) return null;
+            projects[i] = buildProjectFromState(projects[i].file, state);
+            scheduleProjectsProgressRender();
+            return projects[i];
+        }
 
         function renderListBox(containerEl, countsMap) {
             if (!containerEl) return;
@@ -1494,7 +1687,9 @@
                 const name = p.file && p.file.name ? String(p.file.name) : '';
                 const type = p.fieldsType || '';
                 const subtype = p.fieldsSubtype || '';
-                return name.toLowerCase().includes(q) || type.toLowerCase().includes(q) || subtype.toLowerCase().includes(q);
+                const cardSet = p.cardSetLabel || '';
+                return name.toLowerCase().includes(q) || type.toLowerCase().includes(q) || subtype.toLowerCase().includes(q)
+                    || cardSet.toLowerCase().includes(q);
             });
         }
 
@@ -1507,6 +1702,7 @@
             const subtypeCounts = {};
             const rarityCounts = {};
             projects.forEach(function (p) {
+                if (p._loading) return;
                 const t = p.fieldsType || '';
                 const st = p.fieldsSubtype || '';
                 const r = p.rarity || '';
@@ -1547,7 +1743,10 @@
                 const t = iso ? new Date(iso).getTime() : 0;
                 return isFinite(t) ? t : 0;
             }
-            const rarityOrder = { 'Common': 1, 'Uncommon': 2, 'Rare': 3, 'Mythic': 4, 'Legendary': 5 };
+            const rarityOrder = {
+                'Common': 1, 'Uncommon': 2, 'Rare': 3, 'Epic': 4,
+                'Legendary': 5, 'Mythic': 6, 'Fantastical': 7
+            };
             return items.sort(function (a, b) {
                 if (sortKey === 'updatedDesc') return getUpdatedTime(b) - getUpdatedTime(a);
                 if (sortKey === 'updatedAsc') return getUpdatedTime(a) - getUpdatedTime(b);
@@ -1561,6 +1760,22 @@
                 if (sortKey === 'typeDesc') return String(b.fieldsType || '').localeCompare(String(a.fieldsType || ''));
                 if (sortKey === 'subtypeAsc') return String(a.fieldsSubtype || '').localeCompare(String(b.fieldsSubtype || ''));
                 if (sortKey === 'subtypeDesc') return String(b.fieldsSubtype || '').localeCompare(String(a.fieldsSubtype || ''));
+                function cardSortKey(p) {
+                    if (!isFinite(p.cardSetN) || !isFinite(p.cardSetT)) return [Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER];
+                    return [p.cardSetN, p.cardSetT];
+                }
+                if (sortKey === 'cardSetAsc') {
+                    var ak = cardSortKey(a);
+                    var bk = cardSortKey(b);
+                    if (ak[0] !== bk[0]) return ak[0] - bk[0];
+                    return ak[1] - bk[1];
+                }
+                if (sortKey === 'cardSetDesc') {
+                    var akD = cardSortKey(a);
+                    var bkD = cardSortKey(b);
+                    if (akD[0] !== bkD[0]) return bkD[0] - akD[0];
+                    return bkD[1] - akD[1];
+                }
                 if (sortKey === 'rarityAsc') return (rarityOrder[a.rarity] || 99) - (rarityOrder[b.rarity] || 99);
                 if (sortKey === 'rarityDesc') return (rarityOrder[b.rarity] || 99) - (rarityOrder[a.rarity] || 99);
                 return 0;
@@ -1572,6 +1787,7 @@
             cost: document.querySelector('span[data-arrow-base="cost"]'),
             type: document.querySelector('span[data-arrow-base="type"]'),
             subtype: document.querySelector('span[data-arrow-base="subtype"]'),
+            cardset: document.querySelector('span[data-arrow-base="cardset"]'),
             rarity: document.querySelector('span[data-arrow-base="rarity"]'),
             updated: document.querySelector('span[data-arrow-base="updated"]')
         };
@@ -1585,6 +1801,7 @@
             set('cost', '↕');
             set('type', '↕');
             set('subtype', '↕');
+            set('cardset', '↕');
             set('rarity', '↕');
             set('updated', '↕');
 
@@ -1597,6 +1814,8 @@
             if (key === 'typeDesc') set('type', '▼');
             if (key === 'subtypeAsc') set('subtype', '▲');
             if (key === 'subtypeDesc') set('subtype', '▼');
+            if (key === 'cardSetAsc') set('cardset', '▲');
+            if (key === 'cardSetDesc') set('cardset', '▼');
             if (key === 'rarityAsc') set('rarity', '▲');
             if (key === 'rarityDesc') set('rarity', '▼');
             if (key === 'updatedDesc') set('updated', '▼');
@@ -1609,6 +1828,7 @@
             if (base === 'cost') spmSortSelect.value = (cur === 'costAsc') ? 'costDesc' : 'costAsc';
             if (base === 'type') spmSortSelect.value = (cur === 'typeAsc') ? 'typeDesc' : 'typeAsc';
             if (base === 'subtype') spmSortSelect.value = (cur === 'subtypeAsc') ? 'subtypeDesc' : 'subtypeAsc';
+            if (base === 'cardset') spmSortSelect.value = (cur === 'cardSetAsc') ? 'cardSetDesc' : 'cardSetAsc';
             if (base === 'rarity') spmSortSelect.value = (cur === 'rarityAsc') ? 'rarityDesc' : 'rarityAsc';
             if (base === 'updated') spmSortSelect.value = (cur === 'updatedAsc') ? 'updatedDesc' : 'updatedAsc';
             updateHeaderArrows();
@@ -1628,22 +1848,44 @@
         function renderTable(items) {
             if (!spmTableBody) return;
             if (!items || items.length === 0) {
-                spmTableBody.innerHTML = '<tr class="spm-table-empty-row"><td colspan="9" class="spm-muted spm-table-empty-msg">No projects match the current filters (or nothing loaded yet).</td></tr>';
+                spmTableBody.innerHTML = '<tr class="spm-table-empty-row"><td colspan="10" class="spm-muted spm-table-empty-msg">No projects match the current filters (or nothing loaded yet).</td></tr>';
                 return;
             }
             spmTableBody.innerHTML = items.map(function (p) {
                 const nameShort = displaySaveLabel(p.file.name);
                 const when = p.file.modifiedTime ? escapeHtml(new Date(p.file.modifiedTime).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })) : '—';
-                const cost = isFinite(p.costNumber) ? String(p.costNumber) : '—';
-                const rarityValue = p.rarity || '';
-                const typeValue = p.fieldsType || '—';
-                const subtypeValue = p.fieldsSubtype || '—';
                 const sz = formatFileSize(p.file.size);
                 const szTitle = p.file.size != null ? escapeHtml(String(p.file.size) + ' bytes') : '';
                 const openHref = 'index.html?openDriveFile=' + encodeURIComponent(p.file.id);
                 const chk = selectedProjectIds.has(p.file.id) ? 'checked' : '';
                 const rowClass = selectedProjectIds.has(p.file.id) ? ' class="spm-row-selected"' : '';
                 const rowAttr = ' data-project-id="' + escapeHtml(p.file.id) + '"';
+                const busy = '<span class="spm-muted">…</span>';
+
+                if (p._loading) {
+                    return '<tr' + rowClass + rowAttr + '>' +
+                        '<td class="spm-check-cell" data-label=""><input type="checkbox" class="spm-row-check" data-spm-row-check data-project-id="' + escapeHtml(p.file.id) + '" ' + chk + ' aria-label="Select ' + escapeHtml(nameShort) + '"/></td>' +
+                        '<td class="spm-name" data-label="Save" title="' + escapeHtml(p.file.name) + '">' + escapeHtml(nameShort) + '</td>' +
+                        '<td class="spm-muted" data-label="Size" title="' + szTitle + '">' + escapeHtml(sz) + '</td>' +
+                        '<td data-label="Cost">' + busy + '</td>' +
+                        '<td data-label="Type">' + busy + '</td>' +
+                        '<td data-label="Subtype">' + busy + '</td>' +
+                        '<td class="spm-muted" data-label="Card #">' + busy + '</td>' +
+                        '<td data-label="Rarity" data-rarity-tier=""><span class="spm-muted">…</span></td>' +
+                        '<td class="spm-muted" data-label="Updated">' + when + '</td>' +
+                        '<td class="spm-actions" data-label="Actions">' +
+                            '<button type="button" class="spm-small-btn spm-btn-edit" data-spm-edit data-project-id="' + escapeHtml(p.file.id) + '" disabled title="Loading save details…">Edit</button>' +
+                            '<a class="spm-link-btn" href="' + openHref + '" target="_blank" rel="noopener">Open</a>' +
+                            '<button type="button" class="spm-small-btn spm-danger" data-spm-delete data-project-id="' + escapeHtml(p.file.id) + '">Delete</button>' +
+                        '</td>' +
+                    '</tr>';
+                }
+
+                const cost = isFinite(p.costNumber) ? String(p.costNumber) : '—';
+                const rarityValue = p.rarity || '';
+                const typeValue = p.fieldsType || '—';
+                const subtypeValue = p.fieldsSubtype || '—';
+                const cardSetDisplay = p.cardSetLabel ? p.cardSetLabel : '—';
 
                 const selectOptions = RARITY_OPTIONS.map(function (opt) {
                     const val = opt;
@@ -1659,7 +1901,8 @@
                     '<td data-label="Cost">' + escapeHtml(cost) + '</td>' +
                     '<td data-label="Type">' + escapeHtml(typeValue) + '</td>' +
                     '<td data-label="Subtype">' + escapeHtml(subtypeValue) + '</td>' +
-                    '<td data-label="Rarity">' +
+                    '<td class="spm-muted" data-label="Card #">' + escapeHtml(cardSetDisplay) + '</td>' +
+                    '<td data-label="Rarity" data-rarity-tier="' + escapeHtml(rarityValue || '') + '">' +
                         '<div class="spm-rarity">' +
                             '<select data-rarity-set data-project-id="' + escapeHtml(p.file.id) + '">' +
                                 selectOptions +
@@ -1715,36 +1958,26 @@
                 spmRarityCounts.innerHTML = '<div class="spm-muted">Loading…</div>';
                 spmStatus.textContent = 'Downloading saves (' + files.length + ')…';
 
-                projects = [];
+                projects = files.map(makePlaceholderProject);
                 spmLoadedCount.textContent = '0/' + files.length;
+                applyFiltersAndRender();
 
-                // Download JSON for every save so we can count/sort by fields.
-                const loaded = await mapLimit(files, 6, async function (file, i) {
+                var loadedSoFar = 0;
+                await mapLimit(files, SPM_PROJECT_FETCH_CONCURRENCY, async function (file, i) {
                     const state = await fetchDriveProjectJson(file.id);
-                    const fields = getFieldsFromState(state);
-                    const costNumber = computeCost(fields);
-                    const rarity = computeRarityValue(fields);
-                    const fieldsType = computeType(fields);
-                    const fieldsSubtype = computeSubtype(fields);
-                    return {
-                        file: file,
-                        state: state,
-                        fieldsType: fieldsType,
-                        fieldsSubtype: fieldsSubtype,
-                        costNumber: costNumber,
-                        rarity: rarity,
-                        fields: fields
-                    };
+                    projects[i] = buildProjectFromState(file, state);
+                    loadedSoFar++;
+                    spmLoadedCount.textContent = String(loadedSoFar) + '/' + files.length;
+                    scheduleProjectsProgressRender();
                 });
 
-                projects = loaded;
                 spmLoadedCount.textContent = String(projects.length) + '/' + files.length;
 
-                // Compute counts
                 const typeCounts = {};
                 const subtypeCounts = {};
                 const rarityCounts = {};
                 projects.forEach(function (p) {
+                    if (p._loading) return;
                     const t = p.fieldsType || '';
                     const st = p.fieldsSubtype || '';
                     const r = p.rarity || '';
@@ -1768,7 +2001,14 @@
         async function updateProjectRarity(projectId, newRarity, options) {
             options = options || {};
             if (!driveAccessToken) return;
-            const project = projects.find(function (p) { return p.file && p.file.id === projectId; });
+            let project;
+            try {
+                project = await ensureProjectHydrated(projectId);
+            } catch (e) {
+                console.error(e);
+                setMessage('Could not load save: ' + (e && e.message ? e.message : String(e)), true);
+                return;
+            }
             if (!project) {
                 setMessage('Project not loaded yet.', true);
                 return;
@@ -1788,6 +2028,7 @@
             const subtypeCounts = {};
             const rarityCounts = {};
             projects.forEach(function (p) {
+                if (p._loading) return;
                 const t = p.fieldsType || '';
                 const st = p.fieldsSubtype || '';
                 const r = p.rarity || '';
@@ -1889,6 +2130,27 @@
                 hideSpmHoverPreview();
                 return;
             }
+            if (project._loading || !project.state) {
+                try {
+                    project = await ensureProjectHydrated(projectId);
+                } catch (err) {
+                    console.warn('Preview hydrate:', err);
+                    if (req !== spmHoverPreviewReq) return;
+                    el.classList.remove('is-loading');
+                    el.classList.add('is-fallback');
+                    if (fallback) fallback.textContent = 'Could not load preview.';
+                    positionSpmHoverPreview(lastSpmPreviewClientX, lastSpmPreviewClientY);
+                    return;
+                }
+            }
+            if (req !== spmHoverPreviewReq) return;
+            if (!project || !project.state) {
+                el.classList.remove('is-loading');
+                el.classList.add('is-fallback');
+                if (fallback) fallback.textContent = 'No preview available for this save.';
+                positionSpmHoverPreview(lastSpmPreviewClientX, lastSpmPreviewClientY);
+                return;
+            }
             positionSpmHoverPreview(lastSpmPreviewClientX, lastSpmPreviewClientY);
             var url = await resolveSpmProjectPreviewUrl(project);
             if (req !== spmHoverPreviewReq) return;
@@ -1972,6 +2234,104 @@
         });
 
         var editModalProjectId = null;
+        var editModalPreviewReq = 0;
+        var editModalPreviewDebounce = null;
+
+        function getEditModalDraftState() {
+            var project = projects.find(function (p) { return p.file && p.file.id === editModalProjectId; });
+            if (!project || !project.state || typeof project.state !== 'object') return null;
+            var state = {
+                version: project.state.version,
+                updatedAt: project.state.updatedAt,
+                fields: Object.assign({}, project.state.fields || {}),
+                images: project.state.images
+            };
+            var f = state.fields;
+            var typeEl = document.getElementById('spmEditType');
+            var subEl = document.getElementById('spmEditSubtype');
+            var costEl = document.getElementById('spmEditCost');
+            var rarEl = document.getElementById('spmEditRarity');
+            if (typeEl) f.Type = typeEl.value;
+            if (subEl) f.Subtype = subEl.value;
+            if (costEl) {
+                var costNum = parseInt(costEl.value, 10);
+                if (isNaN(costNum)) costNum = 0;
+                f.TreasureCost = String(Math.max(0, Math.min(999, costNum)));
+            }
+            if (rarEl) f.Rarity = rarEl.value;
+            var snIn = document.getElementById('spmEditCardSetNumber');
+            var stIn = document.getElementById('spmEditCardSetTotal');
+            var snRaw = snIn ? String(snIn.value).trim() : '';
+            var stRaw = stIn ? String(stIn.value).trim() : '';
+            if (snRaw === '' && stRaw === '') {
+                f.CardSetNumber = '';
+                f.CardSetTotal = '';
+            } else {
+                var sn = parseInt(snRaw, 10);
+                var st = parseInt(stRaw, 10);
+                if (sn >= 1 && st >= 1) {
+                    f.CardSetNumber = String(sn);
+                    f.CardSetTotal = String(st);
+                } else {
+                    f.CardSetNumber = snRaw;
+                    f.CardSetTotal = stRaw;
+                }
+            }
+            return state;
+        }
+
+        function scheduleEditModalPreviewRefresh() {
+            if (!editModalProjectId) return;
+            if (editModalPreviewDebounce) clearTimeout(editModalPreviewDebounce);
+            editModalPreviewDebounce = setTimeout(function () {
+                editModalPreviewDebounce = null;
+                refreshEditModalPreview();
+            }, 320);
+        }
+
+        async function refreshEditModalPreview() {
+            var req = ++editModalPreviewReq;
+            var img = document.getElementById('spmEditPreviewImg');
+            var ph = document.getElementById('spmEditPreviewPlaceholder');
+            if (!img || !ph) return;
+            if (!editModalProjectId) return;
+            ph.textContent = 'Rendering preview…';
+            ph.removeAttribute('hidden');
+            img.classList.add('is-hidden');
+            img.removeAttribute('src');
+            img.alt = '';
+            var draft = getEditModalDraftState();
+            if (!draft) {
+                if (req !== editModalPreviewReq) return;
+                ph.textContent = 'No project data.';
+                ph.removeAttribute('hidden');
+                return;
+            }
+            if (typeof window.renderCardMakerProjectToDataUrl !== 'function') {
+                if (req !== editModalPreviewReq) return;
+                ph.textContent = 'Preview not ready (reload the page).';
+                ph.removeAttribute('hidden');
+                return;
+            }
+            try {
+                var url = await window.renderCardMakerProjectToDataUrl(draft);
+                if (req !== editModalPreviewReq) return;
+                if (url && String(url).length > 32) {
+                    ph.setAttribute('hidden', '');
+                    img.classList.remove('is-hidden');
+                    img.src = url;
+                    img.alt = 'Card preview';
+                } else {
+                    ph.textContent = 'Could not render preview.';
+                    ph.removeAttribute('hidden');
+                }
+            } catch (e) {
+                console.warn('Edit modal preview:', e);
+                if (req !== editModalPreviewReq) return;
+                ph.textContent = 'Preview failed.';
+                ph.removeAttribute('hidden');
+            }
+        }
 
         function buildEditModalStaticSelects() {
             var typeSel = document.getElementById('spmEditType');
@@ -2012,6 +2372,24 @@
         }
 
         function closeSpmEditModal() {
+            editModalPreviewReq++;
+            if (editModalPreviewDebounce) {
+                clearTimeout(editModalPreviewDebounce);
+                editModalPreviewDebounce = null;
+            }
+            var img = document.getElementById('spmEditPreviewImg');
+            var ph = document.getElementById('spmEditPreviewPlaceholder');
+            if (img) {
+                img.onload = null;
+                img.onerror = null;
+                img.removeAttribute('src');
+                img.classList.add('is-hidden');
+                img.alt = '';
+            }
+            if (ph) {
+                ph.textContent = 'Loading preview…';
+                ph.removeAttribute('hidden');
+            }
             var modal = document.getElementById('spmEditModal');
             if (modal) {
                 modal.classList.remove('is-open');
@@ -2021,8 +2399,15 @@
             editModalProjectId = null;
         }
 
-        function openSpmEditModal(projectId) {
-            var project = projects.find(function (p) { return p.file && p.file.id === projectId; });
+        async function openSpmEditModal(projectId) {
+            var project;
+            try {
+                project = await ensureProjectHydrated(projectId);
+            } catch (e) {
+                console.error(e);
+                setMessage('Could not load save: ' + (e && e.message ? e.message : String(e)), true);
+                return;
+            }
             if (!project) return;
             var errEl = document.getElementById('spmEditError');
             if (errEl) {
@@ -2042,6 +2427,12 @@
                 costEl.value = isFinite(c) ? String(Math.round(c)) : '0';
             }
             ensureOptionValue(document.getElementById('spmEditRarity'), project.rarity || '');
+            var snEl = document.getElementById('spmEditCardSetNumber');
+            var stEl = document.getElementById('spmEditCardSetTotal');
+            if (snEl && stEl) {
+                snEl.value = (f.CardSetNumber !== undefined && f.CardSetNumber !== null) ? String(f.CardSetNumber).trim() : '';
+                stEl.value = (f.CardSetTotal !== undefined && f.CardSetTotal !== null) ? String(f.CardSetTotal).trim() : '';
+            }
             var modal = document.getElementById('spmEditModal');
             if (modal) {
                 modal.classList.add('is-open');
@@ -2050,6 +2441,7 @@
             document.body.style.overflow = 'hidden';
             var nameInput = document.getElementById('spmEditName');
             if (nameInput) nameInput.focus();
+            refreshEditModalPreview();
         }
 
         async function saveSpmEditModal() {
@@ -2087,6 +2479,10 @@
             if (isNaN(costNum)) costNum = 0;
             costNum = Math.max(0, Math.min(999, costNum));
             var rarityV = document.getElementById('spmEditRarity').value;
+            var snIn = document.getElementById('spmEditCardSetNumber');
+            var stIn = document.getElementById('spmEditCardSetTotal');
+            var snRaw = snIn ? String(snIn.value).trim() : '';
+            var stRaw = stIn ? String(stIn.value).trim() : '';
 
             if (!project.state || typeof project.state !== 'object') project.state = {};
             if (!project.state.fields) project.state.fields = {};
@@ -2094,6 +2490,19 @@
             project.state.fields.Subtype = subV;
             project.state.fields.TreasureCost = String(costNum);
             project.state.fields.Rarity = rarityV;
+            if (snRaw === '' && stRaw === '') {
+                project.state.fields.CardSetNumber = '';
+                project.state.fields.CardSetTotal = '';
+            } else {
+                var sn = parseInt(snRaw, 10);
+                var st = parseInt(stRaw, 10);
+                if (!(sn >= 1) || !(st >= 1)) {
+                    showErr('Card # in set: use two whole numbers ≥ 1, or clear both fields to hide on the card.');
+                    return;
+                }
+                project.state.fields.CardSetNumber = String(sn);
+                project.state.fields.CardSetTotal = String(st);
+            }
 
             var btn = document.getElementById('spmEditSaveBtn');
             if (btn) btn.disabled = true;
@@ -2109,6 +2518,10 @@
                 project.fieldsSubtype = computeSubtype(project.state.fields);
                 project.costNumber = computeCost(project.state.fields);
                 project.rarity = computeRarityValue(project.state.fields);
+                var csEdit = computeCardSetKey(project.state.fields);
+                project.cardSetN = csEdit.n;
+                project.cardSetT = csEdit.t;
+                project.cardSetLabel = csEdit.label;
                 project.fields = project.state.fields;
                 recalculateSummaryFromProjects();
                 setMessage('Saved changes for “' + displaySaveLabel(project.file.name) + '”.');
@@ -2126,6 +2539,18 @@
         });
         var spmEditSaveBtnEl = document.getElementById('spmEditSaveBtn');
         if (spmEditSaveBtnEl) spmEditSaveBtnEl.addEventListener('click', function () { saveSpmEditModal(); });
+        (function bindEditModalPreviewInputs() {
+            var ids = ['spmEditType', 'spmEditSubtype', 'spmEditCost', 'spmEditRarity', 'spmEditCardSetNumber', 'spmEditCardSetTotal'];
+            function onFieldChange() {
+                scheduleEditModalPreviewRefresh();
+            }
+            ids.forEach(function (id) {
+                var el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('change', onFieldChange);
+                el.addEventListener('input', onFieldChange);
+            });
+        })();
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
             var modal = document.getElementById('spmEditModal');
@@ -2137,7 +2562,12 @@
             var editBtn = e.target.closest('[data-spm-edit]');
             if (editBtn) {
                 e.preventDefault();
-                openSpmEditModal(editBtn.getAttribute('data-project-id'));
+                if (editBtn.disabled) return;
+                var eid = editBtn.getAttribute('data-project-id');
+                openSpmEditModal(eid).catch(function (err) {
+                    console.error(err);
+                    setMessage('Could not open editor: ' + (err && err.message ? err.message : String(err)), true);
+                });
                 return;
             }
             var del = e.target.closest('[data-spm-delete]');

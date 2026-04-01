@@ -138,18 +138,62 @@
         var showDamage = !!f.showDamageStats;
         var mainW = mainImg && (mainImg.width || mainImg.naturalWidth);
         var mainH = mainImg && (mainImg.height || mainImg.naturalHeight);
+        var aspectRatios = mainW && mainH ? (mainW / mainH) : 1;
+        var DimgWidth = CANVAS_W;
+        var DimgHeight = DimgWidth / aspectRatios;
+        if (DimgHeight > CANVAS_H) {
+            DimgHeight = CANVAS_H;
+            DimgWidth = DimgHeight * aspectRatios;
+        }
+        var dImgX = (CANVAS_W - DimgWidth) / 2;
+        var dImgY = (CANVAS_H - DimgHeight) / 8;
+
+        function rarityTierShowsGem(r) {
+            var order = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic', 'Fantastical'];
+            var idx = order.indexOf(String(r || '').trim());
+            var uncommonIdx = order.indexOf('Uncommon');
+            return idx >= uncommonIdx && uncommonIdx >= 0;
+        }
+
+        var RARITY_HEX = {
+            Common: '#78716c',
+            Uncommon: '#ffffff',
+            Rare: '#3b82f6',
+            Epic: '#8b5cf6',
+            Legendary: '#f59e0b',
+            Mythic: '#ef4444',
+            Fantastical: '#10b981'
+        };
+        function rarityHex(r) {
+            var k = String(r || '').trim();
+            return RARITY_HEX[k] || '#1e293b';
+        }
+        var RARITY_GEM_OVERLAY_ALPHA = 0.5;
+
+        function drawTintedRarityOverlay(ctx, img, x, y, w, h, color) {
+            var tw = Math.max(1, Math.round(w));
+            var th = Math.max(1, Math.round(h));
+            var t = document.createElement('canvas');
+            t.width = tw;
+            t.height = th;
+            var tctx = t.getContext('2d');
+            if (!tctx) return;
+            tctx.clearRect(0, 0, tw, th);
+            tctx.drawImage(img, 0, 0, tw, th);
+            tctx.globalCompositeOperation = 'source-atop';
+            tctx.fillStyle = color;
+            tctx.fillRect(0, 0, tw, th);
+            ctx.save();
+            ctx.globalAlpha = RARITY_GEM_OVERLAY_ALPHA;
+            ctx.drawImage(t, x, y);
+            ctx.restore();
+        }
+
         if (showDamage && mainImg && mainW && mainH) {
             var damageImg = await loadImage('Damage.png');
             var dw = damageImg && (damageImg.width || damageImg.naturalWidth);
             if (dw) {
-                var aspectRatios = mainW / mainH;
-                var DimgWidth = CANVAS_W;
-                var DimgHeight = DimgWidth / aspectRatios;
-                if (DimgHeight > CANVAS_H) {
-                    DimgHeight = CANVAS_H;
-                    DimgWidth = DimgHeight * aspectRatios;
-                }
-                ctx.drawImage(damageImg, (CANVAS_W - DimgWidth) / 2, (CANVAS_H - DimgHeight) / 8, DimgWidth, DimgHeight);
+                ctx.drawImage(damageImg, dImgX, dImgY, DimgWidth, DimgHeight);
             }
             ctx.font = '175px Medieval';
             ctx.textAlign = 'center';
@@ -157,6 +201,21 @@
             ctx.textBaseline = 'middle';
             ctx.fillText(String(f.DamageID != null ? f.DamageID : ''), CANVAS_W / 12.5, CANVAS_H / 12.5);
             ctx.fillText(String(f.DefenseID != null ? f.DefenseID : ''), CANVAS_W - (CANVAS_W / 12.5), CANVAS_H / 12.5);
+        }
+        if (mainImg && mainW && mainH && rarityTierShowsGem(f.Rarity)) {
+            var rarityImg = await loadImage('Rareity.png');
+            var rw = rarityImg && (rarityImg.width || rarityImg.naturalWidth);
+            if (rw) {
+                var gemTier = String(f.Rarity || '').trim();
+                if (gemTier === 'Uncommon') {
+                    ctx.save();
+                    ctx.globalAlpha = RARITY_GEM_OVERLAY_ALPHA;
+                    ctx.drawImage(rarityImg, dImgX, dImgY, DimgWidth, DimgHeight);
+                    ctx.restore();
+                } else {
+                    drawTintedRarityOverlay(ctx, rarityImg, dImgX, dImgY, DimgWidth, DimgHeight, rarityHex(f.Rarity));
+                }
+            }
         }
 
         ctx.textBaseline = 'middle';
@@ -177,10 +236,53 @@
         ctx.font = (parseInt(f.TreasureFontSize, 10) || 150) + 'px Medieval';
         ctx.fillText(String(f.TreasureCost != null ? f.TreasureCost : ''), CANVAS_W - (CANVAS_W / 6.9), CANVAS_H / 1.99);
 
-        ctx.font = (parseInt(f.QoteDiscriptionFontSize, 10) || 80) + 'px Medieval';
+        var quoteFontPx = parseInt(f.QoteDiscriptionFontSize, 10) || 60;
+        ctx.font = quoteFontPx + 'px Medieval';
         ctx.textAlign = f.QuoteCenterAlign ? 'center' : 'left';
         var quoteX = f.QuoteCenterAlign ? (CANVAS_W / 2) : (CANVAS_W / 10);
         ctx.fillText(String(f.QoteDiscription != null ? f.QoteDiscription : ''), quoteX, CANVAS_H - (CANVAS_H / 13));
+
+        var rawSetN = f.CardSetNumber;
+        var rawSetT = f.CardSetTotal;
+        var setNum = (rawSetN === undefined || rawSetN === null)
+            ? 1 : parseInt(String(rawSetN).trim(), 10);
+        var setTot = (rawSetT === undefined || rawSetT === null)
+            ? 120 : parseInt(String(rawSetT).trim(), 10);
+        var hasSetNums = setNum >= 1 && setTot >= 1;
+
+        var rarShown = f.Rarity != null ? String(f.Rarity).trim() : '';
+        if (hasSetNums || rarShown) {
+            var rarityY = CANVAS_H - (CANVAS_H / 28);
+            var setDigitFontPx = 80;
+            var setSlashFontPx = 138;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#ffffff';
+            var leftPadX = CANVAS_W / 10;
+            var gapBetween = CANVAS_W * 0.022;
+            var rarityX = leftPadX;
+            if (hasSetNums) {
+                var sx = leftPadX;
+                var sLeft = String(setNum);
+                var sRight = String(setTot);
+                ctx.font = setDigitFontPx + 'px Medieval';
+                ctx.fillText(sLeft, sx, rarityY);
+                sx += ctx.measureText(sLeft).width + ctx.measureText(' ').width / 2;
+                ctx.font = setSlashFontPx + 'px Medieval';
+                ctx.fillText('/', sx, rarityY);
+                sx += ctx.measureText('/').width;
+                ctx.font = setDigitFontPx + 'px Medieval';
+                sx += ctx.measureText(' ').width / 2;
+                ctx.fillText(sRight, sx, rarityY);
+                sx += ctx.measureText(sRight).width;
+                rarityX = sx + gapBetween;
+            }
+            if (rarShown) {
+                ctx.font = '70px Medieval';
+                ctx.fillText(rarShown, rarityX, rarityY);
+            }
+            ctx.fillStyle = 'black';
+        }
 
         ctx.font = (parseInt(f.MainDisciptionFontSize, 10) || 80) + 'px Medieval';
         ctx.textAlign = f.MainDescriptionCenterAlign ? 'center' : 'left';
