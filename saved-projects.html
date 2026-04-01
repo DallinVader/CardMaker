@@ -26,6 +26,13 @@
             color: #bbf7d0;
         }
         .spm-nav-print:hover { filter: brightness(1.08); }
+        .spm-new-card {
+            background: linear-gradient(135deg, rgba(34,197,94,0.28), rgba(21,128,61,0.35));
+            border-color: rgba(34,197,94,0.45);
+            color: #bbf7d0;
+        }
+        .spm-new-card:hover { filter: brightness(1.08); }
+        .spm-new-card:disabled { opacity: .5; filter: none; cursor: not-allowed; }
         .spm-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-color: rgba(255,255,255,0.18); }
         .spm-ghost { background: rgba(255,255,255,0.06); }
 
@@ -124,6 +131,32 @@
             box-shadow: inset 3px 0 0 #818cf8;
         }
         tbody tr.spm-row-selected:hover { background: rgba(99,102,241,0.16); }
+        tbody tr.spm-row-dup {
+            box-shadow: inset 3px 0 0 rgba(248, 113, 113, 0.9);
+        }
+        tbody tr.spm-row-selected.spm-row-dup {
+            box-shadow: inset 3px 0 0 #818cf8, inset 6px 0 0 rgba(248, 113, 113, 0.9);
+        }
+        tbody tr.spm-row-dup:hover { background: rgba(248, 113, 113, 0.07); }
+        tbody tr.spm-row-selected.spm-row-dup:hover { background: rgba(99,102,241,0.14); }
+        .spm-dup-mark {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 6px;
+            width: 17px;
+            height: 17px;
+            border-radius: 50%;
+            vertical-align: middle;
+            flex-shrink: 0;
+            background: rgba(248, 113, 113, 0.22);
+            border: 1px solid rgba(252, 165, 165, 0.55);
+            color: #fecaca;
+            font-size: 11px;
+            font-weight: 900;
+            line-height: 1;
+            cursor: help;
+        }
         tbody tr[data-project-id] { cursor: help; }
         .spm-name { max-width: min(640px, 50vw); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 900; }
 
@@ -816,6 +849,7 @@
                 <button type="button" class="spm-btn spm-primary" id="spmSignInBtn">Connect Google</button>
                 <button type="button" class="spm-btn spm-ghost" id="spmSignOutBtn" disabled>Sign out</button>
                 <button type="button" class="spm-btn spm-ghost" id="spmRefreshBtn" disabled>Refresh</button>
+                <button type="button" class="spm-btn spm-new-card" id="spmNewCardBtn" disabled title="Create a new cloud save with defaults and the next free card #">New card</button>
             </div>
         </div>
 
@@ -847,7 +881,7 @@
                     <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;">
                         <label class="spm-search-wrap" style="font-weight:900; color:#e2e8f0; font-size:13px;">
                             Search
-                            <input class="spm-input" id="spmSearchInput" placeholder="name / type / subtype / card #" />
+                            <input class="spm-input" id="spmSearchInput" placeholder="save name / card title / type / subtype / card #" />
                         </label>
                     </div>
                     <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:flex-end;">
@@ -1022,6 +1056,7 @@
         const spmSignInBtn = document.getElementById('spmSignInBtn');
         const spmSignOutBtn = document.getElementById('spmSignOutBtn');
         const spmRefreshBtn = document.getElementById('spmRefreshBtn');
+        const spmNewCardBtn = document.getElementById('spmNewCardBtn');
         const spmStatus = document.getElementById('spmStatus');
         const spmMessage = document.getElementById('spmMessage');
 
@@ -1245,6 +1280,7 @@
             const signedIn = !!driveAccessToken;
             spmSignOutBtn.disabled = !signedIn;
             spmRefreshBtn.disabled = !signedIn;
+            if (spmNewCardBtn) spmNewCardBtn.disabled = !signedIn;
             spmSignInBtn.disabled = signedIn;
             spmSignInBtn.textContent = signedIn ? 'Connected' : 'Connect Google';
         }
@@ -1354,6 +1390,11 @@
         spmSignInBtn.addEventListener('click', handleSignIn);
         spmSignOutBtn.addEventListener('click', handleSignOut);
         spmRefreshBtn.addEventListener('click', function () { refreshAll(); });
+        if (spmNewCardBtn) {
+            spmNewCardBtn.addEventListener('click', function () {
+                createNewCardOnDrive().catch(function (e) { console.error(e); });
+            });
+        }
         spmSearchInput.addEventListener('input', function () { applyFiltersAndRender(); });
         spmSortSelect.addEventListener('change', function () {
             updateHeaderArrows();
@@ -1498,6 +1539,31 @@
             return JSON.parse(txt);
         }
 
+        async function fetchDriveFileMetadata(fileId) {
+            const url = DRIVE_FILES_API + '/' + encodeURIComponent(fileId) + '?fields=id,name,modifiedTime,size';
+            const res = await fetch(url, { headers: driveAuthHeaders(driveAccessToken) });
+            const txt = await res.text();
+            if (!res.ok) throw new Error(parseDriveError(txt, res.status));
+            return JSON.parse(txt);
+        }
+
+        async function driveCreateAppDataMetadata(fileName) {
+            const u = new URL(DRIVE_FILES_API);
+            u.searchParams.set('fields', 'id,name');
+            const res = await fetch(u.toString(), {
+                method: 'POST',
+                headers: driveAuthHeaders(driveAccessToken, { 'Content-Type': 'application/json; charset=UTF-8' }),
+                body: JSON.stringify({
+                    name: fileName,
+                    mimeType: 'application/json',
+                    parents: ['appDataFolder']
+                })
+            });
+            const text = await res.text();
+            if (!res.ok) throw new Error(parseDriveError(text, res.status));
+            return JSON.parse(text);
+        }
+
         async function uploadProjectStateBytes(fileId, stateObj) {
             const payload = JSON.stringify(stateObj);
             const u = new URL(DRIVE_UPLOAD_API + '/' + encodeURIComponent(fileId));
@@ -1603,6 +1669,137 @@
             return { n: n, t: t, label: n + ' / ' + t };
         }
 
+        function computeCardTitle(fields) {
+            if (!fields || fields.Title == null) return '';
+            return String(fields.Title).trim();
+        }
+
+        /** Which loaded projects share the same card Title or same card # (set index), for duplicate warnings in the table. */
+        function computeDuplicateProjectIds(allProjects) {
+            var nameCounts = {};
+            var numCounts = {};
+            var loaded = allProjects.filter(function (p) { return p && !p._loading && p.file && p.file.id; });
+            loaded.forEach(function (p) {
+                var title = computeCardTitle(p.fields);
+                if (title) {
+                    var nk = title.toLowerCase();
+                    nameCounts[nk] = (nameCounts[nk] || 0) + 1;
+                }
+                if (isFinite(p.cardSetN) && isFinite(p.cardSetT)) {
+                    var uk = p.cardSetN + '\u0000' + p.cardSetT;
+                    numCounts[uk] = (numCounts[uk] || 0) + 1;
+                }
+            });
+            var dupTitle = new Set();
+            var dupNum = new Set();
+            loaded.forEach(function (p) {
+                var title = computeCardTitle(p.fields);
+                if (title) {
+                    var nk = title.toLowerCase();
+                    if (nameCounts[nk] > 1) dupTitle.add(p.file.id);
+                }
+                if (isFinite(p.cardSetN) && isFinite(p.cardSetT)) {
+                    var uk = p.cardSetN + '\u0000' + p.cardSetT;
+                    if (numCounts[uk] > 1) dupNum.add(p.file.id);
+                }
+            });
+            return { dupTitle: dupTitle, dupNum: dupNum };
+        }
+
+        function duplicateWarningMark(projectId, dupSets) {
+            var parts = [];
+            if (dupSets.dupTitle.has(projectId)) parts.push('Same card title as another save');
+            if (dupSets.dupNum.has(projectId)) parts.push('Same card # as another save');
+            if (!parts.length) return '';
+            var tip = parts.join('. ') + '.';
+            return ' <span class="spm-dup-mark" role="img" title="' + escapeHtml(tip) + '" aria-label="Warning: ' + escapeHtml(tip) + '">!</span>';
+        }
+
+        /** Prefer the most common set size among loaded saves so the new # matches your collection; else 120 (editor default). */
+        function defaultCardSetTotalFromProjects(allProjects) {
+            var counts = {};
+            allProjects.forEach(function (p) {
+                if (!p || p._loading) return;
+                if (isFinite(p.cardSetT) && p.cardSetT >= 1) {
+                    var t = p.cardSetT;
+                    counts[t] = (counts[t] || 0) + 1;
+                }
+            });
+            var best = 120;
+            var bestC = 0;
+            Object.keys(counts).forEach(function (tk) {
+                var c = counts[tk];
+                if (c > bestC) {
+                    bestC = c;
+                    best = parseInt(tk, 10);
+                }
+            });
+            return best;
+        }
+
+        /** Smallest CardSetNumber ≥ 1 not used with the chosen set total. */
+        function pickUnusedCardNumberPair(allProjects) {
+            var setTotal = defaultCardSetTotalFromProjects(allProjects);
+            if (!(setTotal >= 1)) setTotal = 120;
+            var used = {};
+            allProjects.forEach(function (p) {
+                if (!p || p._loading) return;
+                if (isFinite(p.cardSetN) && isFinite(p.cardSetT)) {
+                    used[p.cardSetN + '\u0000' + p.cardSetT] = true;
+                }
+            });
+            for (var n = 1; n <= 99999; n++) {
+                if (!used[n + '\u0000' + setTotal]) return { n: n, t: setTotal };
+            }
+            return { n: 1, t: setTotal + 1 };
+        }
+
+        /** Minimal project JSON matching Card Maker defaults (same shape as index.html buildProjectState). */
+        function buildBlankProjectState(cardSetN, cardSetT) {
+            return {
+                version: 1,
+                updatedAt: new Date().toISOString(),
+                fields: {
+                    ArtHight: '116',
+                    ArtHightPos: '0',
+                    ArtWidthPos: '0',
+                    Title: '',
+                    TitleFontSize: '200',
+                    TitleCenterAlign: true,
+                    DamageID: '0',
+                    DefenseID: '0',
+                    Rarity: 'Common',
+                    CardSetNumber: String(cardSetN),
+                    CardSetTotal: String(cardSetT),
+                    Type: '',
+                    TypeFontSize: '100',
+                    Subtype: '',
+                    SubtypeFontSize: '80',
+                    TreasureCost: '0',
+                    TreasureFontSize: '150',
+                    MainDisciption: '',
+                    MainDisciptionFontSize: '125',
+                    MainDescriptionCenterAlign: true,
+                    SubDisciption: '',
+                    SubDisciptionFontSize: '70',
+                    SubDescriptionCenterAlign: true,
+                    QoteDiscription: '',
+                    QoteDiscriptionFontSize: '60',
+                    QuoteCenterAlign: true,
+                    downloadFormat: 'png',
+                    exportIncludeBleed: true,
+                    exportWidth: '800',
+                    exportWidthInput: '800',
+                    jpegQuality: '0.8',
+                    showDamageStats: true
+                },
+                images: {
+                    cardBaseSrc: '',
+                    artSrc: ''
+                }
+            };
+        }
+
         function buildProjectFromState(file, state) {
             const fields = getFieldsFromState(state);
             const costNumber = computeCost(fields);
@@ -1688,8 +1885,9 @@
                 const type = p.fieldsType || '';
                 const subtype = p.fieldsSubtype || '';
                 const cardSet = p.cardSetLabel || '';
+                const cardTitle = computeCardTitle(p.fields).toLowerCase();
                 return name.toLowerCase().includes(q) || type.toLowerCase().includes(q) || subtype.toLowerCase().includes(q)
-                    || cardSet.toLowerCase().includes(q);
+                    || cardSet.toLowerCase().includes(q) || cardTitle.includes(q);
             });
         }
 
@@ -1851,6 +2049,7 @@
                 spmTableBody.innerHTML = '<tr class="spm-table-empty-row"><td colspan="10" class="spm-muted spm-table-empty-msg">No projects match the current filters (or nothing loaded yet).</td></tr>';
                 return;
             }
+            var dupSets = computeDuplicateProjectIds(projects);
             spmTableBody.innerHTML = items.map(function (p) {
                 const nameShort = displaySaveLabel(p.file.name);
                 const when = p.file.modifiedTime ? escapeHtml(new Date(p.file.modifiedTime).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })) : '—';
@@ -1858,8 +2057,21 @@
                 const szTitle = p.file.size != null ? escapeHtml(String(p.file.size) + ' bytes') : '';
                 const openHref = 'index.html?openDriveFile=' + encodeURIComponent(p.file.id);
                 const chk = selectedProjectIds.has(p.file.id) ? 'checked' : '';
-                const rowClass = selectedProjectIds.has(p.file.id) ? ' class="spm-row-selected"' : '';
+                var rowClasses = [];
+                if (selectedProjectIds.has(p.file.id)) rowClasses.push('spm-row-selected');
+                const isDup = !p._loading && (dupSets.dupTitle.has(p.file.id) || dupSets.dupNum.has(p.file.id));
+                if (isDup) rowClasses.push('spm-row-dup');
+                const rowClass = rowClasses.length ? ' class="' + rowClasses.join(' ') + '"' : '';
                 const rowAttr = ' data-project-id="' + escapeHtml(p.file.id) + '"';
+                const dupTip = !p._loading ? duplicateWarningMark(p.file.id, dupSets) : '';
+                const rowTitleAttr = (function () {
+                    if (p._loading) return '';
+                    var parts = [];
+                    if (dupSets.dupTitle.has(p.file.id)) parts.push('Same card title as another save');
+                    if (dupSets.dupNum.has(p.file.id)) parts.push('Same card # as another save');
+                    if (!parts.length) return '';
+                    return ' title="' + escapeHtml(parts.join('. ') + '.') + '"';
+                })();
                 const busy = '<span class="spm-muted">…</span>';
 
                 if (p._loading) {
@@ -1894,9 +2106,9 @@
                     return '<option value="' + escapeHtml(val) + '" ' + selected + '>' + escapeHtml(label) + '</option>';
                 }).join('');
 
-                return '<tr' + rowClass + rowAttr + '>' +
+                return '<tr' + rowClass + rowAttr + rowTitleAttr + '>' +
                     '<td class="spm-check-cell" data-label=""><input type="checkbox" class="spm-row-check" data-spm-row-check data-project-id="' + escapeHtml(p.file.id) + '" ' + chk + ' aria-label="Select ' + escapeHtml(nameShort) + '"/></td>' +
-                    '<td class="spm-name" data-label="Save" title="' + escapeHtml(p.file.name) + '">' + escapeHtml(nameShort) + '</td>' +
+                    '<td class="spm-name" data-label="Save" title="' + escapeHtml(p.file.name) + '">' + escapeHtml(nameShort) + dupTip + '</td>' +
                     '<td class="spm-muted" data-label="Size" title="' + szTitle + '">' + escapeHtml(sz) + '</td>' +
                     '<td data-label="Cost">' + escapeHtml(cost) + '</td>' +
                     '<td data-label="Type">' + escapeHtml(typeValue) + '</td>' +
@@ -1930,6 +2142,47 @@
             if (spmExportCsvBtn) spmExportCsvBtn.disabled = sorted.length === 0;
             syncSelectAllCheckbox();
             updateBulkUi();
+        }
+
+        async function createNewCardOnDrive() {
+            if (!await ensureSignedIn() || !driveAccessToken) {
+                setMessage('Connect Google first.', true);
+                return;
+            }
+            const btn = spmNewCardBtn;
+            if (btn) btn.disabled = true;
+            try {
+                setMessage('Creating new card…');
+                const pair = pickUnusedCardNumberPair(projects);
+                const base = 'new-card-' + Date.now();
+                const fullName = fullDriveFileNameFromBase(base);
+                const created = await driveCreateAppDataMetadata(fullName);
+                if (!created || !created.id) throw new Error('Drive create returned no file id.');
+                const state = buildBlankProjectState(pair.n, pair.t);
+                await uploadProjectStateBytes(created.id, state);
+                const meta = await fetchDriveFileMetadata(created.id);
+                const fileObj = {
+                    id: meta.id,
+                    name: meta.name || fullName,
+                    modifiedTime: meta.modifiedTime,
+                    size: meta.size
+                };
+                const newProject = buildProjectFromState(fileObj, state);
+                projects.push(newProject);
+                var tc = parseInt(spmTotalCount.textContent, 10);
+                if (isFinite(tc)) spmTotalCount.textContent = String(tc + 1);
+                else spmTotalCount.textContent = String(projects.length);
+                recalculateSummaryFromProjects();
+                setMessage(
+                    'Created “' + displaySaveLabel(fileObj.name) + '” with unused card # ' + pair.n + ' / ' + pair.t + '. Use Open to edit in Card Maker.',
+                    false
+                );
+            } catch (e) {
+                console.error(e);
+                setMessage('Could not create card: ' + (e && e.message ? e.message : String(e)), true);
+            } finally {
+                updateButtons();
+            }
         }
 
         async function refreshAll() {

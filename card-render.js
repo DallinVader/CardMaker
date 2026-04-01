@@ -284,7 +284,7 @@
             ctx.fillStyle = 'black';
         }
 
-        ctx.font = (parseInt(f.MainDisciptionFontSize, 10) || 80) + 'px Medieval';
+        ctx.font = (parseInt(f.MainDisciptionFontSize, 10) || 125) + 'px Medieval';
         ctx.textAlign = f.MainDescriptionCenterAlign ? 'center' : 'left';
         var descriptionX = f.MainDescriptionCenterAlign ? (CANVAS_W / 2) : (CANVAS_W / 10);
         var maxW = CANVAS_W - (CANVAS_W / 4.75);

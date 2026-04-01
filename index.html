@@ -6,7 +6,7 @@
         <title>Card Maker</title>
         <link rel="stylesheet" href="style.css">
     </head>
-    <body>
+    <body class="cm-page">
         <div class="top-bar">
             <h1>Card Maker</h1>
         </div>
@@ -22,6 +22,16 @@
         </div>
         <div class="top-drive-status-wrap">
             <small id="driveStatusText">Checking Google Drive setup...</small>
+        </div>
+
+        <div id="cmCardLoadingBar" class="cm-card-loading" hidden aria-hidden="true">
+            <div class="cm-card-loading-backdrop"></div>
+            <div class="cm-card-loading-top">
+                <div class="cm-card-loading-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Loading card">
+                    <div class="cm-card-loading-bar" aria-hidden="true"></div>
+                </div>
+                <p class="cm-card-loading-label" id="cmCardLoadingText">Loading card…</p>
+            </div>
         </div>
 
         <div id="driveProjectsModal" class="drive-modal" aria-hidden="true">
@@ -63,43 +73,218 @@
             </div>
         </div>
         
+        <div class="cm-wrap">
         <div class="main-container">
             <div class="card-preview">
                 <canvas id="cardCanvas" width="2500" height="3500"></canvas>
             </div>
             
-            <div class="controls-panel">
-                <div class="control-section collapsed">
+            <div class="controls-panel cm-panel cm-editor-panel">
+                <div class="control-section cm-essentials">
                     <div class="section-header" onclick="toggleSection(this)">
-                        <h2>Card Images</h2>
+                        <h2>Quick card</h2>
                     </div>
                     <div class="section-content">
-                        <div class="input-group">
-                            <label>Card Base/Frame:</label>
-                            <input type="file" id="CardBase" accept="image/*">
+                        <div class="cm-name-type-row">
+                            <div class="input-group cm-quick-name">
+                                <label for="Title">Card name</label>
+                                <input type="text" placeholder="Name shown on the card" id="Title" oninput="redrawCanvas()" autocomplete="off">
+                            </div>
+                            <div class="cm-type-sub-col">
+                                <div class="input-group">
+                                    <label for="Type">Type</label>
+                                    <select id="Type" onchange="redrawCanvas()">
+                                        <option value="">—</option>
+                                        <option value="Unit">Unit</option>
+                                        <option value="Spell">Spell</option>
+                                        <option value="Equipment">Equipment</option>
+                                        <option value="Holding">Holding</option>
+                                        <option value="Wealth">Wealth</option>
+                                        <option value="Hero">Hero</option>
+                                        <option value="Tactic">Tactic</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="Subtype">Subtype</label>
+                                    <select id="Subtype" onchange="redrawCanvas()">
+                                        <option value="">—</option>
+                                        <option value="Army">Army</option>
+                                        <option value="Evocation">Evocation</option>
+                                        <option value="Divination">Divination</option>
+                                        <option value="Necromancy">Necromancy</option>
+                                        <option value="Enchantment">Enchantment</option>
+                                        <option value="Transmutation">Transmutation</option>
+                                        <option value="Weapon">Weapon</option>
+                                        <option value="Armor">Armor</option>
+                                        <option value="Economy">Economy</option>
+                                        <option value="Ritual">Ritual</option>
+                                        <option value="Commander">Commander</option>
+                                        <option value="Vehicle">Vehicle</option>
+                                        <option value="Tool">Tool</option>
+                                        <option value="Ship">Ship</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
-                        <div class="input-group">
-                            <label>Art Image:</label>
-                            <input type="file" id="Art" accept="image/*" multiple>
+                        <div class="cm-quick-toolbar" aria-label="Title layout">
+                            <span class="cm-quick-toolbar-label">Title on card</span>
+                            <div class="quick-buttons cm-quick-presets">
+                                <button type="button" onclick="setFontSize('TitleFontSize', 150)" title="Smaller title">Small</button>
+                                <button type="button" onclick="setFontSize('TitleFontSize', 200)" title="Default size">Med</button>
+                                <button type="button" onclick="setFontSize('TitleFontSize', 250)" title="Larger title">Large</button>
+                            </div>
+                            <label class="cm-check-inline"><input type="checkbox" id="TitleCenterAlign" checked onchange="redrawCanvas()"> Center</label>
                         </div>
-                        <div class="input-group">
-                            <label>Art Size (%):</label>
-                            <input value="116" type="number" min="1" max="500" placeholder="Size" id="ArtHight" oninput="ImageSize()">
-                            <small>Drag the bottom-right corner on the card to resize, or type a value</small>
+                        <div class="cm-field-grid cm-field-grid-2">
+                            <div class="input-group">
+                                <label for="CardRarity">Rarity</label>
+                                <select id="CardRarity" onchange="redrawCanvas()" title="Uncommon and higher show extra frame art on the card">
+                                    <option value="Common">Common</option>
+                                    <option value="Uncommon">Uncommon</option>
+                                    <option value="Rare">Rare</option>
+                                    <option value="Epic">Epic</option>
+                                    <option value="Legendary">Legendary</option>
+                                    <option value="Mythic">Mythic</option>
+                                    <option value="Fantastical">Fantastical</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Set #</label>
+                                <div class="cm-setnum-row">
+                                    <input type="number" id="CardSetNumber" min="1" step="1" placeholder="1" value="1" oninput="redrawCanvas()" title="Card number in set" aria-label="Card number in set">
+                                    <span class="cm-setnum-slash" aria-hidden="true">/</span>
+                                    <input type="number" id="CardSetTotal" min="1" step="1" placeholder="120" value="120" oninput="redrawCanvas()" title="Set size" aria-label="Total cards in set">
+                                </div>
+                            </div>
                         </div>
-                        <div class="input-group">
-                            <label>Vertical Position (Y):</label>
-                            <input value="0" type="number" min="-5000" max="5000" placeholder="0" id="ArtHightPos" oninput="ImagePos()">
-                            <small>Drag the art image on the card to move, or type a value</small>
+                        <div class="cm-stat-strip" role="group" aria-label="Cost and combat">
+                            <div class="cm-stat-cell">
+                                <label for="TreasureCost">Cost</label>
+                                <input type="number" id="TreasureCost" placeholder="0" value="0" min="0" max="999" oninput="redrawCanvas()" inputmode="numeric">
+                            </div>
+                            <div class="cm-stat-cell">
+                                <label for="DamageID">Damage</label>
+                                <input type="number" value="0" min="0" max="999" placeholder="0" id="DamageID" oninput="redrawCanvas()" inputmode="numeric">
+                            </div>
+                            <div class="cm-stat-cell">
+                                <label for="DefenseID">Defense</label>
+                                <input type="number" value="0" min="0" max="999" placeholder="0" id="DefenseID" oninput="redrawCanvas()" inputmode="numeric">
+                            </div>
                         </div>
+                        <label class="cm-check-row cm-show-stats-row"><input type="checkbox" onclick="ToggelSwitch()" checked> Show Damage/Defense Stats</label>
+
+                        <p class="cm-quick-sub" id="cm-quick-images">Images</p>
+                        <div class="cm-images-file-row">
+                            <div class="input-group cm-cardbase-group">
+                                <label for="CardBase">Card base / frame</label>
+                                <select id="CardBase" onchange="applyCardBaseFromSelect()">
+                                    <option value="CardFrame.png">Standard</option>
+                                    <option value="CardFrame Old.png">Classic</option>
+                                    <option value="__custom__">Custom…</option>
+                                </select>
+                                <div id="CardBaseCustomWrap" class="cm-cardbase-custom-wrap" hidden>
+                                    <label for="CardBaseCustom" class="cm-cardbase-custom-label">Custom frame file</label>
+                                    <input type="file" id="CardBaseCustom" accept="image/*">
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label for="Art">Art image</label>
+                                <input type="file" id="Art" accept="image/*" multiple>
+                            </div>
+                        </div>
+                        <div class="cm-field-grid cm-field-grid-3">
+                            <div class="input-group">
+                                <label for="ArtHight">Art size %</label>
+                                <input value="116" type="number" min="1" max="500" placeholder="Size" id="ArtHight" oninput="ImageSize()">
+                            </div>
+                            <div class="input-group">
+                                <label for="ArtHightPos">Art Y</label>
+                                <input value="0" type="number" min="-5000" max="5000" placeholder="0" id="ArtHightPos" oninput="ImagePos()" title="Vertical position">
+                            </div>
+                            <div class="input-group">
+                                <label for="ArtWidthPos">Art X</label>
+                                <input value="0" type="number" min="-5000" max="5000" placeholder="0" id="ArtWidthPos" oninput="ImagePos()" title="Horizontal position">
+                            </div>
+                        </div>
+                        <small class="cm-hint-compact cm-quick-hint">Drag art on the preview to move; corner to resize—or use the numbers here.</small>
+
+                        <div class="cm-desc-pair">
+                            <div class="cm-desc-pair-col">
+                                <p class="cm-quick-sub" id="cm-quick-main-desc">Main description</p>
+                                <div class="input-group">
+                                    <label for="MainDisciption">Card rules / main text</label>
+                                    <textarea id="MainDisciption" placeholder="Main description (multiple lines)" rows="2" oninput="redrawCanvas()"></textarea>
+                                </div>
+                                <div class="cm-field-grid cm-field-grid-2">
+                                    <div class="input-group">
+                                        <label>Size <span id="MainDisciptionFontSizeValue">125</span></label>
+                                        <input type="range" id="MainDisciptionFontSize" min="50" max="200" value="125" oninput="redrawCanvas()">
+                                    </div>
+                                    <div class="input-group cm-checkbox-tight">
+                                        <label class="cm-check-row" for="MainDescriptionCenterAlign"><input type="checkbox" id="MainDescriptionCenterAlign" checked onchange="redrawCanvas()"> Center text</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="cm-desc-pair-col">
+                                <p class="cm-quick-sub" id="cm-quick-sub-desc">Sub description</p>
+                                <div class="input-group">
+                                    <label for="SubDisciption">Secondary text</label>
+                                    <textarea id="SubDisciption" placeholder="Sub description" rows="1" oninput="redrawCanvas()"></textarea>
+                                </div>
+                                <div class="cm-field-grid cm-field-grid-2">
+                                    <div class="input-group">
+                                        <label>Size <span id="SubDisciptionFontSizeValue">70</span></label>
+                                        <input type="range" id="SubDisciptionFontSize" min="50" max="200" value="70" oninput="redrawCanvas()">
+                                    </div>
+                                    <div class="input-group cm-checkbox-tight">
+                                        <label class="cm-check-row" for="SubDescriptionCenterAlign"><input type="checkbox" id="SubDescriptionCenterAlign" checked onchange="redrawCanvas()"> Center text</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="cm-quick-sub" id="cm-quick-quote">Quote</p>
                         <div class="input-group">
-                            <label>Horizontal Position (X):</label>
-                            <input value="0" type="number" min="-5000" max="5000" placeholder="0" id="ArtWidthPos" oninput="ImagePos()">
-                            <small>Negative moves left, positive moves right</small>
+                            <label for="QoteDiscription">Quote</label>
+                            <textarea id="QoteDiscription" placeholder="Quote text" rows="1" oninput="redrawCanvas()"></textarea>
+                        </div>
+                        <div class="cm-field-grid cm-field-grid-2">
+                            <div class="input-group">
+                                <label>Size <span id="QoteDiscriptionFontSizeValue">60</span></label>
+                                <input type="range" id="QoteDiscriptionFontSize" min="50" max="200" value="60" oninput="redrawCanvas()">
+                            </div>
+                            <div class="input-group cm-checkbox-tight">
+                                <label class="cm-check-row" for="QuoteCenterAlign"><input type="checkbox" id="QuoteCenterAlign" checked onchange="redrawCanvas()"> Center text</label>
+                            </div>
                         </div>
                     </div>
                 </div>
-                
+
+                <div class="control-section collapsed">
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <h2>Text sizes</h2>
+                    </div>
+                    <div class="section-content">
+                        <p class="cm-typography-hint">Only open when you want to fine-tune; presets above are enough for most cards.</p>
+                        <div class="input-group">
+                            <label>Title <span class="cm-value-pill" id="TitleFontSizeValue">200</span></label>
+                            <input type="range" id="TitleFontSize" min="50" max="300" value="200" oninput="redrawCanvas()">
+                        </div>
+                        <div class="input-group">
+                            <label>Type line <span class="cm-value-pill" id="TypeFontSizeValue">100</span></label>
+                            <input type="range" id="TypeFontSize" min="50" max="200" value="100" oninput="redrawCanvas()">
+                        </div>
+                        <div class="input-group">
+                            <label>Subtype <span class="cm-value-pill" id="SubtypeFontSizeValue">80</span></label>
+                            <input type="range" id="SubtypeFontSize" min="50" max="200" value="80" oninput="redrawCanvas()">
+                        </div>
+                        <div class="input-group">
+                            <label>Cost number <span class="cm-value-pill" id="TreasureFontSizeValue">150</span></label>
+                            <input type="range" id="TreasureFontSize" min="50" max="300" value="150" oninput="redrawCanvas()">
+                        </div>
+                    </div>
+                </div>
+
                 <div class="control-section collapsed">
                     <div class="section-header" onclick="toggleSection(this)">
                         <h2>Export</h2>
@@ -133,211 +318,20 @@
                             <input type="range" id="jpegQuality" min="0.1" max="1" step="0.1" value="0.8" oninput="updateQualityDisplay()">
                             <small>Lower quality = smaller file size</small>
                         </div>
-                        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+                        <div class="cm-export-actions" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
                             <button onclick="downloadCard()" title="Ctrl+D">Download Card</button>
                             <button onclick="openFullscreen()" title="Ctrl+F">Fullscreen Card</button>
                             <button onclick="resetEverything()" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: white;" title="Ctrl+R">Reset All</button>
                         </div>
-                        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(200, 200, 220, 0.3); font-size: 11px; color: #718096;">
+                        <div class="cm-export-shortcuts" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(200, 200, 220, 0.3); font-size: 11px; color: #718096;">
                             <strong>Keyboard Shortcuts:</strong><br>
                             <kbd>Ctrl+D</kbd> Download | <kbd>Ctrl+F</kbd> Fullscreen | <kbd>Ctrl+R</kbd> Reset<br>
-                            <kbd>1-9</kbd> Toggle sections | <kbd>Esc</kbd> Close/Blur
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="control-section collapsed">
-                    <div class="section-header" onclick="toggleSection(this)">
-                        <h2>Title</h2>
-                    </div>
-                    <div class="section-content">
-                        <div class="input-group">
-                            <label>Title Text:</label>
-                            <input type="text" placeholder="Enter card title" id="Title" oninput="redrawCanvas()">
-                        </div>
-                        <div class="input-group">
-                            <label>Font Size: <span id="TitleFontSizeValue">200</span></label>
-                            <input type="range" id="TitleFontSize" min="50" max="300" value="200" oninput="redrawCanvas()">
-                            <div class="quick-buttons">
-                                <button type="button" onclick="setFontSize('TitleFontSize', 150)">Small</button>
-                                <button type="button" onclick="setFontSize('TitleFontSize', 200)">Medium</button>
-                                <button type="button" onclick="setFontSize('TitleFontSize', 250)">Large</button>
-                            </div>
-                        </div>
-                        <div class="input-group">
-                            <label>Center Align:</label>
-                            <input type="checkbox" id="TitleCenterAlign" checked onchange="redrawCanvas()">
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="control-section collapsed">
-                    <div class="section-header" onclick="toggleSection(this)">
-                        <h2>Damage Stats</h2>
-                    </div>
-                    <div class="section-content">
-                        <div class="input-group">
-                            <label>Show Stats:</label>
-                            <input type="checkbox" onclick="ToggelSwitch()" checked>
-                        </div>
-                        <div class="input-group">
-                            <label>Damage:</label>
-                            <input type="number" value="0" min="0" max="999" placeholder="0" id="DamageID" oninput="redrawCanvas()">
-                        </div>
-                        <div class="input-group">
-                            <label>Defense:</label>
-                            <input type="number" value="0" min="0" max="999" placeholder="0" id="DefenseID" oninput="redrawCanvas()">
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="control-section">
-                    <div class="section-header" onclick="toggleSection(this)">
-                        <h2>Types</h2>
-                    </div>
-                    <div class="section-content">
-                        <div class="input-group">
-                            <label>Type:</label>
-                            <select id="Type" onchange="redrawCanvas()">
-                                <option value="">Select type</option>
-                                <option value="Unit">Unit</option>
-                                <option value="Spell">Spell</option>
-                                <option value="Equipment">Equipment</option>
-                                <option value="Holding">Holding</option>
-                                <option value="Wealth">Wealth</option>
-                                <option value="Hero">Hero</option>
-                                <option value="Tactic">Tactic</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
-                            <label>Type Font Size: <span id="TypeFontSizeValue">100</span></label>
-                            <input type="range" id="TypeFontSize" min="50" max="200" oninput="redrawCanvas()" value="100">
-                        </div>
-                        <div class="input-group">
-                            <label>Subtype:</label>
-                            <select id="Subtype" onchange="redrawCanvas()">
-                                <option value="">Select subtype</option>
-                                <option value="Army">Army</option>
-                                <option value="Evocation">Evocation</option>
-                                <option value="Divination">Divination</option>
-                                <option value="Necromancy">Necromancy</option>
-                                <option value="Enchantment">Enchantment</option>
-                                <option value="Transmutation">Transmutation</option>
-                                <option value="Weapon">Weapon</option>
-                                <option value="Armor">Armor</option>
-                                <option value="Economy">Economy</option>
-                                <option value="Ritual">Ritual</option>
-                                <option value="Commander">Commander</option>
-                                <option value="Vehicle">Vehicle</option>
-                                <option value="Tool">Tool</option>
-                                <option value="Ship">Ship</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
-                            <label>Rarity:</label>
-                            <select id="CardRarity" onchange="redrawCanvas()" title="Uncommon and higher show the rarity frame overlay (Rareity.png)">
-                                <option value="Common">Common</option>
-                                <option value="Uncommon">Uncommon</option>
-                                <option value="Rare">Rare</option>
-                                <option value="Epic">Epic</option>
-                                <option value="Legendary">Legendary</option>
-                                <option value="Mythic">Mythic</option>
-                                <option value="Fantastical">Fantastical</option>
-                            </select>
-                            <small>Uncommon and above enable the rarity image on the card (same placement as the damage panel art). Saved to Drive as <strong>Rarity</strong> for Saved Projects.</small>
-                        </div>
-                        <div class="input-group">
-                            <label>Set number:</label>
-                            <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
-                                <input type="number" id="CardSetNumber" min="1" step="1" placeholder="1" value="1" oninput="redrawCanvas()" title="Card # in set (left side of 1 / 120)" style="width:4.5rem;">
-                                <span aria-hidden="true"> / </span>
-                                <input type="number" id="CardSetTotal" min="1" step="1" placeholder="120" value="120" oninput="redrawCanvas()" title="Set size (right side of 1 / 120)" style="width:4.5rem;">
-                            </div>
-                            <small>Displays as <strong>1 / 120</strong> (larger text) to the <strong>left</strong> of the rarity name. Defaults to 1 / 120; clear both fields to hide.</small>
-                        </div>
-                        <div class="input-group">
-                            <label>Subtype Font Size: <span id="SubtypeFontSizeValue">80</span></label>
-                            <input type="range" id="SubtypeFontSize" min="50" max="200" oninput="redrawCanvas()" value="80">
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="control-section collapsed">
-                    <div class="section-header" onclick="toggleSection(this)">
-                        <h2>Treasure Cost</h2>
-                    </div>
-                    <div class="section-content">
-                        <div class="input-group">
-                            <label>Cost:</label>
-                            <input type="number" id="TreasureCost" placeholder="0" value="0" min="0" max="999" oninput="redrawCanvas()">
-                        </div>
-                        <div class="input-group">
-                            <label>Font Size: <span id="TreasureFontSizeValue">150</span></label>
-                            <input type="range" id="TreasureFontSize" min="50" max="300" value="150" oninput="redrawCanvas()">
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="control-section collapsed">
-                    <div class="section-header" onclick="toggleSection(this)">
-                        <h2>Description</h2>
-                    </div>
-                    <div class="section-content">
-                        <div class="input-group">
-                            <label>Main Description:</label>
-                            <textarea id="MainDisciption" placeholder="Enter main description (supports multiple lines)" rows="3" oninput="redrawCanvas()"></textarea>
-                        </div>
-                        <div class="input-group">
-                            <label>Font Size: <span id="MainDisciptionFontSizeValue">80</span></label>
-                            <input type="range" id="MainDisciptionFontSize" min="50" max="200" value="80" oninput="redrawCanvas()">
-                        </div>
-                        <div class="input-group">
-                            <label>Center Align:</label>
-                            <input type="checkbox" id="MainDescriptionCenterAlign" checked onchange="redrawCanvas()">
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="control-section collapsed">
-                    <div class="section-header" onclick="toggleSection(this)">
-                        <h2>Sub Description</h2>
-                    </div>
-                    <div class="section-content">
-                        <div class="input-group">
-                            <label>Sub Description:</label>
-                            <textarea id="SubDisciption" placeholder="Enter sub description (supports multiple lines)" rows="2" oninput="redrawCanvas()"></textarea>
-                        </div>
-                        <div class="input-group">
-                            <label>Font Size: <span id="SubDisciptionFontSizeValue">70</span></label>
-                            <input type="range" id="SubDisciptionFontSize" min="50" max="200" value="70" oninput="redrawCanvas()">
-                        </div>
-                        <div class="input-group">
-                            <label>Center Align:</label>
-                            <input type="checkbox" id="SubDescriptionCenterAlign" checked onchange="redrawCanvas()">
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="control-section collapsed">
-                    <div class="section-header" onclick="toggleSection(this)">
-                        <h2>Quote</h2>
-                    </div>
-                    <div class="section-content">
-                        <div class="input-group">
-                            <label>Quote Text:</label>
-                            <textarea id="QoteDiscription" placeholder="Enter quote text" rows="2" oninput="redrawCanvas()"></textarea>
-                        </div>
-                        <div class="input-group">
-                            <label>Font Size: <span id="QoteDiscriptionFontSizeValue">60</span></label>
-                            <input type="range" id="QoteDiscriptionFontSize" min="50" max="200" value="60" oninput="redrawCanvas()">
-                        </div>
-                        <div class="input-group">
-                            <label>Center Align:</label>
-                            <input type="checkbox" id="QuoteCenterAlign" checked onchange="redrawCanvas()">
+                            <kbd>1</kbd>–<kbd>3</kbd> Toggle sidebar sections | <kbd>Esc</kbd> Close/Blur
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
         </div>
         
         <!-- Fullscreen Modal -->
@@ -769,8 +763,10 @@
                 return;
             }
             
-            // Reset file inputs
-            document.getElementById("CardBase").value = '';
+            var cardBaseSel = document.getElementById('CardBase');
+            if (cardBaseSel) cardBaseSel.value = 'CardFrame.png';
+            removeCardBaseDynamicOption();
+            setCardBaseCustomVisible(false);
             document.getElementById("Art").value = '';
             
             // Reset art position
@@ -810,7 +806,7 @@
             
             // Reset descriptions
             document.getElementById("MainDisciption").value = '';
-            document.getElementById("MainDisciptionFontSize").value = 80;
+            document.getElementById("MainDisciptionFontSize").value = 125;
             document.getElementById("MainDescriptionCenterAlign").checked = true;
             document.getElementById("SubDisciption").value = '';
             document.getElementById("SubDisciptionFontSize").value = 70;
@@ -1192,9 +1188,11 @@
             img.src = loadSrc;
         }
 
-        function applyProjectState(state) {
+        /** @param {function():void} [onComplete] called after fields apply and images decode (or skip), just after redrawCanvas */
+        function applyProjectState(state, onComplete) {
             if (!state || !state.fields) {
                 alert('Invalid project file.');
+                if (typeof onComplete === 'function') onComplete();
                 return;
             }
             const f = state.fields;
@@ -1265,6 +1263,7 @@
             const images = state.images || {};
             setImageSource(MainImage, images.cardBaseSrc, function (img) {
                 if (img) MainImage = img;
+                syncCardBaseSelectFromMainImage();
                 setImageSource(ArtImage, images.artSrc, function (artImg) {
                     if (artImg) {
                         ArtImage = artImg;
@@ -1277,8 +1276,29 @@
                     updateExportSizeDisplayFromSlider();
                     updateExportBleedHint();
                     redrawCanvas();
+                    if (typeof onComplete === 'function') onComplete();
                 });
             });
+        }
+
+        function showCardLoadingBar(message) {
+            var wrap = document.getElementById('cmCardLoadingBar');
+            var label = document.getElementById('cmCardLoadingText');
+            if (label) label.textContent = message || 'Loading card…';
+            if (wrap) {
+                wrap.hidden = false;
+                wrap.setAttribute('aria-hidden', 'false');
+            }
+            document.body.setAttribute('aria-busy', 'true');
+        }
+
+        function hideCardLoadingBar() {
+            var wrap = document.getElementById('cmCardLoadingBar');
+            if (wrap) {
+                wrap.hidden = true;
+                wrap.setAttribute('aria-hidden', 'true');
+            }
+            document.body.removeAttribute('aria-busy');
         }
 
         // Drive REST per https://developers.google.com/workspace/drive/api/guides/appdata
@@ -1517,10 +1537,18 @@
         }
 
         async function loadProjectFromDriveByFile(file) {
-            setDriveStatus('Loading "' + displaySaveLabel(file.name) + '"...');
-            const state = await fetchDriveProjectJsonByFile(file);
-            applyProjectState(state);
-            setDriveStatus('Loaded "' + displaySaveLabel(file.name) + '".');
+            var label = displaySaveLabel(file.name);
+            showCardLoadingBar('Loading “' + label + '”…');
+            try {
+                setDriveStatus('Loading "' + label + '"...');
+                const state = await fetchDriveProjectJsonByFile(file);
+                await new Promise(function (resolve) {
+                    applyProjectState(state, resolve);
+                });
+                setDriveStatus('Loaded "' + label + '".');
+            } finally {
+                hideCardLoadingBar();
+            }
         }
 
         /**
@@ -1802,27 +1830,86 @@
             }
         });
 
-        // Card base/frame file upload
-        document.getElementById("CardBase").addEventListener("change", function (event) {
-            let file = event.target.files[0];
+        function getCardBaseFilenameFromSrc(src) {
+            if (!src || String(src).indexOf('data:') === 0) return null;
+            var s = String(src).split('?')[0];
+            var parts = s.split('/');
+            return parts.length ? parts[parts.length - 1] : null;
+        }
+
+        function removeCardBaseDynamicOption() {
+            var dyn = document.getElementById('CardBaseDynamicOption');
+            if (dyn) dyn.remove();
+        }
+
+        function setCardBaseCustomVisible(show) {
+            var w = document.getElementById('CardBaseCustomWrap');
+            var f = document.getElementById('CardBaseCustom');
+            if (w) w.hidden = !show;
+            if (!show && f) f.value = '';
+        }
+
+        function syncCardBaseSelectFromMainImage() {
+            var sel = document.getElementById('CardBase');
+            if (!sel || sel.tagName !== 'SELECT') return;
+            removeCardBaseDynamicOption();
+            var fn = getCardBaseFilenameFromSrc(MainImage && MainImage.src);
+            if (fn === 'CardFrame.png' || fn === 'CardFrame Old.png') {
+                sel.value = fn;
+                setCardBaseCustomVisible(false);
+                return;
+            }
+            var hasCustomOpt = sel.querySelector('option[value="__custom__"]');
+            if (hasCustomOpt) {
+                sel.value = '__custom__';
+                setCardBaseCustomVisible(true);
+            }
+        }
+
+        function applyCardBaseFromSelect() {
+            var sel = document.getElementById('CardBase');
+            if (!sel) return;
+            var v = sel.value;
+            removeCardBaseDynamicOption();
+            if (v === '__custom__') {
+                setCardBaseCustomVisible(true);
+                return;
+            }
+            if (v === '__embedded__') {
+                setCardBaseCustomVisible(true);
+                return;
+            }
+            setCardBaseCustomVisible(false);
+            if (!v) return;
+            var img = new Image();
+            img.hy = MainImage && MainImage.hy != null ? MainImage.hy : 0;
+            img.wx = MainImage && MainImage.wx != null ? MainImage.wx : 0;
+            img.onload = function () {
+                MainImage = img;
+                redrawCanvas();
+            };
+            img.onerror = function () {
+                syncCardBaseSelectFromMainImage();
+            };
+            img.src = v;
+        }
+
+        document.getElementById('CardBaseCustom').addEventListener('change', function (event) {
+            var file = event.target.files && event.target.files[0];
             if (!file) return;
-            
-            let img = new Image();
-            let reader = new FileReader();
-            
-            reader.onload = function(e) {
+            var img = new Image();
+            var reader = new FileReader();
+            reader.onload = function (e) {
                 img.src = e.target.result;
             };
-            
-            reader.onloadend = function() {
+            reader.onloadend = function () {
                 MainImage = img;
                 MainImage.hy = 0;
                 MainImage.wx = 0;
-                MainImage.onload = function() {
+                MainImage.onload = function () {
                     redrawCanvas();
                 };
             };
-            
             reader.readAsDataURL(file);
         });
         
