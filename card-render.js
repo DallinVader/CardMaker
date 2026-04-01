@@ -81,6 +81,46 @@
         return lines;
     }
 
+    /** Right-aligned set title: shrink font to fit, then up to 3 wrapped lines (no early “…” unless still impossible). */
+    function drawSetNameBottomRight(ctx, rawName, rightX, centerY, maxWidth) {
+        var name = String(rawName || '').trim();
+        if (!name) return;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        var px;
+        for (px = 64; px >= 28; px -= 2) {
+            ctx.font = px + 'px Medieval';
+            if (ctx.measureText(name).width <= maxWidth) {
+                ctx.fillText(name, rightX, centerY);
+                return;
+            }
+        }
+        ctx.font = '28px Medieval';
+        var lines = wrapTextLines(ctx, name, maxWidth);
+        var maxLines = 3;
+        if (lines.length > maxLines) {
+            lines = lines.slice(0, maxLines);
+            var last = lines[maxLines - 1];
+            while (last.length > 1 && ctx.measureText(last + '…').width > maxWidth) {
+                last = last.slice(0, -1);
+            }
+            lines[maxLines - 1] = last + '…';
+        }
+        if (lines.length === 1 && ctx.measureText(lines[0]).width > maxWidth) {
+            var w = lines[0];
+            while (w.length > 1 && ctx.measureText(w + '…').width > maxWidth) {
+                w = w.slice(0, -1);
+            }
+            ctx.fillText(w + '…', rightX, centerY);
+            return;
+        }
+        var lineH = 34;
+        var startY = centerY - ((lines.length - 1) * lineH) / 2;
+        for (var li = 0; li < lines.length; li++) {
+            ctx.fillText(lines[li], rightX, startY + li * lineH);
+        }
+    }
+
     /**
      * @param {object} parsed
      * @returns {Promise<string|null>} PNG data URL or null
@@ -251,17 +291,18 @@
         var hasSetNums = setNum >= 1 && setTot >= 1;
 
         var rarShown = f.Rarity != null ? String(f.Rarity).trim() : '';
-        if (hasSetNums || rarShown) {
+        var setNameStr = f.CardMakerSetName != null ? String(f.CardMakerSetName).trim() : '';
+        if (hasSetNums || rarShown || setNameStr) {
             var rarityY = CANVAS_H - (CANVAS_H / 28);
             var setDigitFontPx = 80;
             var setSlashFontPx = 138;
-            ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = '#ffffff';
             var leftPadX = CANVAS_W / 10;
             var gapBetween = CANVAS_W * 0.022;
             var rarityX = leftPadX;
             if (hasSetNums) {
+                ctx.textAlign = 'left';
                 var sx = leftPadX;
                 var sLeft = String(setNum);
                 var sRight = String(setTot);
@@ -278,8 +319,14 @@
                 rarityX = sx + gapBetween;
             }
             if (rarShown) {
+                ctx.textAlign = 'left';
                 ctx.font = '70px Medieval';
                 ctx.fillText(rarShown, rarityX, rarityY);
+            }
+            if (setNameStr) {
+                var rightPadX = CANVAS_W - (CANVAS_W / 10);
+                var maxNameW = CANVAS_W * 0.52;
+                drawSetNameBottomRight(ctx, setNameStr, rightPadX, rarityY, maxNameW);
             }
             ctx.fillStyle = 'black';
         }

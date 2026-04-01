@@ -37,6 +37,7 @@
         .spm-ghost { background: rgba(255,255,255,0.06); }
 
         .spm-row { display: grid; grid-template-columns: minmax(280px, 320px) minmax(0, 1fr); gap: 24px; align-items: start; }
+        .spm-row > .spm-panel:first-child,
         .spm-row > .spm-panel:last-child { min-width: 0; }
         @media (max-width: 980px) { .spm-row { grid-template-columns: 1fr; } }
 
@@ -254,6 +255,34 @@
         .spm-filter-row { display: flex; flex-wrap: wrap; gap: 16px 18px; align-items: flex-end; margin-bottom: 18px; }
         .spm-filter-row label { font-weight: 800; color: #e2e8f0; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; display: flex; flex-direction: column; gap: 8px; }
         .spm-filter-row .spm-select { min-width: 152px; }
+
+        /* Summary column: default named set must stay within narrow panel */
+        .spm-default-set-field {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 12px;
+            align-items: flex-end;
+            margin-bottom: 10px;
+        }
+        .spm-default-set-field > label {
+            flex: 1 1 100%;
+            min-width: 0;
+            max-width: 100%;
+            font-weight: 900;
+            color: #e2e8f0;
+            font-size: 13px;
+            text-transform: none;
+            letter-spacing: normal;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .spm-default-set-field > label .spm-select {
+            min-width: 0;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
 
         .spm-bulk-bar {
             display: grid;
@@ -647,6 +676,26 @@
         .spm-search-wrap { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1 1 340px; }
         .spm-search-wrap .spm-input { width: 100%; min-width: 0; max-width: 100%; }
 
+        /* Search + Set sit side by side; Set stays directly to the right of the search field */
+        .spm-search-set-pair {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            gap: 12px;
+            flex: 1 1 280px;
+            min-width: 0;
+        }
+        .spm-search-set-pair .spm-search-wrap {
+            flex: 1 1 200px;
+            max-width: min(400px, 100%);
+        }
+        .spm-search-set-pair .spm-set-filter-label {
+            flex: 0 0 auto;
+        }
+        .spm-search-set-pair .spm-set-filter-label .spm-select {
+            min-width: 180px;
+        }
+
         @media (max-width: 900px) {
             .spm-top {
                 flex-direction: column;
@@ -866,6 +915,16 @@
                     <div class="v" id="spmStatus">Not connected</div>
                 </div>
 
+                <h3 class="spm-list-heading">Named sets</h3>
+                <p class="spm-muted" style="font-size:12px; line-height:1.45; margin:0 0 10px;">Sets are stored in this browser. Assign them to saves below or use the same choice in Card Maker for the default total instead of 120.</p>
+                <div class="spm-default-set-field">
+                    <label>Default for Card Maker
+                        <select class="spm-select" id="spmActiveSetSelect" title="Active set: editor uses this set’s card count for new cards"></select>
+                    </label>
+                    <button type="button" class="spm-small-btn" id="spmAddNamedSetBtn">Add set…</button>
+                    <button type="button" class="spm-small-btn" id="spmEditNamedSetBtn">Edit set…</button>
+                </div>
+
                 <h3 class="spm-list-heading">Counts by type</h3>
                 <div class="spm-list-box" id="spmTypeCounts"></div>
 
@@ -878,10 +937,13 @@
 
             <div class="spm-panel">
                 <div class="spm-table-tools">
-                    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;">
+                    <div class="spm-search-set-pair">
                         <label class="spm-search-wrap" style="font-weight:900; color:#e2e8f0; font-size:13px;">
                             Search
-                            <input class="spm-input" id="spmSearchInput" placeholder="save name / card title / type / subtype / card #" />
+                            <input class="spm-input" id="spmSearchInput" placeholder="save name / title / type / subtype / set / card #" />
+                        </label>
+                        <label class="spm-set-filter-label" style="font-weight:900; color:#e2e8f0; font-size:13px;">
+                            <select class="spm-select" id="spmFilterSet"><option value="">All sets</option></select>
                         </label>
                     </div>
                     <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:flex-end;">
@@ -951,6 +1013,7 @@
                                 </div>
                                 <button type="button" class="spm-small-btn spm-bulk-clear-btn" id="spmClearSelectionBtn">Clear selection</button>
                                 <button type="button" class="spm-small-btn spm-bulk-print-btn" id="spmOpenPrintGridBtn" disabled title="Opens Print 9-up sheet in a new tab">Open in print grid…</button>
+                                <button type="button" class="spm-small-btn" id="spmOpenCreateSetBtn" disabled title="Assign a named set, total size, and card numbers to selected saves">Assign named set…</button>
                             </div>
                             <p class="spm-bulk-meta" id="spmFilteredHint"></p>
                         </div>
@@ -967,6 +1030,7 @@
                                 <th style="width: 80px;" class="spm-th-sortable" data-sort-base="cost">Cost <span class="spm-th-arrow" data-arrow-base="cost">↕</span></th>
                                 <th style="min-width: 150px;" class="spm-th-sortable" data-sort-base="type">Type <span class="spm-th-arrow" data-arrow-base="type">↕</span></th>
                                 <th style="min-width: 160px;" class="spm-th-sortable" data-sort-base="subtype">Subtype <span class="spm-th-arrow" data-arrow-base="subtype">↕</span></th>
+                                <th style="min-width: 120px;">Set</th>
                                 <th style="min-width: 100px;" class="spm-th-sortable" data-sort-base="cardset">Card # <span class="spm-th-arrow" data-arrow-base="cardset">↕</span></th>
                                 <th style="min-width: 140px;" class="spm-th-sortable" data-sort-base="rarity">Rarity <span class="spm-th-arrow" data-arrow-base="rarity">↕</span></th>
                                 <th style="min-width: 160px;" class="spm-th-sortable" data-sort-base="updated">Updated <span class="spm-th-arrow" data-arrow-base="updated">↕</span></th>
@@ -1007,6 +1071,11 @@
                 <input type="number" id="spmEditCost" class="spm-input" min="0" max="999" step="1" />
             </div>
             <div class="spm-modal-field">
+                <label for="spmEditSetMembership">Named set</label>
+                <select id="spmEditSetMembership" class="spm-select"></select>
+                <span class="spm-modal-suffix">Optional. Choosing a set fills “total” with that set’s size (you can still edit numbers).</span>
+            </div>
+            <div class="spm-modal-field">
                 <label>Card # in set</label>
                 <div class="spm-edit-cardset-row" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                     <input type="number" id="spmEditCardSetNumber" class="spm-input" min="1" step="1" placeholder="1" aria-label="Card number in set" />
@@ -1035,12 +1104,94 @@
         </div>
     </div>
 
+    <div id="spmCreateSetModal" class="spm-modal" aria-hidden="true">
+        <div class="spm-modal-backdrop" data-spm-create-set-close></div>
+        <div class="spm-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="spmCreateSetTitle">
+            <div class="spm-modal-panel">
+                <button type="button" class="spm-modal-close" data-spm-create-set-close aria-label="Close">&times;</button>
+                <h2 id="spmCreateSetTitle">Assign named set</h2>
+                <p class="spm-modal-hint">Uses your current sort order. Each selected save gets card # 1, 2, … The set’s <strong>total</strong> is stored on every card (replacing ad‑hoc totals like 120). Create a new named set or pick an existing one.</p>
+                <div class="spm-modal-field">
+                    <label for="spmCreateSetPickSet">Set</label>
+                    <select id="spmCreateSetPickSet" class="spm-select" aria-describedby="spmCreateSetSelectedHint"></select>
+                </div>
+                <div class="spm-modal-field" id="spmCreateSetNewWrap">
+                    <label for="spmCreateSetName">New set name</label>
+                    <input type="text" id="spmCreateSetName" class="spm-input" maxlength="80" placeholder="e.g. Core 2026" autocomplete="off" />
+                </div>
+                <div class="spm-modal-field">
+                    <label for="spmCreateSetTotal">Cards in set (total)</label>
+                    <input type="number" id="spmCreateSetTotal" class="spm-input" min="1" step="1" placeholder="120" aria-describedby="spmCreateSetSelectedHint" />
+                    <span id="spmCreateSetSelectedHint" class="spm-modal-suffix"><span id="spmCreateSetSelectedCount">0</span> save(s) selected.</span>
+                </div>
+                <p id="spmCreateSetError" class="spm-modal-error" hidden></p>
+                <div class="spm-modal-actions">
+                    <button type="button" class="spm-btn spm-ghost" data-spm-create-set-close>Cancel</button>
+                    <button type="button" class="spm-btn spm-primary" id="spmCreateSetApplyBtn">Apply to selected</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="spmDefineSetModal" class="spm-modal" aria-hidden="true">
+        <div class="spm-modal-backdrop" data-spm-define-set-close></div>
+        <div class="spm-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="spmDefineSetTitle">
+            <div class="spm-modal-panel">
+                <button type="button" class="spm-modal-close" data-spm-define-set-close aria-label="Close">&times;</button>
+                <h2 id="spmDefineSetTitle">Add named set</h2>
+                <p class="spm-modal-hint">Only creates the set here in your browser. Assign cards via <strong>Assign named set</strong> or pick this set in Card Maker to use its size instead of 120.</p>
+                <div class="spm-modal-field">
+                    <label for="spmDefineSetName">Set name</label>
+                    <input type="text" id="spmDefineSetName" class="spm-input" maxlength="80" autocomplete="off" />
+                </div>
+                <div class="spm-modal-field">
+                    <label for="spmDefineSetTotal">Cards in set</label>
+                    <input type="number" id="spmDefineSetTotal" class="spm-input" min="1" step="1" placeholder="60" />
+                </div>
+                <p id="spmDefineSetError" class="spm-modal-error" hidden></p>
+                <div class="spm-modal-actions">
+                    <button type="button" class="spm-btn spm-ghost" data-spm-define-set-close>Cancel</button>
+                    <button type="button" class="spm-btn spm-primary" id="spmDefineSetSaveBtn">Save set</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="spmEditSetModal" class="spm-modal" aria-hidden="true">
+        <div class="spm-modal-backdrop" data-spm-edit-set-close></div>
+        <div class="spm-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="spmEditSetTitle">
+            <div class="spm-modal-panel">
+                <button type="button" class="spm-modal-close" data-spm-edit-set-close aria-label="Close">&times;</button>
+                <h2 id="spmEditSetTitle">Edit named set</h2>
+                <p class="spm-modal-hint">Renaming or changing the card count only updates this browser’s set list. Cloud saves keep their own <code style="color:#93c5fd">n / total</code> until you edit or reassign them.</p>
+                <div class="spm-modal-field">
+                    <label for="spmEditSetPick">Set</label>
+                    <select id="spmEditSetPick" class="spm-select"></select>
+                </div>
+                <div class="spm-modal-field">
+                    <label for="spmEditSetName">Name</label>
+                    <input type="text" id="spmEditSetName" class="spm-input" maxlength="80" autocomplete="off" />
+                </div>
+                <div class="spm-modal-field">
+                    <label for="spmEditSetTotal">Cards in set</label>
+                    <input type="number" id="spmEditSetTotal" class="spm-input" min="1" step="1" />
+                </div>
+                <p id="spmEditSetError" class="spm-modal-error" hidden></p>
+                <div class="spm-modal-actions">
+                    <button type="button" class="spm-btn spm-ghost" data-spm-edit-set-close>Cancel</button>
+                    <button type="button" class="spm-btn spm-primary" id="spmEditSetSaveBtn">Save changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="spmHoverPreview" class="spm-hover-preview" hidden aria-hidden="true">
         <img alt="" decoding="async" />
         <div class="spm-hover-preview-fallback">No preview available for this save.</div>
     </div>
 
     <script src="card-render.js"></script>
+    <script src="cardmaker-sets.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
         const GOOGLE_CLIENT_ID = '984239146057-o6ujksfj9qk8tmqm9c8msrpidgm6492r.apps.googleusercontent.com';
@@ -1081,6 +1232,7 @@
         const spmBulkApplyBtn = document.getElementById('spmBulkApplyBtn');
         const spmClearSelectionBtn = document.getElementById('spmClearSelectionBtn');
         const spmOpenPrintGridBtn = document.getElementById('spmOpenPrintGridBtn');
+        const spmOpenCreateSetBtn = document.getElementById('spmOpenCreateSetBtn');
         const spmFilteredHint = document.getElementById('spmFilteredHint');
 
         const selectedProjectIds = new Set();
@@ -1136,6 +1288,115 @@
             return el.value;
         }
 
+        function resolveNamedSetLabel(project) {
+            if (!project || !project.cardMakerSetId) return '—';
+            if (typeof CardMakerSets === 'undefined') return '—';
+            var s = CardMakerSets.getNamedSetById(project.cardMakerSetId);
+            return s ? s.name : '(unknown id)';
+        }
+
+        function rebuildSetFilterSelect() {
+            var sel = document.getElementById('spmFilterSet');
+            if (!sel) return;
+            var prev = sel.value;
+            while (sel.firstChild) {
+                sel.removeChild(sel.firstChild);
+            }
+            var o0 = document.createElement('option');
+            o0.value = '';
+            o0.textContent = 'All sets';
+            sel.appendChild(o0);
+            var o1 = document.createElement('option');
+            o1.value = '__none__';
+            o1.textContent = 'Unassigned';
+            sel.appendChild(o1);
+            if (typeof CardMakerSets !== 'undefined') {
+                CardMakerSets.readNamedSets().forEach(function (s) {
+                    var o = document.createElement('option');
+                    o.value = s.id;
+                    o.textContent = s.name + ' (' + s.total + ')';
+                    sel.appendChild(o);
+                });
+            }
+            var ok = Array.from(sel.options).some(function (x) { return x.value === prev; });
+            if (ok) sel.value = prev;
+        }
+
+        function fillSpmActiveSetSelect() {
+            var sel = document.getElementById('spmActiveSetSelect');
+            if (!sel || typeof CardMakerSets === 'undefined') return;
+            CardMakerSets.fillSelect(sel, true, '— None (120 in editor) —', CardMakerSets.getActiveSetId());
+        }
+
+        function syncCreateSetPickOptions(forceNew) {
+            var sel = document.getElementById('spmCreateSetPickSet');
+            if (!sel || typeof CardMakerSets === 'undefined') return;
+            var prev = sel.value;
+            while (sel.firstChild) {
+                sel.removeChild(sel.firstChild);
+            }
+            var on = document.createElement('option');
+            on.value = '__new__';
+            on.textContent = '+ New set…';
+            sel.appendChild(on);
+            CardMakerSets.readNamedSets().forEach(function (s) {
+                var o = document.createElement('option');
+                o.value = s.id;
+                o.textContent = s.name + ' (' + s.total + ')';
+                sel.appendChild(o);
+            });
+            if (forceNew) {
+                sel.value = '__new__';
+            } else {
+                var ok = prev && Array.from(sel.options).some(function (x) { return x.value === prev; });
+                sel.value = ok ? prev : '__new__';
+            }
+            onSpmCreateSetPickChange();
+        }
+
+        function onSpmCreateSetPickChange() {
+            var sel = document.getElementById('spmCreateSetPickSet');
+            var nameIn = document.getElementById('spmCreateSetName');
+            var totalIn = document.getElementById('spmCreateSetTotal');
+            var wrap = document.getElementById('spmCreateSetNewWrap');
+            if (!sel || !totalIn) return;
+            var cntEl = document.getElementById('spmCreateSetSelectedCount');
+            var nSel = cntEl ? parseInt(cntEl.textContent, 10) : 1;
+            if (!isFinite(nSel) || nSel < 1) nSel = 1;
+            if (sel.value === '__new__') {
+                if (wrap) wrap.style.display = '';
+                if (nameIn) {
+                    nameIn.disabled = false;
+                    nameIn.value = '';
+                }
+                totalIn.readOnly = false;
+                var def = typeof CardMakerSets !== 'undefined' ? CardMakerSets.getDefaultCardSetTotal() : 120;
+                if (!(def >= 1)) def = 120;
+                totalIn.value = String(Math.max(def, nSel));
+            } else {
+                if (wrap) wrap.style.display = 'none';
+                if (nameIn) {
+                    nameIn.disabled = true;
+                    nameIn.value = '';
+                }
+                var s = CardMakerSets.getNamedSetById(sel.value);
+                totalIn.readOnly = true;
+                totalIn.value = s ? String(s.total) : '120';
+            }
+        }
+
+        function refreshNamedSetDropdowns() {
+            rebuildSetFilterSelect();
+            fillSpmActiveSetSelect();
+            syncCreateSetPickOptions();
+            var editMem = document.getElementById('spmEditSetMembership');
+            var editModal = document.getElementById('spmEditModal');
+            if (editMem && editModal && editModal.classList.contains('is-open') && typeof CardMakerSets !== 'undefined') {
+                var prev = editMem.value;
+                CardMakerSets.fillSelect(editMem, true, '— None —', prev);
+            }
+        }
+
         function rebuildFilterSelects() {
             function fill(sel, distinctVals, allLabel) {
                 if (!sel) return;
@@ -1174,6 +1435,7 @@
             fill(spmFilterType, types, 'All types');
             fill(spmFilterSubtype, subtypes, 'All subtypes');
             fill(spmFilterRarity, rarities, 'All rarities');
+            rebuildSetFilterSelect();
         }
 
         function readStoredDriveRecord() {
@@ -1408,7 +1670,20 @@
                 if (spmFilterType) spmFilterType.value = '';
                 if (spmFilterSubtype) spmFilterSubtype.value = '';
                 if (spmFilterRarity) spmFilterRarity.value = '';
+                var sf = document.getElementById('spmFilterSet');
+                if (sf) sf.value = '';
                 applyFiltersAndRender();
+            });
+        }
+        var spmFilterSetEl = document.getElementById('spmFilterSet');
+        if (spmFilterSetEl) {
+            spmFilterSetEl.addEventListener('change', function () { applyFiltersAndRender(); });
+        }
+        var spmActiveSetSelectEl = document.getElementById('spmActiveSetSelect');
+        if (spmActiveSetSelectEl && typeof CardMakerSets !== 'undefined') {
+            spmActiveSetSelectEl.addEventListener('change', function () {
+                CardMakerSets.setActiveSetId(spmActiveSetSelectEl.value);
+                setMessage(spmActiveSetSelectEl.value ? 'Default set for Card Maker updated (matches editor dropdown).' : 'Cleared default set (editor uses 120 when no set).');
             });
         }
         if (spmBulkRaritySelect) {
@@ -1426,9 +1701,9 @@
                 setMessage('Updating ' + ids.length + ' save(s)…');
                 (async function () {
                     try {
-                        for (var i = 0; i < ids.length; i++) {
-                            await updateProjectRarity(ids[i], r, { skipRecalc: true });
-                        }
+                        await mapLimit(ids, SPM_BULK_UPLOAD_CONCURRENCY, async function (fileId) {
+                            await updateProjectRarity(fileId, r, { skipRecalc: true });
+                        });
                         recalculateSummaryFromProjects();
                         setMessage('Updated rarity on ' + ids.length + ' save(s).');
                         if (spmBulkRaritySelect) spmBulkRaritySelect.value = '';
@@ -1468,6 +1743,15 @@
                 setMessage('Opened print grid in a new tab with ' + ids.length + ' card(s). Up to 9 slots fill in order; sign in on the print page if prompted.', false);
             });
         }
+        if (spmOpenCreateSetBtn) {
+            spmOpenCreateSetBtn.addEventListener('click', function () {
+                if (!driveAccessToken) {
+                    setMessage('Connect Google first.', true);
+                    return;
+                }
+                openSpmCreateSetModal();
+            });
+        }
         if (spmSelectAll) {
             spmSelectAll.addEventListener('change', function () {
                 var visible = getFilteredProjects();
@@ -1488,7 +1772,7 @@
                     if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
                     return s;
                 }
-                var lines = [['Save name', 'File size', 'Cost', 'Type', 'Subtype', 'Card #', 'Rarity', 'Updated (local)', 'Drive file id'].map(csvCell).join(',')];
+                var lines = [['Save name', 'File size', 'Cost', 'Type', 'Subtype', 'Set name', 'Card #', 'Rarity', 'Updated (local)', 'Drive file id'].map(csvCell).join(',')];
                 rows.forEach(function (p) {
                     var name = displaySaveLabel(p.file.name);
                     var when = p.file.modifiedTime ? new Date(p.file.modifiedTime).toISOString() : '';
@@ -1498,6 +1782,7 @@
                         isFinite(p.costNumber) ? String(p.costNumber) : '',
                         p.fieldsType || '',
                         p.fieldsSubtype || '',
+                        resolveNamedSetLabel(p) === '—' ? '' : resolveNamedSetLabel(p),
                         p.cardSetLabel || '',
                         p.rarity || '',
                         when,
@@ -1564,17 +1849,33 @@
             return JSON.parse(text);
         }
 
+        function mergeDriveFileMetadata(project, meta) {
+            if (!project || !project.file || !meta) return;
+            if (meta.modifiedTime) project.file.modifiedTime = meta.modifiedTime;
+            if (meta.size != null) project.file.size = meta.size;
+        }
+
+        /** PATCH file content; returns { modifiedTime, size } so the table “Updated” column can refresh without a full reload. */
         async function uploadProjectStateBytes(fileId, stateObj) {
             const payload = JSON.stringify(stateObj);
             const u = new URL(DRIVE_UPLOAD_API + '/' + encodeURIComponent(fileId));
             u.searchParams.set('uploadType', 'media');
+            u.searchParams.set('fields', 'modifiedTime,size');
             const res = await fetch(u.toString(), {
                 method: 'PATCH',
-                headers: driveAuthHeaders(driveAccessToken),
+                headers: driveAuthHeaders(driveAccessToken, { 'Content-Type': 'application/json; charset=UTF-8' }),
                 body: payload
             });
             const txt = await res.text();
             if (!res.ok) throw new Error(parseDriveError(txt, res.status));
+            try {
+                const j = JSON.parse(txt);
+                if (j && j.modifiedTime) return { modifiedTime: j.modifiedTime, size: j.size };
+            } catch (e) { /* ignore */ }
+            return {
+                modifiedTime: new Date().toISOString(),
+                size: new Blob([payload]).size
+            };
         }
 
         async function driveRenameFile(fileId, newName) {
@@ -1613,6 +1914,8 @@
 
         /** Parallelism for downloading project JSON from Drive (images are inside JSON — more workers = list fills faster). */
         const SPM_PROJECT_FETCH_CONCURRENCY = 14;
+        /** Parallel uploads when assigning sets / bulk rarity (bounded to reduce Drive throttling). */
+        const SPM_BULK_UPLOAD_CONCURRENCY = 8;
 
         /** Very small concurrency helper for loading many saves. */
         async function mapLimit(items, limit, fn) {
@@ -1715,8 +2018,14 @@
             return ' <span class="spm-dup-mark" role="img" title="' + escapeHtml(tip) + '" aria-label="Warning: ' + escapeHtml(tip) + '">!</span>';
         }
 
-        /** Prefer the most common set size among loaded saves so the new # matches your collection; else 120 (editor default). */
+        /** Prefer active named set, then most common set size among loads; else 120. */
         function defaultCardSetTotalFromProjects(allProjects) {
+            if (typeof CardMakerSets !== 'undefined') {
+                var aid = CardMakerSets.getActiveSetId();
+                var aset = aid && CardMakerSets.getNamedSetById(aid);
+                var at = aset && CardMakerSets.normalizeTotal(aset.total);
+                if (at >= 1) return at;
+            }
             var counts = {};
             allProjects.forEach(function (p) {
                 if (!p || p._loading) return;
@@ -1755,7 +2064,13 @@
         }
 
         /** Minimal project JSON matching Card Maker defaults (same shape as index.html buildProjectState). */
-        function buildBlankProjectState(cardSetN, cardSetT) {
+        function buildBlankProjectState(cardSetN, cardSetT, setIdOpt) {
+            var sid = setIdOpt != null && String(setIdOpt).trim() ? String(setIdOpt).trim() : '';
+            var sname = '';
+            if (sid && typeof CardMakerSets !== 'undefined') {
+                var sn = CardMakerSets.getNamedSetById(sid);
+                if (sn) sname = sn.name;
+            }
             return {
                 version: 1,
                 updatedAt: new Date().toISOString(),
@@ -1771,6 +2086,8 @@
                     Rarity: 'Common',
                     CardSetNumber: String(cardSetN),
                     CardSetTotal: String(cardSetT),
+                    CardMakerSetId: sid,
+                    CardMakerSetName: sname,
                     Type: '',
                     TypeFontSize: '100',
                     Subtype: '',
@@ -1807,6 +2124,7 @@
             const fieldsType = computeType(fields);
             const fieldsSubtype = computeSubtype(fields);
             var cs = computeCardSetKey(fields);
+            var setId = fields && fields.CardMakerSetId != null ? String(fields.CardMakerSetId).trim() : '';
             return {
                 file: file,
                 state: state,
@@ -1817,6 +2135,7 @@
                 cardSetN: cs.n,
                 cardSetT: cs.t,
                 cardSetLabel: cs.label,
+                cardMakerSetId: setId,
                 fields: fields
             };
         }
@@ -1833,7 +2152,8 @@
                 rarity: '',
                 cardSetN: NaN,
                 cardSetT: NaN,
-                cardSetLabel: ''
+                cardSetLabel: '',
+                cardMakerSetId: ''
             };
         }
 
@@ -1876,18 +2196,26 @@
             const ft = filterValueFromSelect(spmFilterType);
             const fst = filterValueFromSelect(spmFilterSubtype);
             const fr = filterValueFromSelect(spmFilterRarity);
+            var fsetEl = document.getElementById('spmFilterSet');
+            var fset = fsetEl ? fsetEl.value : '';
             return projects.filter(function (p) {
                 if (ft !== null && (p.fieldsType || '') !== ft) return false;
                 if (fst !== null && (p.fieldsSubtype || '') !== fst) return false;
                 if (fr !== null && (p.rarity || '') !== fr) return false;
+                if (fset === '__none__') {
+                    if ((p.cardMakerSetId || '') !== '') return false;
+                } else if (fset) {
+                    if ((p.cardMakerSetId || '') !== fset) return false;
+                }
                 if (!q) return true;
                 const name = p.file && p.file.name ? String(p.file.name) : '';
                 const type = p.fieldsType || '';
                 const subtype = p.fieldsSubtype || '';
                 const cardSet = p.cardSetLabel || '';
+                const setLbl = String(resolveNamedSetLabel(p)).toLowerCase();
                 const cardTitle = computeCardTitle(p.fields).toLowerCase();
                 return name.toLowerCase().includes(q) || type.toLowerCase().includes(q) || subtype.toLowerCase().includes(q)
-                    || cardSet.toLowerCase().includes(q) || cardTitle.includes(q);
+                    || cardSet.toLowerCase().includes(q) || cardTitle.includes(q) || setLbl.includes(q);
             });
         }
 
@@ -1932,6 +2260,7 @@
                 spmBulkApplyBtn.disabled = n === 0 || !(spmBulkRaritySelect && spmBulkRaritySelect.value);
             }
             if (spmOpenPrintGridBtn) spmOpenPrintGridBtn.disabled = n === 0;
+            if (spmOpenCreateSetBtn) spmOpenCreateSetBtn.disabled = n === 0;
         }
 
         function sortProjects(items) {
@@ -2046,7 +2375,7 @@
         function renderTable(items) {
             if (!spmTableBody) return;
             if (!items || items.length === 0) {
-                spmTableBody.innerHTML = '<tr class="spm-table-empty-row"><td colspan="10" class="spm-muted spm-table-empty-msg">No projects match the current filters (or nothing loaded yet).</td></tr>';
+                spmTableBody.innerHTML = '<tr class="spm-table-empty-row"><td colspan="11" class="spm-muted spm-table-empty-msg">No projects match the current filters (or nothing loaded yet).</td></tr>';
                 return;
             }
             var dupSets = computeDuplicateProjectIds(projects);
@@ -2082,6 +2411,7 @@
                         '<td data-label="Cost">' + busy + '</td>' +
                         '<td data-label="Type">' + busy + '</td>' +
                         '<td data-label="Subtype">' + busy + '</td>' +
+                        '<td class="spm-muted" data-label="Set">' + busy + '</td>' +
                         '<td class="spm-muted" data-label="Card #">' + busy + '</td>' +
                         '<td data-label="Rarity" data-rarity-tier=""><span class="spm-muted">…</span></td>' +
                         '<td class="spm-muted" data-label="Updated">' + when + '</td>' +
@@ -2097,6 +2427,7 @@
                 const rarityValue = p.rarity || '';
                 const typeValue = p.fieldsType || '—';
                 const subtypeValue = p.fieldsSubtype || '—';
+                const namedSetDisplay = resolveNamedSetLabel(p);
                 const cardSetDisplay = p.cardSetLabel ? p.cardSetLabel : '—';
 
                 const selectOptions = RARITY_OPTIONS.map(function (opt) {
@@ -2113,6 +2444,7 @@
                     '<td data-label="Cost">' + escapeHtml(cost) + '</td>' +
                     '<td data-label="Type">' + escapeHtml(typeValue) + '</td>' +
                     '<td data-label="Subtype">' + escapeHtml(subtypeValue) + '</td>' +
+                    '<td class="spm-muted" data-label="Set">' + escapeHtml(namedSetDisplay) + '</td>' +
                     '<td class="spm-muted" data-label="Card #">' + escapeHtml(cardSetDisplay) + '</td>' +
                     '<td data-label="Rarity" data-rarity-tier="' + escapeHtml(rarityValue || '') + '">' +
                         '<div class="spm-rarity">' +
@@ -2158,14 +2490,14 @@
                 const fullName = fullDriveFileNameFromBase(base);
                 const created = await driveCreateAppDataMetadata(fullName);
                 if (!created || !created.id) throw new Error('Drive create returned no file id.');
-                const state = buildBlankProjectState(pair.n, pair.t);
-                await uploadProjectStateBytes(created.id, state);
-                const meta = await fetchDriveFileMetadata(created.id);
+                var sid = typeof CardMakerSets !== 'undefined' ? CardMakerSets.getActiveSetId() : '';
+                const state = buildBlankProjectState(pair.n, pair.t, sid);
+                const upMeta = await uploadProjectStateBytes(created.id, state);
                 const fileObj = {
-                    id: meta.id,
-                    name: meta.name || fullName,
-                    modifiedTime: meta.modifiedTime,
-                    size: meta.size
+                    id: created.id,
+                    name: fullName,
+                    modifiedTime: upMeta && upMeta.modifiedTime ? upMeta.modifiedTime : new Date().toISOString(),
+                    size: upMeta && upMeta.size != null ? upMeta.size : null
                 };
                 const newProject = buildProjectFromState(fileObj, state);
                 projects.push(newProject);
@@ -2271,7 +2603,8 @@
             if (!payloadState.fields) payloadState.fields = {};
             payloadState.fields.Rarity = newRarity;
 
-            await uploadProjectStateBytes(projectId, payloadState);
+            const upMeta = await uploadProjectStateBytes(projectId, payloadState);
+            mergeDriveFileMetadata(project, upMeta);
 
             project.rarity = newRarity;
             if (options.skipRecalc) return;
@@ -2292,6 +2625,161 @@
             renderCounts(typeCounts, subtypeCounts, rarityCounts, spmTotalCount.textContent, projects.length);
             rebuildFilterSelects();
             applyFiltersAndRender();
+        }
+
+        function getSelectedProjectsInTableOrder() {
+            var visible = getVisibleSortedProjects();
+            return visible.filter(function (p) {
+                return p.file && p.file.id && selectedProjectIds.has(p.file.id);
+            });
+        }
+
+        async function updateProjectCardSetIndex(projectId, n, t, setId, setName) {
+            if (!driveAccessToken) return;
+            var project = await ensureProjectHydrated(projectId);
+            if (!project) throw new Error('Save not found.');
+            if (!project.state || typeof project.state !== 'object') throw new Error('Invalid save data.');
+            if (!project.state.fields) project.state.fields = {};
+            project.state.fields.CardSetNumber = String(n);
+            project.state.fields.CardSetTotal = String(t);
+            var sid = setId != null && String(setId).trim() ? String(setId).trim() : '';
+            project.state.fields.CardMakerSetId = sid;
+            var sname = setName != null && String(setName).trim() ? String(setName).trim() : '';
+            project.state.fields.CardMakerSetName = sid ? sname : '';
+            const upMeta = await uploadProjectStateBytes(projectId, project.state);
+            mergeDriveFileMetadata(project, upMeta);
+            var cs = computeCardSetKey(project.state.fields);
+            project.cardSetN = cs.n;
+            project.cardSetT = cs.t;
+            project.cardSetLabel = cs.label;
+            project.cardMakerSetId = sid;
+            project.fields = project.state.fields;
+        }
+
+        function closeSpmCreateSetModal() {
+            var modal = document.getElementById('spmCreateSetModal');
+            if (modal) {
+                modal.classList.remove('is-open');
+                modal.setAttribute('aria-hidden', 'true');
+            }
+            document.body.style.overflow = '';
+            var err = document.getElementById('spmCreateSetError');
+            if (err) {
+                err.hidden = true;
+                err.textContent = '';
+            }
+        }
+
+        function openSpmCreateSetModal() {
+            var ordered = getSelectedProjectsInTableOrder();
+            if (!ordered.length) {
+                setMessage('Select one or more saves with the checkboxes.', true);
+                return;
+            }
+            var err = document.getElementById('spmCreateSetError');
+            if (err) {
+                err.hidden = true;
+                err.textContent = '';
+            }
+            var countEl = document.getElementById('spmCreateSetSelectedCount');
+            if (countEl) countEl.textContent = String(ordered.length);
+            syncCreateSetPickOptions(true);
+            var modal = document.getElementById('spmCreateSetModal');
+            if (modal) {
+                modal.classList.add('is-open');
+                modal.setAttribute('aria-hidden', 'false');
+            }
+            document.body.style.overflow = 'hidden';
+            var pickFocus = document.getElementById('spmCreateSetPickSet');
+            if (pickFocus) pickFocus.focus();
+        }
+
+        async function applySpmCreateSetModal() {
+            var errEl = document.getElementById('spmCreateSetError');
+            function showErr(msg) {
+                if (errEl) {
+                    errEl.textContent = msg;
+                    errEl.hidden = false;
+                }
+            }
+            function clearErr() {
+                if (errEl) {
+                    errEl.textContent = '';
+                    errEl.hidden = true;
+                }
+            }
+            clearErr();
+            if (typeof CardMakerSets === 'undefined') {
+                showErr('Could not load sets helper. Reload the page.');
+                return;
+            }
+            var ordered = getSelectedProjectsInTableOrder();
+            if (!ordered.length) {
+                showErr('No selected saves in the current filtered list. Clear filters or select rows.');
+                return;
+            }
+            var pick = document.getElementById('spmCreateSetPickSet');
+            var pickV = pick ? pick.value : '__new__';
+            var totalIn = document.getElementById('spmCreateSetTotal');
+            var setRec = null;
+            if (pickV === '__new__') {
+                var name = document.getElementById('spmCreateSetName').value.trim();
+                var tNew = totalIn ? parseInt(String(totalIn.value).trim(), 10) : NaN;
+                if (!name) {
+                    showErr('Enter a name for the new set.');
+                    return;
+                }
+                setRec = CardMakerSets.addNamedSet(name, tNew);
+                if (!setRec) {
+                    showErr('Enter a valid card count (whole number ≥ 1).');
+                    return;
+                }
+            } else {
+                setRec = CardMakerSets.getNamedSetById(pickV);
+                if (!setRec) {
+                    showErr('That set no longer exists. Choose another or create a new one.');
+                    refreshNamedSetDropdowns();
+                    return;
+                }
+            }
+            var t = CardMakerSets.normalizeTotal(setRec.total);
+            if (!(t >= 1)) {
+                showErr('Invalid set size.');
+                return;
+            }
+            if (ordered.length > t) {
+                showErr('You selected ' + ordered.length + ' saves but “' + setRec.name + '” only has ' + t + ' cards. Increase the set size or select fewer saves.');
+                return;
+            }
+            var btn = document.getElementById('spmCreateSetApplyBtn');
+            if (btn) btn.disabled = true;
+            try {
+                setMessage('Updating ' + ordered.length + ' save(s)…');
+                await mapLimit(ordered, SPM_BULK_UPLOAD_CONCURRENCY, async function (p, idx) {
+                    await updateProjectCardSetIndex(p.file.id, idx + 1, t, setRec.id, setRec.name);
+                });
+                refreshNamedSetDropdowns();
+                recalculateSummaryFromProjects();
+                setMessage('Assigned “' + setRec.name + '” (' + t + ' cards): numbered 1–' + ordered.length + ' on ' + ordered.length + ' save(s).');
+                closeSpmCreateSetModal();
+            } catch (e) {
+                console.error(e);
+                recalculateSummaryFromProjects();
+                showErr((e && e.message) ? e.message : String(e));
+                setMessage('Create set failed: ' + (e && e.message ? e.message : String(e)), true);
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        document.querySelectorAll('[data-spm-create-set-close]').forEach(function (el) {
+            el.addEventListener('click', function () { closeSpmCreateSetModal(); });
+        });
+        var spmCreateSetApplyBtnEl = document.getElementById('spmCreateSetApplyBtn');
+        if (spmCreateSetApplyBtnEl) {
+            spmCreateSetApplyBtnEl.addEventListener('click', function () {
+                applySpmCreateSetModal().catch(function (e) { console.error(e); });
+            });
         }
 
         async function deleteDriveProject(fileId) {
@@ -2346,11 +2834,30 @@
             el.style.top = y + 'px';
         }
 
+        /** Shallow clone state for preview render; fills CardMakerSetName from named-set registry when missing (matches editor). */
+        function stateForCardPreviewRender(state) {
+            if (!state || typeof state !== 'object') return state;
+            var fields = state.fields || {};
+            var id = fields.CardMakerSetId != null ? String(fields.CardMakerSetId).trim() : '';
+            var name = fields.CardMakerSetName != null ? String(fields.CardMakerSetName).trim() : '';
+            if (!id || name || typeof CardMakerSets === 'undefined') {
+                return state;
+            }
+            var reg = CardMakerSets.getNamedSetById(id);
+            if (!reg || !reg.name) return state;
+            return {
+                version: state.version,
+                updatedAt: state.updatedAt,
+                fields: Object.assign({}, fields, { CardMakerSetName: reg.name }),
+                images: state.images
+            };
+        }
+
         async function resolveSpmProjectPreviewUrl(project) {
             if (!project || !project.state || typeof project.state !== 'object') return null;
             if (typeof window.renderCardMakerProjectToDataUrl === 'function') {
                 try {
-                    var url = await window.renderCardMakerProjectToDataUrl(project.state);
+                    var url = await window.renderCardMakerProjectToDataUrl(stateForCardPreviewRender(project.state));
                     if (url && String(url).length > 32) return url;
                 } catch (err) {
                     console.warn('Card preview render:', err);
@@ -2530,6 +3037,16 @@
                     f.CardSetTotal = stRaw;
                 }
             }
+            var setMemEl = document.getElementById('spmEditSetMembership');
+            if (setMemEl) {
+                f.CardMakerSetId = String(setMemEl.value || '').trim();
+                if (f.CardMakerSetId && typeof CardMakerSets !== 'undefined') {
+                    var sn = CardMakerSets.getNamedSetById(f.CardMakerSetId);
+                    f.CardMakerSetName = sn ? sn.name : (f.CardMakerSetName || '');
+                } else {
+                    f.CardMakerSetName = '';
+                }
+            }
             return state;
         }
 
@@ -2680,6 +3197,11 @@
                 costEl.value = isFinite(c) ? String(Math.round(c)) : '0';
             }
             ensureOptionValue(document.getElementById('spmEditRarity'), project.rarity || '');
+            var setMem = document.getElementById('spmEditSetMembership');
+            if (setMem && typeof CardMakerSets !== 'undefined') {
+                var curSet = f.CardMakerSetId != null ? String(f.CardMakerSetId).trim() : '';
+                CardMakerSets.fillSelect(setMem, true, '— None —', curSet);
+            }
             var snEl = document.getElementById('spmEditCardSetNumber');
             var stEl = document.getElementById('spmEditCardSetTotal');
             if (snEl && stEl) {
@@ -2732,6 +3254,8 @@
             if (isNaN(costNum)) costNum = 0;
             costNum = Math.max(0, Math.min(999, costNum));
             var rarityV = document.getElementById('spmEditRarity').value;
+            var setMemV = document.getElementById('spmEditSetMembership');
+            var setIdStr = setMemV ? String(setMemV.value || '').trim() : '';
             var snIn = document.getElementById('spmEditCardSetNumber');
             var stIn = document.getElementById('spmEditCardSetTotal');
             var snRaw = snIn ? String(snIn.value).trim() : '';
@@ -2743,6 +3267,13 @@
             project.state.fields.Subtype = subV;
             project.state.fields.TreasureCost = String(costNum);
             project.state.fields.Rarity = rarityV;
+            project.state.fields.CardMakerSetId = setIdStr;
+            if (setIdStr && typeof CardMakerSets !== 'undefined') {
+                var sreg = CardMakerSets.getNamedSetById(setIdStr);
+                project.state.fields.CardMakerSetName = sreg ? sreg.name : '';
+            } else {
+                project.state.fields.CardMakerSetName = '';
+            }
             if (snRaw === '' && stRaw === '') {
                 project.state.fields.CardSetNumber = '';
                 project.state.fields.CardSetTotal = '';
@@ -2766,7 +3297,8 @@
                     if (meta.modifiedTime) project.file.modifiedTime = meta.modifiedTime;
                     if (meta.size != null) project.file.size = meta.size;
                 }
-                await uploadProjectStateBytes(project.file.id, project.state);
+                const upMeta = await uploadProjectStateBytes(project.file.id, project.state);
+                mergeDriveFileMetadata(project, upMeta);
                 project.fieldsType = computeType(project.state.fields);
                 project.fieldsSubtype = computeSubtype(project.state.fields);
                 project.costNumber = computeCost(project.state.fields);
@@ -2775,6 +3307,7 @@
                 project.cardSetN = csEdit.n;
                 project.cardSetT = csEdit.t;
                 project.cardSetLabel = csEdit.label;
+                project.cardMakerSetId = setIdStr;
                 project.fields = project.state.fields;
                 recalculateSummaryFromProjects();
                 setMessage('Saved changes for “' + displaySaveLabel(project.file.name) + '”.');
@@ -2792,6 +3325,15 @@
         });
         var spmEditSaveBtnEl = document.getElementById('spmEditSaveBtn');
         if (spmEditSaveBtnEl) spmEditSaveBtnEl.addEventListener('click', function () { saveSpmEditModal(); });
+        function onSpmEditSetMembershipChange() {
+            var sel = document.getElementById('spmEditSetMembership');
+            var st = document.getElementById('spmEditCardSetTotal');
+            if (!sel || !st || typeof CardMakerSets === 'undefined') return;
+            if (!sel.value) return;
+            var s = CardMakerSets.getNamedSetById(sel.value);
+            if (s) st.value = String(s.total);
+            scheduleEditModalPreviewRefresh();
+        }
         (function bindEditModalPreviewInputs() {
             var ids = ['spmEditType', 'spmEditSubtype', 'spmEditCost', 'spmEditRarity', 'spmEditCardSetNumber', 'spmEditCardSetTotal'];
             function onFieldChange() {
@@ -2803,9 +3345,221 @@
                 el.addEventListener('change', onFieldChange);
                 el.addEventListener('input', onFieldChange);
             });
+            var setM = document.getElementById('spmEditSetMembership');
+            if (setM) {
+                setM.addEventListener('change', onSpmEditSetMembershipChange);
+            }
         })();
+        var spmCreateSetPickSetEl = document.getElementById('spmCreateSetPickSet');
+        if (spmCreateSetPickSetEl) {
+            spmCreateSetPickSetEl.addEventListener('change', onSpmCreateSetPickChange);
+        }
+        function closeSpmDefineSetModal() {
+            var m = document.getElementById('spmDefineSetModal');
+            if (m) {
+                m.classList.remove('is-open');
+                m.setAttribute('aria-hidden', 'true');
+            }
+            document.body.style.overflow = '';
+            var e = document.getElementById('spmDefineSetError');
+            if (e) {
+                e.hidden = true;
+                e.textContent = '';
+            }
+        }
+        function openSpmDefineSetModal() {
+            var err = document.getElementById('spmDefineSetError');
+            if (err) {
+                err.hidden = true;
+                err.textContent = '';
+            }
+            var n = document.getElementById('spmDefineSetName');
+            var t = document.getElementById('spmDefineSetTotal');
+            if (n) n.value = '';
+            if (t) t.value = typeof CardMakerSets !== 'undefined' ? String(CardMakerSets.getDefaultCardSetTotal()) : '60';
+            var m = document.getElementById('spmDefineSetModal');
+            if (m) {
+                m.classList.add('is-open');
+                m.setAttribute('aria-hidden', 'false');
+            }
+            document.body.style.overflow = 'hidden';
+            if (n) n.focus();
+        }
+        document.querySelectorAll('[data-spm-define-set-close]').forEach(function (el) {
+            el.addEventListener('click', function () { closeSpmDefineSetModal(); });
+        });
+        var spmDefineSetSaveBtn = document.getElementById('spmDefineSetSaveBtn');
+        if (spmDefineSetSaveBtn) {
+            spmDefineSetSaveBtn.addEventListener('click', function () {
+                var errEl = document.getElementById('spmDefineSetError');
+                function showDefErr(msg) {
+                    if (errEl) {
+                        errEl.textContent = msg;
+                        errEl.hidden = false;
+                    }
+                }
+                if (typeof CardMakerSets === 'undefined') {
+                    showDefErr('Reload the page and try again.');
+                    return;
+                }
+                var name = document.getElementById('spmDefineSetName').value.trim();
+                var tot = parseInt(String(document.getElementById('spmDefineSetTotal').value).trim(), 10);
+                if (!name) {
+                    showDefErr('Enter a set name.');
+                    return;
+                }
+                var rec = CardMakerSets.addNamedSet(name, tot);
+                if (!rec) {
+                    showDefErr('Enter how many cards are in the set (whole number ≥ 1).');
+                    return;
+                }
+                if (errEl) {
+                    errEl.hidden = true;
+                    errEl.textContent = '';
+                }
+                refreshNamedSetDropdowns();
+                setMessage('Added named set “' + rec.name + '” (' + rec.total + ' cards).');
+                closeSpmDefineSetModal();
+            });
+        }
+        var spmAddNamedSetBtn = document.getElementById('spmAddNamedSetBtn');
+        if (spmAddNamedSetBtn) {
+            spmAddNamedSetBtn.addEventListener('click', function () { openSpmDefineSetModal(); });
+        }
+
+        function fillSpmEditSetPickOptions(preserveId) {
+            var sel = document.getElementById('spmEditSetPick');
+            if (!sel || typeof CardMakerSets === 'undefined') return;
+            var prev = preserveId != null ? String(preserveId) : sel.value;
+            while (sel.firstChild) {
+                sel.removeChild(sel.firstChild);
+            }
+            CardMakerSets.readNamedSets().forEach(function (s) {
+                var o = document.createElement('option');
+                o.value = s.id;
+                o.textContent = s.name + ' (' + s.total + ')';
+                sel.appendChild(o);
+            });
+            var ok = prev && Array.from(sel.options).some(function (x) { return x.value === prev; });
+            sel.value = ok ? prev : (sel.options[0] ? sel.options[0].value : '');
+        }
+
+        function onSpmEditSetPickChange() {
+            var sel = document.getElementById('spmEditSetPick');
+            var n = document.getElementById('spmEditSetName');
+            var t = document.getElementById('spmEditSetTotal');
+            if (!sel || !sel.value || typeof CardMakerSets === 'undefined') return;
+            var s = CardMakerSets.getNamedSetById(sel.value);
+            if (!s) return;
+            if (n) n.value = s.name;
+            if (t) t.value = String(s.total);
+        }
+
+        function closeSpmEditSetModal() {
+            var m = document.getElementById('spmEditSetModal');
+            if (m) {
+                m.classList.remove('is-open');
+                m.setAttribute('aria-hidden', 'true');
+            }
+            document.body.style.overflow = '';
+            var err = document.getElementById('spmEditSetError');
+            if (err) {
+                err.hidden = true;
+                err.textContent = '';
+            }
+        }
+
+        function openSpmEditSetModal() {
+            if (typeof CardMakerSets === 'undefined') {
+                setMessage('Reload the page and try again.', true);
+                return;
+            }
+            if (!CardMakerSets.readNamedSets().length) {
+                setMessage('Add a named set first, then you can edit it.', true);
+                return;
+            }
+            var errEl = document.getElementById('spmEditSetError');
+            if (errEl) {
+                errEl.hidden = true;
+                errEl.textContent = '';
+            }
+            fillSpmEditSetPickOptions();
+            onSpmEditSetPickChange();
+            var m = document.getElementById('spmEditSetModal');
+            if (m) {
+                m.classList.add('is-open');
+                m.setAttribute('aria-hidden', 'false');
+            }
+            document.body.style.overflow = 'hidden';
+            var nameIn = document.getElementById('spmEditSetName');
+            if (nameIn) nameIn.focus();
+        }
+
+        document.querySelectorAll('[data-spm-edit-set-close]').forEach(function (el) {
+            el.addEventListener('click', function () { closeSpmEditSetModal(); });
+        });
+        var spmEditSetPickEl = document.getElementById('spmEditSetPick');
+        if (spmEditSetPickEl) {
+            spmEditSetPickEl.addEventListener('change', onSpmEditSetPickChange);
+        }
+        var spmEditSetSaveBtn = document.getElementById('spmEditSetSaveBtn');
+        if (spmEditSetSaveBtn) {
+            spmEditSetSaveBtn.addEventListener('click', function () {
+                var errBox = document.getElementById('spmEditSetError');
+                function showEditSetErr(msg) {
+                    if (errBox) {
+                        errBox.textContent = msg;
+                        errBox.hidden = false;
+                    }
+                }
+                if (typeof CardMakerSets === 'undefined') {
+                    showEditSetErr('Reload the page and try again.');
+                    return;
+                }
+                var pick = document.getElementById('spmEditSetPick');
+                var id = pick ? pick.value : '';
+                if (!id) {
+                    showEditSetErr('Choose a set.');
+                    return;
+                }
+                var name = document.getElementById('spmEditSetName').value.trim();
+                var tot = parseInt(String(document.getElementById('spmEditSetTotal').value).trim(), 10);
+                var rec = CardMakerSets.updateNamedSet(id, name, tot);
+                if (!rec) {
+                    showEditSetErr('Enter a name and a valid card count (whole number ≥ 1).');
+                    return;
+                }
+                if (errBox) {
+                    errBox.hidden = true;
+                    errBox.textContent = '';
+                }
+                refreshNamedSetDropdowns();
+                setMessage('Updated named set “' + rec.name + '” (' + rec.total + ' cards).');
+                closeSpmEditSetModal();
+            });
+        }
+        var spmEditNamedSetBtn = document.getElementById('spmEditNamedSetBtn');
+        if (spmEditNamedSetBtn) {
+            spmEditNamedSetBtn.addEventListener('click', function () { openSpmEditSetModal(); });
+        }
+
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
+            var editSetMo = document.getElementById('spmEditSetModal');
+            if (editSetMo && editSetMo.classList.contains('is-open')) {
+                closeSpmEditSetModal();
+                return;
+            }
+            var defMo = document.getElementById('spmDefineSetModal');
+            if (defMo && defMo.classList.contains('is-open')) {
+                closeSpmDefineSetModal();
+                return;
+            }
+            var createModal = document.getElementById('spmCreateSetModal');
+            if (createModal && createModal.classList.contains('is-open')) {
+                closeSpmCreateSetModal();
+                return;
+            }
             var modal = document.getElementById('spmEditModal');
             if (modal && modal.classList.contains('is-open')) closeSpmEditModal();
         });
@@ -2840,6 +3594,8 @@
                 }
             })();
         });
+
+        refreshNamedSetDropdowns();
 
         // Boot: try restoring session from localStorage
         (async function boot() {

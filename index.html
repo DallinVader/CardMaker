@@ -156,6 +156,12 @@
                                     <input type="number" id="CardSetTotal" min="1" step="1" placeholder="120" value="120" oninput="redrawCanvas()" title="Set size" aria-label="Total cards in set">
                                 </div>
                             </div>
+                            <div class="input-group" style="grid-column: 1 / -1;">
+                                <label for="cardmakerWorkingSet">Named set</label>
+                                <select id="cardmakerWorkingSet" title="Picks a set you defined on Saved Projects. Updates total (right) and saves with the card."></select>
+                                <input type="hidden" id="CardMakerSetId" value="">
+                                <input type="hidden" id="CardMakerSetName" value="">
+                            </div>
                         </div>
                         <div class="cm-stat-strip" role="group" aria-label="Cost and combat">
                             <div class="cm-stat-cell">
@@ -346,6 +352,7 @@
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="card-render.js"></script>
+    <script src="cardmaker-sets.js"></script>
     <script>
         // Optional: not used for Drive save/load (OAuth only). Restricted API keys often break gapi if passed to init.
         const GOOGLE_API_KEY = '';
@@ -797,8 +804,22 @@
             document.getElementById("SubtypeFontSize").value = 80;
             const sn = document.getElementById('CardSetNumber');
             const st = document.getElementById('CardSetTotal');
+            const hidSet = document.getElementById('CardMakerSetId');
+            const nameHid = document.getElementById('CardMakerSetName');
+            const wsel = document.getElementById('cardmakerWorkingSet');
             if (sn) sn.value = '1';
-            if (st) st.value = '120';
+            if (typeof CardMakerSets !== 'undefined') {
+                var rid = CardMakerSets.getActiveSetId();
+                if (st) st.value = String(CardMakerSets.getDefaultCardSetTotal());
+                if (hidSet) hidSet.value = rid || '';
+                var rset = rid && CardMakerSets.getNamedSetById(rid);
+                if (nameHid) nameHid.value = rset ? rset.name : '';
+                if (wsel) CardMakerSets.fillSelect(wsel, true, '— None (120 default) —', rid || '');
+            } else {
+                if (st) st.value = '120';
+                if (hidSet) hidSet.value = '';
+                if (nameHid) nameHid.value = '';
+            }
             
             // Reset treasure cost
             document.getElementById("TreasureCost").value = 0;
@@ -1134,6 +1155,8 @@
                     Rarity: document.getElementById('CardRarity') ? document.getElementById('CardRarity').value : 'Common',
                     CardSetNumber: document.getElementById('CardSetNumber') ? document.getElementById('CardSetNumber').value : '',
                     CardSetTotal: document.getElementById('CardSetTotal') ? document.getElementById('CardSetTotal').value : '',
+                    CardMakerSetId: document.getElementById('CardMakerSetId') ? String(document.getElementById('CardMakerSetId').value || '').trim() : '',
+                    CardMakerSetName: document.getElementById('CardMakerSetName') ? String(document.getElementById('CardMakerSetName').value || '').trim() : '',
                     Type: document.getElementById('Type').value,
                     TypeFontSize: document.getElementById('TypeFontSize').value,
                     Subtype: document.getElementById('Subtype').value,
@@ -1235,9 +1258,27 @@
                 elSetN.value = (f.CardSetNumber === undefined || f.CardSetNumber === null)
                     ? '1' : String(f.CardSetNumber).trim();
             }
+            var defTot = typeof CardMakerSets !== 'undefined' ? CardMakerSets.getDefaultCardSetTotal() : 120;
             if (elSetT) {
                 elSetT.value = (f.CardSetTotal === undefined || f.CardSetTotal === null)
-                    ? '120' : String(f.CardSetTotal).trim();
+                    ? String(defTot) : String(f.CardSetTotal).trim();
+            }
+            var hidSet = document.getElementById('CardMakerSetId');
+            var nameHid = document.getElementById('CardMakerSetName');
+            var setIdApply = (f.CardMakerSetId !== undefined && f.CardMakerSetId !== null)
+                ? String(f.CardMakerSetId).trim() : '';
+            if (hidSet) hidSet.value = setIdApply;
+            if (nameHid) {
+                nameHid.value = (f.CardMakerSetName !== undefined && f.CardMakerSetName !== null)
+                    ? String(f.CardMakerSetName).trim() : '';
+            }
+            var wsel = document.getElementById('cardmakerWorkingSet');
+            if (wsel && typeof CardMakerSets !== 'undefined') {
+                CardMakerSets.fillSelect(wsel, true, '— None (120 default) —', setIdApply);
+                if (setIdApply) {
+                    var regSet = CardMakerSets.getNamedSetById(setIdApply);
+                    if (regSet && nameHid) nameHid.value = regSet.name;
+                }
             }
             setIfExists('TreasureCost', f.TreasureCost);
             setIfExists('TreasureFontSize', f.TreasureFontSize);
@@ -1956,6 +1997,64 @@
             reader.readAsDataURL(file[0]); // Read the first file as data URL
         });
 
+        function wrapSetNameTextLines(ctx, text, maxWidth) {
+            var words = String(text || '').split(/\s+/).filter(Boolean);
+            var line = '';
+            var lines = [];
+            for (var index = 0; index < words.length; index++) {
+                var word = words[index];
+                var testLine = line + word + ' ';
+                if (ctx.measureText(testLine).width > maxWidth && line.length > 0) {
+                    lines.push(line.trim());
+                    line = word + ' ';
+                } else {
+                    line = testLine;
+                }
+            }
+            if (line.length > 0) lines.push(line.trim());
+            return lines;
+        }
+
+        /** Same behavior as card-render.js drawSetNameBottomRight (editor canvas). */
+        function drawSetNameBottomRightEditor(ctx, rawName, rightX, centerY, maxWidth) {
+            var name = String(rawName || '').trim();
+            if (!name) return;
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            var px;
+            for (px = 64; px >= 28; px -= 2) {
+                ctx.font = px + 'px Medieval';
+                if (ctx.measureText(name).width <= maxWidth) {
+                    ctx.fillText(name, rightX, centerY);
+                    return;
+                }
+            }
+            ctx.font = '28px Medieval';
+            var lines = wrapSetNameTextLines(ctx, name, maxWidth);
+            var maxLines = 3;
+            if (lines.length > maxLines) {
+                lines = lines.slice(0, maxLines);
+                var last = lines[maxLines - 1];
+                while (last.length > 1 && ctx.measureText(last + '…').width > maxWidth) {
+                    last = last.slice(0, -1);
+                }
+                lines[maxLines - 1] = last + '…';
+            }
+            if (lines.length === 1 && ctx.measureText(lines[0]).width > maxWidth) {
+                var w = lines[0];
+                while (w.length > 1 && ctx.measureText(w + '…').width > maxWidth) {
+                    w = w.slice(0, -1);
+                }
+                ctx.fillText(w + '…', rightX, centerY);
+                return;
+            }
+            var lineH = 34;
+            var startY = centerY - ((lines.length - 1) * lineH) / 2;
+            for (var li = 0; li < lines.length; li++) {
+                ctx.fillText(lines[li], rightX, startY + li * lineH);
+            }
+        }
+
         // Redraw the canvas with all images and text
         function redrawCanvas() {
         syncCardRarityUi();
@@ -2069,17 +2168,19 @@
 
             const cardRarEl = document.getElementById('CardRarity');
             const rarLabel = cardRarEl && cardRarEl.value ? String(cardRarEl.value).trim() : '';
-            if (setSn !== null || rarLabel) {
+            var setNameHidEl = document.getElementById('CardMakerSetName');
+            var setNameStr = setNameHidEl && setNameHidEl.value ? String(setNameHidEl.value).trim() : '';
+            if (setSn !== null || rarLabel || setNameStr) {
                 ctx.save();
                 const setDigitFontPx = 80;
                 const setSlashFontPx = 138;
-                ctx.textAlign = 'left';
                 ctx.textBaseline = 'middle';
                 ctx.fillStyle = '#ffffff';
                 const leftPadX = canvas.width / 10;
                 const gapBetween = canvas.width * 0.022;
                 let rarityX = leftPadX;
                 if (setSn !== null) {
+                    ctx.textAlign = 'left';
                     let x = leftPadX;
                     const sL = String(setSn);
                     const sR = String(setSt);
@@ -2096,8 +2197,14 @@
                     rarityX = x + gapBetween;
                 }
                 if (rarLabel) {
+                    ctx.textAlign = 'left';
                     ctx.font = '70px Medieval';
                     ctx.fillText(rarLabel, rarityX, rarityY);
+                }
+                if (setNameStr) {
+                    var rightPadX = canvas.width - (canvas.width / 10);
+                    var maxNameW = canvas.width * 0.52;
+                    drawSetNameBottomRightEditor(ctx, setNameStr, rightPadX, rarityY, maxNameW);
                 }
                 ctx.restore();
             }
@@ -2352,6 +2459,31 @@
             }
         });
 
+        (function initCardMakerNamedSetsUi() {
+            if (typeof CardMakerSets === 'undefined') return;
+            var sel = document.getElementById('cardmakerWorkingSet');
+            var hid = document.getElementById('CardMakerSetId');
+            var nameHid = document.getElementById('CardMakerSetName');
+            var st = document.getElementById('CardSetTotal');
+            if (!sel) return;
+            var active = CardMakerSets.getActiveSetId();
+            CardMakerSets.fillSelect(sel, true, '— None (120 default) —', active);
+            if (active && CardMakerSets.getNamedSetById(active)) {
+                if (st) st.value = String(CardMakerSets.getDefaultCardSetTotal());
+                if (hid) hid.value = active;
+                var aset = CardMakerSets.getNamedSetById(active);
+                if (nameHid) nameHid.value = aset ? aset.name : '';
+            }
+            sel.addEventListener('change', function () {
+                var id = sel.value;
+                CardMakerSets.setActiveSetId(id);
+                if (hid) hid.value = id;
+                var nset = id && CardMakerSets.getNamedSetById(id);
+                if (nameHid) nameHid.value = nset ? nset.name : '';
+                if (st) st.value = String(CardMakerSets.getDefaultCardSetTotal());
+                redrawCanvas();
+            });
+        })();
 
     </script>
 </body>
