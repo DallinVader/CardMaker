@@ -168,7 +168,7 @@
             var k = String(r || '').trim();
             return RARITY_HEX[k] || '#1e293b';
         }
-        var RARITY_GEM_OVERLAY_ALPHA = 0.5;
+        var RARITY_GEM_OVERLAY_ALPHA = 0.9;
 
         function drawTintedRarityOverlay(ctx, img, x, y, w, h, color) {
             var tw = Math.max(1, Math.round(w));

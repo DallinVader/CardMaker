@@ -443,7 +443,7 @@
             sel.setAttribute('data-rarity-tier', String(sel.value || 'Common').trim());
         }
         /** Tint Rareity.png without touching pixels under transparent areas (offscreen composite). */
-        var RARITY_GEM_OVERLAY_ALPHA = 0.5;
+        var RARITY_GEM_OVERLAY_ALPHA = 0.9;
         function drawTintedRarityOverlay(ctx, img, x, y, w, h, color) {
             var tw = Math.max(1, Math.round(w));
             var th = Math.max(1, Math.round(h));
