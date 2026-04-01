@@ -1499,6 +1499,18 @@
             }
         }
 
+        function driveSaveNameDefaultFromCardTitle() {
+            var titleEl = document.getElementById('Title');
+            if (!titleEl) return '';
+            var s = String(titleEl.value || '').trim();
+            if (!s) return '';
+            s = s.replace(/[/\\?%*:|"<>#\x00-\x1f]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+            s = s.replace(/\s+/g, ' ').trim();
+            if (!s) return '';
+            if (s.length > 80) s = s.slice(0, 80);
+            return s;
+        }
+
         async function openDriveProjectsModal() {
             if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) {
                 alert('Sign in with Google first.');
@@ -1506,6 +1518,11 @@
             }
             const modal = document.getElementById('driveProjectsModal');
             if (!modal) return;
+            const nameInput = document.getElementById('driveSaveNameInput');
+            if (nameInput) {
+                var def = driveSaveNameDefaultFromCardTitle();
+                nameInput.value = def;
+            }
             modal.classList.add('is-open');
             modal.setAttribute('aria-hidden', 'false');
             document.body.style.overflow = 'hidden';
