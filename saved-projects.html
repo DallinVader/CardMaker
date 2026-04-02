@@ -1920,6 +1920,110 @@
         /** Parallel uploads when assigning sets / bulk rarity (bounded to reduce Drive throttling). */
         const SPM_BULK_UPLOAD_CONCURRENCY = 8;
 
+        /** Persist full save JSON in IndexedDB so refresh / new tab can skip re-download when Drive metadata matches. */
+        const SPM_IDB_NAME = 'cardmaker-spm-saves';
+        const SPM_IDB_STORE = 'byFileId';
+        const SPM_IDB_VERSION = 1;
+        var spmIdbOpenPromise = null;
+        function openSpmIdb() {
+            if (spmIdbOpenPromise) return spmIdbOpenPromise;
+            spmIdbOpenPromise = new Promise(function (resolve) {
+                if (!window.indexedDB) {
+                    resolve(null);
+                    return;
+                }
+                var req = indexedDB.open(SPM_IDB_NAME, SPM_IDB_VERSION);
+                req.onerror = function () {
+                    console.warn('SPM IndexedDB open error', req.error);
+                    resolve(null);
+                };
+                req.onsuccess = function () {
+                    resolve(req.result);
+                };
+                req.onupgradeneeded = function (e) {
+                    var db = e.target.result;
+                    if (!db.objectStoreNames.contains(SPM_IDB_STORE)) {
+                        db.createObjectStore(SPM_IDB_STORE);
+                    }
+                };
+            });
+            return spmIdbOpenPromise;
+        }
+        function driveFileMetaUnchanged(prevFile, nextFile) {
+            if (!prevFile || !nextFile) return false;
+            if (!prevFile.modifiedTime || !nextFile.modifiedTime) return false;
+            if (prevFile.modifiedTime !== nextFile.modifiedTime) return false;
+            if (nextFile.size == null || prevFile.size == null) return true;
+            return String(prevFile.size) === String(nextFile.size);
+        }
+        async function spmReadSaveCache(fileId) {
+            var db = await openSpmIdb();
+            if (!db) return null;
+            try {
+                return await new Promise(function (resolve, reject) {
+                    var tx = db.transaction(SPM_IDB_STORE, 'readonly');
+                    var r = tx.objectStore(SPM_IDB_STORE).get(fileId);
+                    r.onsuccess = function () {
+                        resolve(r.result || null);
+                    };
+                    r.onerror = function () {
+                        reject(r.error);
+                    };
+                });
+            } catch (e) {
+                console.warn('SPM cache read', e);
+                return null;
+            }
+        }
+        async function spmWriteSaveCache(fileId, fileMeta, state) {
+            var db = await openSpmIdb();
+            if (!db || !fileMeta) return;
+            try {
+                var rec = {
+                    modifiedTime: fileMeta.modifiedTime,
+                    size: fileMeta.size,
+                    state: state
+                };
+                await new Promise(function (resolve, reject) {
+                    var tx = db.transaction(SPM_IDB_STORE, 'readwrite');
+                    tx.oncomplete = function () {
+                        resolve();
+                    };
+                    tx.onerror = function () {
+                        reject(tx.error);
+                    };
+                    tx.objectStore(SPM_IDB_STORE).put(rec, fileId);
+                });
+            } catch (e) {
+                console.warn('SPM cache write', e);
+            }
+        }
+        async function spmPruneSaveCache(keepIds) {
+            var db = await openSpmIdb();
+            if (!db || !keepIds) return;
+            try {
+                await new Promise(function (resolve, reject) {
+                    var tx = db.transaction(SPM_IDB_STORE, 'readwrite');
+                    tx.oncomplete = function () {
+                        resolve();
+                    };
+                    tx.onerror = function () {
+                        reject(tx.error);
+                    };
+                    var store = tx.objectStore(SPM_IDB_STORE);
+                    var req = store.openCursor();
+                    req.onsuccess = function (e) {
+                        var cur = e.target.result;
+                        if (!cur) return;
+                        if (!keepIds.has(cur.key)) store.delete(cur.key);
+                        cur.continue();
+                    };
+                });
+            } catch (e) {
+                console.warn('SPM cache prune', e);
+            }
+        }
+
         /** Very small concurrency helper for loading many saves. */
         async function mapLimit(items, limit, fn) {
             const out = new Array(items.length);
@@ -2164,10 +2268,21 @@
             var project = projects.find(function (p) { return p.file && p.file.id === projectId; });
             if (!project) return null;
             if (!project._loading && project.state && typeof project.state === 'object') return project;
+            var cached = await spmReadSaveCache(projectId);
+            var metaRef = { modifiedTime: cached && cached.modifiedTime, size: cached && cached.size };
+            if (cached && cached.state && project.file && driveFileMetaUnchanged(metaRef, project.file)) {
+                var i0 = projects.findIndex(function (p) { return p.file && p.file.id === projectId; });
+                if (i0 < 0) return null;
+                projects[i0] = buildProjectFromState(project.file, cached.state);
+                scheduleProjectsProgressRender();
+                return projects[i0];
+            }
             var state = await fetchDriveProjectJson(projectId);
             var i = projects.findIndex(function (p) { return p.file && p.file.id === projectId; });
             if (i < 0) return null;
-            projects[i] = buildProjectFromState(projects[i].file, state);
+            var f = projects[i].file;
+            projects[i] = buildProjectFromState(f, state);
+            await spmWriteSaveCache(projectId, f, state);
             scheduleProjectsProgressRender();
             return projects[i];
         }
@@ -2544,16 +2659,39 @@
                 spmTypeCounts.innerHTML = '<div class="spm-muted">Loading…</div>';
                 spmSubtypeCounts.innerHTML = '<div class="spm-muted">Loading…</div>';
                 spmRarityCounts.innerHTML = '<div class="spm-muted">Loading…</div>';
-                spmStatus.textContent = 'Downloading saves (' + files.length + ')…';
+                spmStatus.textContent = 'Checking saves (' + files.length + ')…';
+
+                var previousById = new Map();
+                projects.forEach(function (p) {
+                    if (p && p.file && p.file.id && !p._loading && p.state && typeof p.state === 'object') {
+                        previousById.set(p.file.id, p);
+                    }
+                });
 
                 projects = files.map(makePlaceholderProject);
                 spmLoadedCount.textContent = '0/' + files.length;
                 applyFiltersAndRender();
 
                 var loadedSoFar = 0;
+                var skippedUnchanged = 0;
                 await mapLimit(files, SPM_PROJECT_FETCH_CONCURRENCY, async function (file, i) {
-                    const state = await fetchDriveProjectJson(file.id);
-                    projects[i] = buildProjectFromState(file, state);
+                    var prev = previousById.get(file.id);
+                    if (prev && driveFileMetaUnchanged(prev.file, file)) {
+                        prev.file = { id: file.id, name: file.name, modifiedTime: file.modifiedTime, size: file.size };
+                        projects[i] = prev;
+                        skippedUnchanged++;
+                    } else {
+                        var fromDisk = await spmReadSaveCache(file.id);
+                        var diskMeta = { modifiedTime: fromDisk && fromDisk.modifiedTime, size: fromDisk && fromDisk.size };
+                        if (fromDisk && fromDisk.state && driveFileMetaUnchanged(diskMeta, file)) {
+                            projects[i] = buildProjectFromState(file, fromDisk.state);
+                            skippedUnchanged++;
+                        } else {
+                            const state = await fetchDriveProjectJson(file.id);
+                            projects[i] = buildProjectFromState(file, state);
+                            await spmWriteSaveCache(file.id, file, state);
+                        }
+                    }
                     loadedSoFar++;
                     spmLoadedCount.textContent = String(loadedSoFar) + '/' + files.length;
                     scheduleProjectsProgressRender();
@@ -2578,7 +2716,13 @@
                 renderCounts(typeCounts, subtypeCounts, rarityCounts, files.length, projects.length);
                 rebuildFilterSelects();
                 applyFiltersAndRender();
-                setMessage('Loaded ' + projects.length + ' saves.');
+                var msg = 'Loaded ' + projects.length + ' saves.';
+                if (skippedUnchanged > 0) {
+                    msg += ' ' + skippedUnchanged + ' unchanged (skipped re-download).';
+                }
+                setMessage(msg);
+                var keepIds = new Set(files.map(function (f) { return f.id; }));
+                await spmPruneSaveCache(keepIds);
             } catch (e) {
                 console.error(e);
                 spmStatus.textContent = 'Load failed';
