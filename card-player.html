@@ -94,7 +94,7 @@
         <div class="cp-main">
             <div class="cp-panel">
                 <h2>Saved cards</h2>
-                <p class="cp-muted">Loads cards from the same cache as <strong>Saved projects</strong> (open that page once while signed in so downloads are cached). You can also import <code style="color:#93c5fd">.cardmaker.json</code> files.</p>
+                <p class="cp-muted">The library is stored <strong>only in this browser</strong> for <strong id="cpOriginHint">this site</strong>. It does not carry over from <code style="color:#93c5fd">localhost</code> to GitHub Pages (different origins). To fill the cache here: open <a href="saved-projects.html" style="color:#93c5fd">Saved projects</a> on <em>this same URL</em>, sign in to Google, and wait until all saves finish loading. Your Google Cloud OAuth “Authorized JavaScript origins” must include this origin or sign-in will fail on Pages. Alternatively, use <strong>Import JSON</strong> — imports are saved in the browser so they persist after refresh (watch storage limits if art is huge).</p>
                 <div class="cp-stats">
                     <span id="cpStatLibrary">Library: —</span>
                     <span id="cpStatDeck">Deck: 0</span>
@@ -121,6 +121,7 @@
                 <div class="cp-actions">
                     <button type="button" class="cp-btn" id="cpRefresh">Refresh library</button>
                     <button type="button" class="cp-btn" id="cpImportBtn">Import JSON…</button>
+                    <button type="button" class="cp-btn" id="cpClearImports">Clear saved imports</button>
                     <input type="file" class="cp-file-input" id="cpImportFile" accept=".json,application/json" multiple />
                     <button type="button" class="cp-btn" id="cpSelectAll">Select all</button>
                     <button type="button" class="cp-btn" id="cpSelectNone">Select none</button>
@@ -154,6 +155,7 @@
     var SPM_IDB_STORE = 'byFileId';
     var SPM_IDB_VERSION = 1;
     var WS_STORAGE = 'cardmaker_mp_ws_v1';
+    var IMPORTS_STORAGE_KEY = 'cardmaker_player_imports_v1';
 
     var library = [];
     var imported = [];
@@ -226,6 +228,41 @@
             h = ((h << 5) + h) ^ parts.charCodeAt(si);
         }
         return 'imp_' + (h >>> 0).toString(36);
+    }
+
+    function loadImportsFromStorage() {
+        imported = [];
+        try {
+            var raw = localStorage.getItem(IMPORTS_STORAGE_KEY);
+            if (!raw) return;
+            var j = JSON.parse(raw);
+            var arr = Array.isArray(j) ? j : (j && Array.isArray(j.cards) ? j.cards : []);
+            var byId = {};
+            arr.forEach(function (row) {
+                if (!row || typeof row.state !== 'object' || !row.state.fields) return;
+                var id = (row.id && String(row.id).trim()) || stableImportIdFromState(row.state);
+                byId[id] = { id: id, state: row.state, source: 'file' };
+            });
+            imported = Object.keys(byId).map(function (k) { return byId[k]; });
+        } catch (e) {
+            imported = [];
+        }
+    }
+
+    function saveImportsToStorage() {
+        try {
+            var payload = {
+                v: 1,
+                cards: imported.map(function (c) {
+                    return { id: c.id, state: c.state };
+                })
+            };
+            localStorage.setItem(IMPORTS_STORAGE_KEY, JSON.stringify(payload));
+        } catch (e) {
+            if (e && e.name === 'QuotaExceededError') {
+                setStatus('Storage full: trim card art or import fewer cards.');
+            }
+        }
     }
 
     function getCardById(id) {
@@ -496,7 +533,11 @@
 
     function updateStats() {
         var n = allCards().length;
-        cpStatLibrary.textContent = 'Library: ' + n + (n ? '' : ' (open Saved projects to cache cards)');
+        var libLine = 'Library: ' + n;
+        if (n > 0) {
+            libLine += ' (' + library.length + ' cache + ' + imported.length + ' imported)';
+        }
+        cpStatLibrary.textContent = libLine;
         var conn = !!(mpWs && mpWs.readyState === 1);
         var isGuest = conn && mpRoom && !mpIsHost;
         var deckCount = isGuest
@@ -511,7 +552,7 @@
         var cards = allCards();
         libraryListEl.innerHTML = '';
         if (cards.length === 0) {
-            libraryListEl.innerHTML = '<div class="cp-muted" style="padding:12px 14px">No cards yet. Refresh after using Saved projects, or import JSON.</div>';
+            libraryListEl.innerHTML = '<div class="cp-muted" style="padding:12px 14px">No cards yet. On this origin, open <strong>Saved projects</strong> and load your Drive saves, or use <strong>Import JSON</strong> (saved in this browser).</div>';
             updateStats();
             return;
         }
@@ -682,7 +723,11 @@
             .then(function (rows) {
                 library = rows;
                 renderLibraryList();
-                setStatus('Library: ' + library.length + ' from cache + ' + imported.length + ' imported.');
+                var msg = library.length + ' from IndexedDB cache + ' + imported.length + ' imported.';
+                if (library.length === 0 && imported.length === 0) {
+                    msg = 'No cards for ' + (typeof location !== 'undefined' ? location.origin : 'this site') + '. Use Saved projects (same URL) or Import JSON.';
+                }
+                setStatus(msg);
             })
             .catch(function () {
                 setStatus('Could not read card cache.');
@@ -806,21 +851,39 @@
             var added = 0;
             results.forEach(function (r) {
                 if (r) {
+                    imported = imported.filter(function (x) { return x.id !== r.id; });
                     imported.push(r);
                     added++;
                 }
             });
             cpImportFile.value = '';
+            saveImportsToStorage();
             renderLibraryList();
             setStatus('Imported ' + added + ' file(s). Total library: ' + allCards().length + '.');
         });
+    });
+
+    document.getElementById('cpClearImports').addEventListener('click', function () {
+        imported = [];
+        try {
+            localStorage.removeItem(IMPORTS_STORAGE_KEY);
+        } catch (e) { /* ignore */ }
+        renderLibraryList();
+        setStatus('Cleared imported cards from this browser.');
     });
 
     try {
         document.fonts.load('200px Medieval').catch(function () {});
     } catch (e) {}
 
-    refreshLibrary();
+    (function boot() {
+        var oh = document.getElementById('cpOriginHint');
+        if (oh && typeof location !== 'undefined') {
+            oh.textContent = location.origin;
+        }
+        loadImportsFromStorage();
+        refreshLibrary();
+    })();
 })();
     </script>
 </body>
