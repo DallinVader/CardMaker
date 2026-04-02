@@ -37,14 +37,24 @@
             max-height: min(42vh, 360px); overflow: auto; border-radius: 12px; border: 1px solid rgba(148,163,184,0.14);
             background: rgba(15,23,42,0.35); padding: 8px 4px;
         }
-        .cp-list label {
-            display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; cursor: pointer;
-            border-radius: 8px; margin: 0 4px 2px; font-size: 13px; line-height: 1.35;
+        .cp-lib-row {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            padding: 8px 10px; border-radius: 8px; margin: 0 4px 4px; font-size: 13px; line-height: 1.35;
         }
-        .cp-list label:hover { background: rgba(102,126,234,0.12); }
-        .cp-list input { margin-top: 3px; flex-shrink: 0; }
-        .cp-list .cp-card-title { font-weight: 800; color: #f1f5f9; word-break: break-word; }
-        .cp-list .cp-card-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+        .cp-lib-row:hover { background: rgba(102,126,234,0.1); }
+        .cp-lib-meta { min-width: 0; flex: 1; }
+        .cp-lib-qty-label {
+            display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0;
+            font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8;
+        }
+        .cp-lib-qty-label input {
+            width: 52px; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(148,163,184,0.25);
+            background: rgba(15,23,42,0.6); color: #e2e8f0; font-weight: 800; font-size: 14px;
+            font-variant-numeric: tabular-nums; text-align: center;
+        }
+        .cp-lib-qty-label input:focus { outline: 2px solid rgba(129,140,248,0.5); outline-offset: 1px; }
+        .cp-list .cp-card-title { font-weight: 800; color: #f1f5f9; word-break: break-word; display: block; }
+        .cp-list .cp-card-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; display: block; }
         .cp-field-wrap {
             position: relative; border-radius: 16px; border: none;
             background: rgba(15,23,42,0.55);
@@ -158,6 +168,9 @@
         }
         .cp-status { margin-top: 10px; font-size: 12px; color: #93c5fd; min-height: 1.25em; }
         .cp-file-input { display: none; }
+        #cpDeckModal .drive-modal-panel { max-width: min(920px, 96vw); max-height: min(92vh, 900px); display: flex; flex-direction: column; }
+        #cpDeckModal .cp-deck-modal-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+        #cpDeckDriveList { max-height: min(200px, 28vh); }
     </style>
 </head>
 <body>
@@ -174,7 +187,7 @@
         <div class="cp-main">
             <div class="cp-panel">
                 <h2>Saved cards</h2>
-                <p class="cp-muted">Loads cards from the same cache as <strong>Saved projects</strong> (open that page once while signed in so downloads are cached). You can also import <code style="color:#93c5fd">.cardmaker.json</code> files.</p>
+                <p class="cp-muted">Loads cards from the same cache as <strong>Saved projects</strong> (open that page once while signed in so downloads are cached). Import <code style="color:#93c5fd">.cardmaker.json</code> files here. Open <strong>Deck builder</strong> to set how many of each card are in your deck and save decks to Google Drive.</p>
                 <div class="cp-stats">
                     <span id="cpStatLibrary">Library: —</span>
                     <span id="cpStatDeck">Deck: 0</span>
@@ -183,11 +196,9 @@
                     <button type="button" class="cp-btn" id="cpRefresh">Refresh library</button>
                     <button type="button" class="cp-btn" id="cpImportBtn">Import JSON…</button>
                     <input type="file" class="cp-file-input" id="cpImportFile" accept=".json,application/json" multiple />
-                    <button type="button" class="cp-btn" id="cpSelectAll">Select all</button>
-                    <button type="button" class="cp-btn" id="cpSelectNone">Select none</button>
+                    <button type="button" class="cp-btn cp-btn-primary" id="cpOpenDeckModal">Deck builder…</button>
                 </div>
                 <div class="cp-actions">
-                    <button type="button" class="cp-btn cp-btn-primary" id="cpBuildDeck">Build deck from selection</button>
                     <button type="button" class="cp-btn" id="cpUseAll">Use entire library as deck</button>
                 </div>
                 <div class="cp-actions">
@@ -195,7 +206,6 @@
                     <button type="button" class="cp-btn cp-btn-primary" id="cpDraw" disabled>Draw to field</button>
                     <button type="button" class="cp-btn" id="cpClearField">Clear field</button>
                 </div>
-                <div class="cp-list" id="cpLibraryList" role="group" aria-label="Card library"></div>
                 <p class="cp-status" id="cpStatus" aria-live="polite"></p>
             </div>
 
@@ -217,7 +227,60 @@
         </div>
     </div>
 
+    <div id="cpDeckModal" class="drive-modal" aria-hidden="true">
+        <div class="drive-modal-backdrop" id="cpDeckModalBackdrop" aria-hidden="true"></div>
+        <div class="drive-modal-panel" role="dialog" aria-modal="true" aria-labelledby="cpDeckModalTitle">
+            <button type="button" class="drive-modal-close" id="cpDeckModalClose" aria-label="Close">&times;</button>
+            <h2 id="cpDeckModalTitle" class="drive-modal-title">Deck builder</h2>
+            <p class="drive-modal-hint">Set <strong>Qty</strong> for each card. <strong>Apply to play deck</strong> loads those counts into the table deck. Deck files are stored in Google Drive <strong>hidden app data</strong> as <code class="drive-code">name.cardmaker-deck.json</code> (same place as card saves).</p>
+
+            <div class="cp-deck-modal-scroll">
+                <div class="drive-modal-section">
+                    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
+                        <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="cpDeckSignIn">Sign in with Google</button>
+                        <small id="cpDeckDriveLine" class="drive-modal-suffix" style="margin:0;">Not signed in.</small>
+                    </div>
+                </div>
+
+                <div class="drive-modal-section">
+                    <label class="drive-modal-label" for="cpDeckNameInput">Deck name (for Drive)</label>
+                    <div class="drive-save-row">
+                        <input type="text" id="cpDeckNameInput" class="drive-modal-input" placeholder="e.g. main-deck" autocomplete="off" maxlength="80" />
+                        <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="cpDeckSaveDrive">Save to Drive</button>
+                    </div>
+                </div>
+
+                <div class="drive-modal-section drive-modal-section-grow">
+                    <div class="drive-list-toolbar">
+                        <span class="drive-modal-label" style="margin:0;">Decks on Drive</span>
+                        <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="cpDeckRefreshDriveList">Refresh list</button>
+                    </div>
+                    <div id="cpDeckDriveList" class="drive-modal-list" role="list"></div>
+                </div>
+
+                <div class="drive-modal-section">
+                    <div class="drive-list-toolbar">
+                        <span class="drive-modal-label" style="margin:0;">Library — quantities</span>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="cpDeckModalAllOne" title="Set every Qty to 1">All ×1</button>
+                            <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="cpDeckModalAllZero" title="Set every Qty to 0">All ×0</button>
+                        </div>
+                    </div>
+                    <div class="cp-list" id="cpDeckModalLibrary" role="group" aria-label="Card library and quantities"></div>
+                    <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;">
+                        <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="cpDeckApplyPlay">Apply to play deck</button>
+                    </div>
+                </div>
+            </div>
+
+            <p id="cpDeckModalMessage" class="drive-modal-message" role="status" aria-live="polite"></p>
+        </div>
+    </div>
+
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="card-render.js"></script>
+    <script src="card-player-decks-drive.js"></script>
     <script>
 (function () {
     var SPM_IDB_NAME = 'cardmaker-spm-saves';
@@ -227,7 +290,8 @@
     var library = [];
     var imported = [];
     var deck = [];
-    var libraryListEl = document.getElementById('cpLibraryList');
+    var libraryListEl = document.getElementById('cpDeckModalLibrary');
+    var DECK_NAME_STORAGE_KEY = 'cardmaker_cp_deck_name_v1';
     var cpStatLibrary = document.getElementById('cpStatLibrary');
     var cpStatDeck = document.getElementById('cpStatDeck');
     var cpStatus = document.getElementById('cpStatus');
@@ -410,33 +474,60 @@
         cards.forEach(function (c, idx) {
             var title = cardTitleFromState(c.state);
             var sub = cardSubtitle(c.state, c.id);
-            var id = 'cp-lib-' + idx;
-            var label = document.createElement('label');
-            label.setAttribute('for', id);
-            label.innerHTML =
-                '<input type="checkbox" id="' + id + '" data-cp-idx="' + idx + '" checked />' +
-                '<span><span class="cp-card-title"></span><span class="cp-card-sub"></span></span>';
-            label.querySelector('.cp-card-title').textContent = title;
-            label.querySelector('.cp-card-sub').textContent = sub;
-            libraryListEl.appendChild(label);
+            var row = document.createElement('div');
+            row.className = 'cp-lib-row';
+            row.setAttribute('data-cp-row-idx', String(idx));
+            var inpId = 'cp-lib-qty-' + idx;
+            row.innerHTML =
+                '<div class="cp-lib-meta">' +
+                    '<span class="cp-card-title"></span>' +
+                    '<span class="cp-card-sub"></span>' +
+                '</div>' +
+                '<label class="cp-lib-qty-label" for="' + inpId + '">Qty' +
+                    '<input type="number" id="' + inpId + '" min="0" max="99" value="1" inputmode="numeric" />' +
+                '</label>';
+            row.querySelector('.cp-card-title').textContent = title;
+            row.querySelector('.cp-card-sub').textContent = sub;
+            var qtyInp = row.querySelector('input[type="number"]');
+            if (qtyInp) {
+                qtyInp.setAttribute('data-cp-card-id', c.id);
+                qtyInp.setAttribute('aria-label', 'Copies in deck for ' + title);
+            }
+            libraryListEl.appendChild(row);
         });
         updateStats();
     }
 
-    function getSelectedIndices() {
-        var boxes = libraryListEl.querySelectorAll('input[type="checkbox"][data-cp-idx]');
-        var idxs = [];
-        boxes.forEach(function (b) {
-            if (b.checked) idxs.push(parseInt(b.getAttribute('data-cp-idx'), 10));
-        });
-        return idxs;
+    function parseQtyInput(inp) {
+        var n = parseInt(String(inp && inp.value != null ? inp.value : '0'), 10);
+        if (!isFinite(n) || n < 0) n = 0;
+        if (n > 99) n = 99;
+        return n;
+    }
+
+    function cardById(id) {
+        var cards = allCards();
+        var i;
+        for (i = 0; i < cards.length; i++) {
+            if (cards[i].id === id) return cards[i];
+        }
+        return null;
     }
 
     function buildDeckFromSelection() {
-        var cards = allCards();
-        var idxs = getSelectedIndices();
-        deck = idxs.filter(function (i) { return i >= 0 && i < cards.length; }).map(function (i) { return cards[i]; });
-        setStatus('Deck: ' + deck.length + ' cards from selection.');
+        var map = {};
+        allCards().forEach(function (c) { map[c.id] = c; });
+        var next = [];
+        libraryListEl.querySelectorAll('input[data-cp-card-id]').forEach(function (inp) {
+            var id = inp.getAttribute('data-cp-card-id');
+            var c = map[id];
+            if (!c) return;
+            var n = parseQtyInput(inp);
+            var k;
+            for (k = 0; k < n; k++) next.push(c);
+        });
+        deck = next;
+        setStatus('Deck: ' + deck.length + ' cards (from builder quantities).');
         updateStats();
     }
 
@@ -712,14 +803,349 @@
             });
     }
 
+    /* —— Deck modal + Drive —— */
+    var cpDeckModal = document.getElementById('cpDeckModal');
+    var cpDeckNameInput = document.getElementById('cpDeckNameInput');
+    var cpDeckModalMessage = document.getElementById('cpDeckModalMessage');
+    var cpDeckDriveLine = document.getElementById('cpDeckDriveLine');
+    var cpDeckDriveList = document.getElementById('cpDeckDriveList');
+
+    function setDeckModalMessage(text, isError) {
+        if (!cpDeckModalMessage) return;
+        cpDeckModalMessage.textContent = text || '';
+        cpDeckModalMessage.classList.toggle('is-error', !!isError);
+    }
+
+    function escapeHtml(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function sanitizeDeckBaseName(base) {
+        var s = String(base || '').trim();
+        if (!s) return '';
+        var ext = (window.CPDrive && CPDrive.DECK_FILE_EXTENSION) || '.cardmaker-deck.json';
+        if (s.toLowerCase().endsWith(ext.toLowerCase())) s = s.slice(0, -ext.length);
+        s = s.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
+        if (s.length > 80) s = s.slice(0, 80);
+        return s;
+    }
+
+    function fullDeckDriveFileName(base) {
+        var b = sanitizeDeckBaseName(base);
+        if (!b) throw new Error('Enter a deck name.');
+        return b + ((window.CPDrive && CPDrive.DECK_FILE_EXTENSION) || '.cardmaker-deck.json');
+    }
+
+    function displayDeckSaveLabel(fileName) {
+        var ext = (window.CPDrive && CPDrive.DECK_FILE_EXTENSION) || '.cardmaker-deck.json';
+        var n = String(fileName || '');
+        if (n.toLowerCase().endsWith(ext.toLowerCase())) return n.slice(0, -ext.length);
+        return n;
+    }
+
+    function collectDeckEntriesForSave() {
+        var arr = [];
+        if (!libraryListEl) return arr;
+        libraryListEl.querySelectorAll('input[data-cp-card-id]').forEach(function (inp) {
+            var id = inp.getAttribute('data-cp-card-id');
+            var n = parseQtyInput(inp);
+            if (n > 0) arr.push({ id: id, qty: n });
+        });
+        return arr;
+    }
+
+    function buildDeckJsonString(displayName) {
+        var name = String(displayName || '').trim() || 'Deck';
+        return JSON.stringify({
+            version: 1,
+            kind: 'cardmaker-deck',
+            name: name,
+            updatedAt: new Date().toISOString(),
+            entries: collectDeckEntriesForSave()
+        });
+    }
+
+    function buildJsonStringForSave(nameForDoc) {
+        return buildDeckJsonString(sanitizeDeckBaseName(nameForDoc) || nameForDoc || 'Deck');
+    }
+
+    function parseDeckDocument(text) {
+        var j = JSON.parse(text);
+        if (!j || j.kind !== 'cardmaker-deck' || !Array.isArray(j.entries)) {
+            throw new Error('Not a valid Card Maker deck file.');
+        }
+        return j;
+    }
+
+    function applyDeckDocumentToInputs(doc) {
+        var byId = {};
+        (doc.entries || []).forEach(function (e) {
+            if (!e || e.id == null) return;
+            var q = parseInt(String(e.qty), 10);
+            if (!isFinite(q) || q < 0) q = 0;
+            if (q > 99) q = 99;
+            byId[String(e.id)] = q;
+        });
+        libraryListEl.querySelectorAll('input[data-cp-card-id]').forEach(function (inp) {
+            var id = inp.getAttribute('data-cp-card-id');
+            inp.value = byId[id] != null ? String(byId[id]) : '0';
+        });
+        if (doc.name && cpDeckNameInput) cpDeckNameInput.value = String(doc.name).trim();
+    }
+
+    function formatDriveListDate(iso) {
+        if (!iso) return '—';
+        try {
+            return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+        } catch (e) {
+            return iso;
+        }
+    }
+
+    function renderDriveDeckList(files) {
+        if (!cpDeckDriveList) return;
+        if (!files || files.length === 0) {
+            cpDeckDriveList.innerHTML = '<div class="drive-modal-empty">No deck files yet. Enter a name and click <strong>Save to Drive</strong>.</div>';
+            return;
+        }
+        cpDeckDriveList.innerHTML = files.map(function (f, i) {
+            var nameShort = escapeHtml(displayDeckSaveLabel(f.name));
+            var when = escapeHtml(formatDriveListDate(f.modifiedTime));
+            return '<div class="drive-modal-item" data-cp-deck-row="' + i + '">' +
+                '<div class="drive-modal-item-info">' +
+                    '<span class="drive-modal-item-name" title="' + escapeHtml(f.name) + '">' + nameShort + '</span>' +
+                    '<div class="drive-modal-item-meta"><span class="drive-modal-item-date">' + when + '</span></div>' +
+                '</div>' +
+                '<div class="drive-modal-item-actions">' +
+                    '<button type="button" class="drive-modal-btn drive-modal-btn-small drive-modal-btn-load" data-cp-deck-load="' + escapeHtml(f.id) + '">Load</button>' +
+                    '<button type="button" class="drive-modal-btn drive-modal-btn-small drive-modal-btn-danger" data-cp-deck-delete="' + escapeHtml(f.id) + '">Delete</button>' +
+                '</div></div>';
+        }).join('');
+    }
+
+    function updateDeckDriveUi() {
+        var signed = window.CPDrive && CPDrive.isSignedIn && CPDrive.isSignedIn();
+        if (cpDeckDriveLine) {
+            cpDeckDriveLine.textContent = signed
+                ? 'Signed in — deck files use the same Google session as Card Maker.'
+                : 'Sign in to save and load decks from Google Drive.';
+        }
+        var btn = document.getElementById('cpDeckSignIn');
+        if (btn) btn.textContent = signed ? 'Sign out' : 'Sign in with Google';
+    }
+
+    function waitForGoogleScripts(maxWaitMs) {
+        var step = 80;
+        var elapsed = 0;
+        return new Promise(function (resolve) {
+            function tick() {
+                if (window.gapi && window.google && google.accounts && google.accounts.oauth2) {
+                    resolve(true);
+                    return;
+                }
+                elapsed += step;
+                if (elapsed >= maxWaitMs) {
+                    resolve(false);
+                    return;
+                }
+                setTimeout(tick, step);
+            }
+            tick();
+        });
+    }
+
+    function openDeckModal() {
+        if (!cpDeckModal) return;
+        try {
+            var saved = localStorage.getItem(DECK_NAME_STORAGE_KEY);
+            if (saved && cpDeckNameInput && !cpDeckNameInput.value.trim()) cpDeckNameInput.value = saved;
+        } catch (e) { /* ignore */ }
+        renderLibraryList();
+        setDeckModalMessage('');
+        cpDeckModal.classList.add('is-open');
+        cpDeckModal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        updateDeckDriveUi();
+        if (window.CPDrive && CPDrive.isSignedIn && CPDrive.isSignedIn()) {
+            refreshDriveDeckListUi().catch(function () {});
+        } else {
+            if (cpDeckDriveList) {
+                cpDeckDriveList.innerHTML = '<div class="drive-modal-empty">Sign in to list saved decks.</div>';
+            }
+        }
+    }
+
+    function closeDeckModal() {
+        if (!cpDeckModal) return;
+        try {
+            if (cpDeckNameInput && cpDeckNameInput.value.trim()) {
+                localStorage.setItem(DECK_NAME_STORAGE_KEY, cpDeckNameInput.value.trim());
+            }
+        } catch (e) { /* ignore */ }
+        cpDeckModal.classList.remove('is-open');
+        cpDeckModal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+
+    function refreshDriveDeckListUi() {
+        if (!window.CPDrive || !CPDrive.listDeckFiles) return Promise.resolve();
+        return CPDrive.ensureDriveTokenBeforeDriveOp().then(function (ok) {
+            if (!ok || !CPDrive.getAccessToken()) throw new Error('Not signed in.');
+            return CPDrive.listDeckFiles();
+        }).then(function (files) {
+            renderDriveDeckList(files);
+        }).catch(function (err) {
+            console.error(err);
+            if (cpDeckDriveList) {
+                cpDeckDriveList.innerHTML = '<div class="drive-modal-empty is-error">' + escapeHtml(err.message || String(err)) + '</div>';
+            }
+        });
+    }
+
+    document.getElementById('cpOpenDeckModal').addEventListener('click', openDeckModal);
+    document.getElementById('cpDeckModalClose').addEventListener('click', closeDeckModal);
+    document.getElementById('cpDeckModalBackdrop').addEventListener('click', closeDeckModal);
+
+    document.getElementById('cpDeckModalAllOne').addEventListener('click', function () {
+        libraryListEl.querySelectorAll('input[data-cp-card-id]').forEach(function (inp) { inp.value = '1'; });
+    });
+    document.getElementById('cpDeckModalAllZero').addEventListener('click', function () {
+        libraryListEl.querySelectorAll('input[data-cp-card-id]').forEach(function (inp) { inp.value = '0'; });
+    });
+    document.getElementById('cpDeckApplyPlay').addEventListener('click', function () {
+        buildDeckFromSelection();
+        setDeckModalMessage('Play deck updated: ' + deck.length + ' cards. Close the builder when you are done.');
+    });
+
+    document.getElementById('cpDeckSaveDrive').addEventListener('click', function () {
+        setDeckModalMessage('');
+        if (!window.CPDrive || !CPDrive.hasDriveConfig()) {
+            setDeckModalMessage('Drive is not configured for this page.', true);
+            return;
+        }
+        var nameBase;
+        try {
+            nameBase = cpDeckNameInput && cpDeckNameInput.value.trim()
+                ? cpDeckNameInput.value.trim()
+                : 'deck';
+            var fileName = fullDeckDriveFileName(nameBase);
+            var json = buildJsonStringForSave(nameBase);
+            CPDrive.ensureDriveTokenBeforeDriveOp().then(function (ok) {
+                if (!ok || !CPDrive.getAccessToken()) {
+                    setDeckModalMessage('Sign in with Google first.', true);
+                    return null;
+                }
+                return CPDrive.saveDeckToDrive(fileName, json);
+            }).then(function (v) {
+                if (v === null) return;
+                setDeckModalMessage('Saved “' + displayDeckSaveLabel(fileName) + '” to Drive.');
+                try {
+                    localStorage.setItem(DECK_NAME_STORAGE_KEY, sanitizeDeckBaseName(nameBase));
+                } catch (e2) { /* ignore */ }
+                return refreshDriveDeckListUi();
+            }).catch(function (err) {
+                setDeckModalMessage(err.message || String(err), true);
+            });
+        } catch (e) {
+            setDeckModalMessage(e.message || String(e), true);
+        }
+    });
+
+    document.getElementById('cpDeckRefreshDriveList').addEventListener('click', function () {
+        setDeckModalMessage('');
+        refreshDriveDeckListUi().catch(function (err) {
+            setDeckModalMessage(err.message || String(err), true);
+        });
+    });
+
+    document.getElementById('cpDeckSignIn').addEventListener('click', function () {
+        setDeckModalMessage('');
+        if (!window.CPDrive || !CPDrive.hasDriveConfig()) {
+            setDeckModalMessage('Google Client ID is not set on this page.', true);
+            return;
+        }
+        if (CPDrive.isSignedIn && CPDrive.isSignedIn()) {
+            CPDrive.signOut();
+            updateDeckDriveUi();
+            if (cpDeckDriveList) {
+                cpDeckDriveList.innerHTML = '<div class="drive-modal-empty">Sign in to list saved decks.</div>';
+            }
+            return;
+        }
+        waitForGoogleScripts(10000).then(function (ok) {
+            if (!ok) {
+                setDeckModalMessage('Google scripts not loaded. Use http://localhost or HTTPS (not file://).', true);
+                return;
+            }
+            return CPDrive.initGoogleDriveClient(false);
+        }).then(function (ready) {
+            if (ready === false) return;
+            return CPDrive.signIn();
+        }).then(function (signed) {
+            if (signed === false) {
+                setDeckModalMessage('Sign-in was cancelled or failed.', true);
+                return;
+            }
+            if (signed) {
+                updateDeckDriveUi();
+                return refreshDriveDeckListUi();
+            }
+        }).catch(function (err) {
+            setDeckModalMessage(err.message || String(err), true);
+        });
+    });
+
+    if (cpDeckDriveList) {
+        cpDeckDriveList.addEventListener('click', function (ev) {
+            var t = ev.target;
+            if (!t || !t.getAttribute) return;
+            var loadId = t.getAttribute('data-cp-deck-load');
+            var delId = t.getAttribute('data-cp-deck-delete');
+            if (loadId) {
+                setDeckModalMessage('Loading…');
+                CPDrive.ensureDriveTokenBeforeDriveOp().then(function (ok) {
+                    if (!ok) throw new Error('Not signed in.');
+                    return CPDrive.fetchDriveFileMedia(loadId);
+                }).then(function (text) {
+                    var doc = parseDeckDocument(text);
+                    applyDeckDocumentToInputs(doc);
+                    var missing = [];
+                    (doc.entries || []).forEach(function (e) {
+                        if (e && e.id && !cardById(e.id)) missing.push(e.id);
+                    });
+                    buildDeckFromSelection();
+                    var msg = 'Loaded deck (“' + (doc.name || 'untitled') + '”) — applied ' + deck.length + ' cards to play deck.';
+                    if (missing.length) msg += ' ' + missing.length + ' entr' + (missing.length === 1 ? 'y' : 'ies') + ' not in this library (skipped).';
+                    setDeckModalMessage(msg, missing.length > 0);
+                }).catch(function (err) {
+                    setDeckModalMessage(err.message || String(err), true);
+                });
+            }
+            if (delId) {
+                if (!confirm('Delete this deck file from Google Drive?')) return;
+                CPDrive.ensureDriveTokenBeforeDriveOp().then(function (ok) {
+                    if (!ok) throw new Error('Not signed in.');
+                    return CPDrive.deleteDriveFile(delId);
+                }).then(function () {
+                    setDeckModalMessage('Deck deleted.');
+                    return refreshDriveDeckListUi();
+                }).catch(function (err) {
+                    setDeckModalMessage(err.message || String(err), true);
+                });
+            }
+        });
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        if (cpDeckModal && cpDeckModal.classList.contains('is-open')) closeDeckModal();
+    });
+
     document.getElementById('cpRefresh').addEventListener('click', refreshLibrary);
-    document.getElementById('cpSelectAll').addEventListener('click', function () {
-        libraryListEl.querySelectorAll('input[type="checkbox"]').forEach(function (b) { b.checked = true; });
-    });
-    document.getElementById('cpSelectNone').addEventListener('click', function () {
-        libraryListEl.querySelectorAll('input[type="checkbox"]').forEach(function (b) { b.checked = false; });
-    });
-    document.getElementById('cpBuildDeck').addEventListener('click', buildDeckFromSelection);
     document.getElementById('cpUseAll').addEventListener('click', useAllAsDeck);
     document.getElementById('cpShuffle').addEventListener('click', shuffleDeck);
     document.getElementById('cpDraw').addEventListener('click', drawOne);
@@ -773,6 +1199,13 @@
     try {
         document.fonts.load('200px Medieval').catch(function () {});
     } catch (e) {}
+
+    waitForGoogleScripts(8000).then(function (ok) {
+        if (!ok || !window.CPDrive) return;
+        return CPDrive.tryRestoreSession();
+    }).then(function () {
+        updateDeckDriveUi();
+    }).catch(function () {});
 
     attachDrawZoneDrag();
     refreshLibrary();
