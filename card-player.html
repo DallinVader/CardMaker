@@ -102,10 +102,11 @@
                 </div>
                 <div class="cp-mp">
                     <h2>Online (2 players)</h2>
-                    <p class="cp-muted">Run <code style="color:#93c5fd">npm install</code> then <code style="color:#93c5fd">npm run multiplayer</code> on one machine. Others open <code style="color:#93c5fd">http://&lt;that-computer-ip&gt;:8765/card-player.html</code> and use the same WebSocket URL (see server log). Host builds the deck and draws; both can move cards. Each player needs the same card files in their library (cache + imports).</p>
+                    <p id="cpMpHttpsWarn" class="cp-muted" hidden style="padding:12px 14px;border-radius:12px;border:1px solid rgba(251,191,36,0.45);background:rgba(120,53,15,0.35);color:#fde68a;line-height:1.5"><strong>Playing from GitHub Pages:</strong> this site is HTTPS, so you must use <code style="color:#fcd34d">wss://</code> (not <code style="color:#fcd34d">ws://</code>). On the host PC run <code style="color:#fcd34d">npm start</code> (from the CardMaker folder, after <code style="color:#fcd34d">npm install</code>), then in another terminal run <code style="color:#fcd34d">cloudflared tunnel --url http://127.0.0.1:8765</code> (install <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noopener" style="color:#fbbf24">cloudflared</a>) or <code style="color:#fcd34d">ngrok http 8765</code>. Copy the tunnel’s hostname and paste <strong><code style="color:#fcd34d">wss://THAT-HOST</code></strong> below (same host as the https:// line, only the scheme is wss). Optional: share <code style="color:#fcd34d">card-player.html?mp=wss%3A%2F%2Fyour-tunnel…</code> so the URL is prefilled.</p>
+                    <p class="cp-muted"><strong>LAN:</strong> run <code style="color:#93c5fd">npm start</code> and use the printed <code style="color:#93c5fd">ws://…</code> from <code style="color:#93c5fd">http://…:8765/card-player.html</code>. <strong>Internet + this Pages URL:</strong> host runs the game server + a tunnel; everyone keeps using GitHub Pages for the UI and puts the tunnel’s <code style="color:#93c5fd">wss://…</code> in the box. Firewall: allow TCP <strong>8765</strong> on the host where Node runs. Same card data on each side (imports OK).</p>
                     <div class="cp-row">
                         <label for="cpWsUrl">WebSocket</label>
-                        <input type="text" id="cpWsUrl" autocomplete="off" placeholder="ws://192.168.1.5:8765" />
+                        <input type="text" id="cpWsUrl" autocomplete="off" placeholder="wss://abc.trycloudflare.com or ws://192.168.1.5:8765" />
                     </div>
                     <div class="cp-actions">
                         <button type="button" class="cp-btn cp-btn-primary" id="cpMpHost">Host room</button>
@@ -173,7 +174,11 @@
     var cpImportFile = document.getElementById('cpImportFile');
 
     function defaultWsUrl() {
-        if (typeof location !== 'undefined' && location.protocol === 'http:' && location.hostname) {
+        if (typeof location === 'undefined') return '';
+        if (location.protocol === 'https:') {
+            return '';
+        }
+        if (location.protocol === 'http:' && location.hostname) {
             return 'ws://' + location.hostname + ':8765';
         }
         return 'ws://localhost:8765';
@@ -185,6 +190,49 @@
             if (s && s.trim()) return s.trim();
         } catch (e) { /* ignore */ }
         return defaultWsUrl();
+    }
+
+    function resolveWebSocketUrlInput() {
+        var el = document.getElementById('cpWsUrl');
+        var raw = el && el.value ? el.value.trim() : '';
+        if (raw) return raw;
+        return defaultWsUrl();
+    }
+
+    function validateMultiplayerWs(wsUrl) {
+        var u = String(wsUrl || '').trim();
+        if (!u) {
+            if (typeof location !== 'undefined' && location.protocol === 'https:') {
+                return 'Set WebSocket to wss:// from your tunnel (cloudflared / ngrok). Example in the yellow box above, or add ?mp=wss://… to this page URL.';
+            }
+            return 'Paste a WebSocket URL: wss://… for GitHub Pages (tunnel), or ws://… for LAN (npm start on host).';
+        }
+        if (typeof location !== 'undefined' && location.protocol === 'https:' && /^ws:\/\//i.test(u)) {
+            return 'This page is HTTPS: use wss:// (tunnel to the host game server), not ws:// — see yellow box.';
+        }
+        return null;
+    }
+
+    function showMultiplayerHttpsWarning() {
+        var w = document.getElementById('cpMpHttpsWarn');
+        if (!w || typeof location === 'undefined') return;
+        w.hidden = location.protocol !== 'https:';
+    }
+
+    function applyMpQueryParam() {
+        try {
+            if (typeof location === 'undefined' || !location.search) return;
+            var params = new URLSearchParams(location.search);
+            var relay = params.get('mp') || params.get('wss') || params.get('relay');
+            if (!relay || !String(relay).trim()) return;
+            relay = String(relay).trim();
+            if (!/^wss:\/\//i.test(relay) && !/^ws:\/\//i.test(relay)) return;
+            var inp = document.getElementById('cpWsUrl');
+            if (inp) inp.value = relay;
+            try {
+                localStorage.setItem(WS_STORAGE, relay);
+            } catch (e) { /* ignore */ }
+        } catch (e) { /* ignore */ }
     }
 
     function setStatus(msg) {
@@ -750,9 +798,36 @@
     document.getElementById('cpClearField').addEventListener('click', clearField);
 
     document.getElementById('cpWsUrl').value = loadWsUrl();
+    applyMpQueryParam();
+    showMultiplayerHttpsWarning();
+
+    function attachMpSocketHandlers(ws, onConnected) {
+        ws.onmessage = handleWsMessage;
+        ws.onclose = function (ev) {
+            if (mpWs !== this) return;
+            var hadRoom = !!mpRoom;
+            resetMpClient();
+            if (hadRoom) {
+                setStatus('Disconnected from server.');
+            } else if (ev && (ev.code === 1006 || ev.code === 1002)) {
+                setStatus('Could not connect. GitHub Pages needs wss:// (tunnel). LAN needs ws:// to host IP. Check tunnel is up and firewall allows port 8765 on the host.');
+            }
+        };
+        ws.onerror = function () {
+            setStatus('WebSocket failed — host running npm start + tunnel? On GitHub Pages use wss:// from cloudflared/ngrok, not ws://.');
+        };
+        ws.onopen = function () {
+            onConnected();
+        };
+    }
 
     document.getElementById('cpMpHost').addEventListener('click', function () {
-        var url = document.getElementById('cpWsUrl').value.trim() || defaultWsUrl();
+        var url = resolveWebSocketUrlInput();
+        var err = validateMultiplayerWs(url);
+        if (err) {
+            setStatus(err);
+            return;
+        }
         try {
             localStorage.setItem(WS_STORAGE, url);
         } catch (e) { /* ignore */ }
@@ -762,19 +837,9 @@
             } catch (e) { /* ignore */ }
         }
         mpWs = new WebSocket(url);
-        mpWs.onmessage = handleWsMessage;
-        mpWs.onclose = function () {
-            if (mpWs !== this) return;
-            var was = !!mpRoom;
-            resetMpClient();
-            if (was) setStatus('Disconnected from server.');
-        };
-        mpWs.onerror = function () {
-            setStatus('WebSocket error — is the multiplayer server running?');
-        };
-        mpWs.onopen = function () {
+        attachMpSocketHandlers(mpWs, function () {
             mpWs.send(JSON.stringify({ type: 'create' }));
-        };
+        });
     });
 
     document.getElementById('cpMpJoin').addEventListener('click', function () {
@@ -783,7 +848,12 @@
             setStatus('Enter the room code from the host.');
             return;
         }
-        var url = document.getElementById('cpWsUrl').value.trim() || defaultWsUrl();
+        var url = resolveWebSocketUrlInput();
+        var err = validateMultiplayerWs(url);
+        if (err) {
+            setStatus(err);
+            return;
+        }
         try {
             localStorage.setItem(WS_STORAGE, url);
         } catch (e) { /* ignore */ }
@@ -793,19 +863,9 @@
             } catch (e) { /* ignore */ }
         }
         mpWs = new WebSocket(url);
-        mpWs.onmessage = handleWsMessage;
-        mpWs.onclose = function () {
-            if (mpWs !== this) return;
-            var was = !!mpRoom;
-            resetMpClient();
-            if (was) setStatus('Disconnected from server.');
-        };
-        mpWs.onerror = function () {
-            setStatus('WebSocket error — is the multiplayer server running?');
-        };
-        mpWs.onopen = function () {
+        attachMpSocketHandlers(mpWs, function () {
             mpWs.send(JSON.stringify({ type: 'join', room: code }));
-        };
+        });
     });
 
     document.getElementById('cpMpDisconnect').addEventListener('click', function () {

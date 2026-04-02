@@ -1,14 +1,20 @@
 /**
- * Minimal WebSocket relay for card-player multiplayer.
- * Run: npm install && npm run multiplayer
- * Then open card-player from http://YOUR_IP:8765 (this server serves static files too) or any static host,
- * and set WebSocket URL to ws://YOUR_IP:8765 (or wss if you terminate TLS in front).
+ * Card-player multiplayer relay (HTTP + WebSocket, same port).
+ *
+ * Local / LAN: npm start → use ws://LAN_IP:8765 from http://LAN_IP:8765/card-player.html
+ *
+ * GitHub Pages (https): browsers only allow wss:// from an https page. Options:
+ *   1) Tunnel (easiest): run this server, then e.g. `cloudflared tunnel --url http://127.0.0.1:8765`
+ *      and in Card Player paste wss://YOUR_SUBDOMAIN.trycloudflare.com (same host as the tunnel URL, wss not https).
+ *   2) Native TLS: set SSL_KEY_PATH + SSL_CERT_PATH to PEM files, restart; use wss://your-host:PORT
  */
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const https = require('https');
+const os = require('os');
 const WebSocket = require('ws');
 
 const PORT = parseInt(process.env.PORT || '8765', 10);
@@ -91,7 +97,7 @@ function removePeer(ws) {
   ws.cmIsHost = undefined;
 }
 
-const server = http.createServer((req, res) => {
+function handleStaticFile(req, res) {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405);
     res.end();
@@ -120,7 +126,22 @@ const server = http.createServer((req, res) => {
     }
     fs.createReadStream(filePath).pipe(res);
   });
-});
+}
+
+const keyPath = process.env.SSL_KEY_PATH || '';
+const certPath = process.env.SSL_CERT_PATH || '';
+const useTls =
+  Boolean(keyPath && certPath && fs.existsSync(keyPath) && fs.existsSync(certPath));
+
+const server = useTls
+  ? https.createServer(
+      {
+        key: fs.readFileSync(keyPath),
+        cert: fs.readFileSync(certPath)
+      },
+      handleStaticFile
+    )
+  : http.createServer(handleStaticFile);
 
 const wss = new WebSocket.Server({ server });
 
@@ -253,7 +274,64 @@ wss.on('connection', (ws) => {
   ws.on('error', () => removePeer(ws));
 });
 
-server.listen(PORT, () => {
-  console.log('Card player multiplayer + static files at http://0.0.0.0:' + PORT + '/card-player.html');
-  console.log('WebSocket: ws://0.0.0.0:' + PORT);
+function listLanIPv4s() {
+  const out = [];
+  const ifs = os.networkInterfaces();
+  for (const name of Object.keys(ifs)) {
+    for (const addr of ifs[name] || []) {
+      const v4 = addr.family === 'IPv4' || addr.family === 4;
+      if (v4 && !addr.internal) {
+        out.push(addr.address);
+      }
+    }
+  }
+  return out;
+}
+
+server.on('error', (err) => {
+  if (err && err.code === 'EADDRINUSE') {
+    console.error('');
+    console.error('Port ' + PORT + ' is already in use (another server or app is using it).');
+    console.error('');
+    console.error('Fix: close that process, or use a different port, e.g.');
+    console.error('  Windows PowerShell:  $env:PORT=8766; npm start');
+    console.error('  Windows cmd:         set PORT=8766 && npm start');
+    console.error('  macOS/Linux:         PORT=8766 npm start');
+    console.error('');
+    console.error('If you use e.g. PORT=8766, use that same port in the game WebSocket URL and in cloudflared (--url http://127.0.0.1:8766).');
+    console.error('');
+    process.exit(1);
+  }
+  throw err;
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+  const wsProto = useTls ? 'wss' : 'ws';
+  const httpProto = useTls ? 'https' : 'http';
+  console.log('');
+  console.log(
+    'Listening on 0.0.0.0:' + PORT + (useTls ? ' (HTTPS + WSS)' : ' (HTTP + WS)')
+  );
+  console.log('GitHub Pages: use a tunnel for wss:// → this port, or set SSL_* env for wss:// here.');
+  console.log('If Windows asks, allow Node.js / inbound TCP ' + PORT + '.');
+  console.log('');
+  const ips = listLanIPv4s();
+  if (ips.length === 0) {
+    console.log('Local: ' + httpProto + '://127.0.0.1:' + PORT + '/card-player.html');
+    console.log('WebSocket: ' + wsProto + '://127.0.0.1:' + PORT);
+  } else {
+    ips.forEach((ip) => {
+      console.log('LAN page: ' + httpProto + '://' + ip + ':' + PORT + '/card-player.html');
+      console.log('  WebSocket: ' + wsProto + '://' + ip + ':' + PORT);
+    });
+    console.log('Local: ' + httpProto + '://127.0.0.1:' + PORT + '/card-player.html');
+  }
+  console.log('');
+  if (!useTls) {
+    console.log(
+      'Tunnel example (Cloudflare): cloudflared tunnel --url http://127.0.0.1:' + PORT
+    );
+    console.log('Then on https://YOUR.github.io/.../card-player use WebSocket wss://SUBDOMAIN.trycloudflare.com');
+  }
+  console.log('');
 });
