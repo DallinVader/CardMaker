@@ -156,11 +156,37 @@
             transform-style: preserve-3d;
             transform: scale(1);
             transform-origin: center center;
-            transition: transform 0.35s ease;
+            transition: width 0.28s cubic-bezier(0.22, 1, 0.36, 1), transform 0.2s ease, filter 0.25s ease;
+            backface-visibility: hidden;
         }
+        /* Enlarge by real width (sharp). --cp-enlarge-shift nudges card up/down to stay in viewport. */
         .cp-card-on-field.cp-card-enlarged {
-            transform: scale(1.75);
+            transform: translateY(var(--cp-enlarge-shift, 0px));
+            width: min(340px, 76vw) !important;
+            max-height: calc(100vh - 28px);
             z-index: 6500 !important;
+            filter: drop-shadow(0 16px 32px rgba(0, 0, 0, 0.55));
+        }
+        .cp-card-on-field.cp-hand-card.cp-card-enlarged {
+            width: min(420px, 86vw) !important;
+        }
+        @media (max-width: 640px) {
+            .cp-card-on-field.cp-card-enlarged { width: min(280px, 86vw) !important; }
+            .cp-card-on-field.cp-hand-card.cp-card-enlarged { width: min(320px, 90vw) !important; }
+        }
+        .cp-card-on-field.cp-card-enlarged .cp-card-rot {
+            max-height: calc(100vh - 36px);
+        }
+        .cp-card-on-field.cp-card-enlarged .cp-flip-inner {
+            max-height: inherit;
+        }
+        .cp-card-on-field.cp-card-enlarged .cp-flip-face img {
+            max-height: min(calc(100vh - 48px), 82vh);
+            width: 100%;
+            height: auto;
+            object-fit: contain;
+            image-rendering: auto;
+            image-rendering: high-quality;
         }
         .cp-card-rot {
             width: 100%;
@@ -203,7 +229,15 @@
         @media (prefers-reduced-motion: reduce) {
             .cp-flip-inner { transition: none; }
             .cp-card-on-field { transition: none; }
-            .cp-card-on-field.cp-card-enlarged { transform: scale(1); }
+            .cp-card-on-field.cp-card-enlarged {
+                width: min(133px, 18.67vw) !important;
+                max-height: none;
+                transform: none;
+                filter: none;
+            }
+            .cp-card-on-field.cp-hand-card.cp-card-enlarged {
+                width: min(92px, 13vw) !important;
+            }
         }
         .cp-status { margin-top: 10px; font-size: 12px; color: #93c5fd; min-height: 1.25em; }
         .cp-file-input { display: none; }
@@ -871,6 +905,39 @@
         });
     }
 
+    function fitEnlargedCardInViewport(wrap) {
+        if (!wrap || !wrap.classList.contains('cp-card-enlarged')) return;
+        var margin = 14;
+        var prevStr = getComputedStyle(wrap).getPropertyValue('--cp-enlarge-shift').trim();
+        var prev = 0;
+        if (prevStr) {
+            prev = parseFloat(prevStr);
+            if (!isFinite(prev)) prev = 0;
+        }
+        var r = wrap.getBoundingClientRect();
+        var extra = 0;
+        var maxBottom = window.innerHeight - margin;
+        if (r.bottom > maxBottom) {
+            extra += maxBottom - r.bottom;
+        }
+        var newTop = r.top + extra;
+        if (newTop < margin) {
+            extra += margin - newTop;
+        }
+        wrap.style.setProperty('--cp-enlarge-shift', (prev + extra) + 'px');
+    }
+
+    function scheduleEnlargeViewportFit(wrap) {
+        function run() {
+            fitEnlargedCardInViewport(wrap);
+        }
+        requestAnimationFrame(function () {
+            requestAnimationFrame(run);
+        });
+        setTimeout(run, 60);
+        setTimeout(run, 320);
+    }
+
     function attachHoverEnlarge(wrap) {
         var hoverTimer = null;
         function clearEnlarge() {
@@ -879,13 +946,16 @@
                 hoverTimer = null;
             }
             wrap.classList.remove('cp-card-enlarged');
+            wrap.style.removeProperty('--cp-enlarge-shift');
         }
         function armIdleEnlarge() {
             if (hoverTimer != null) clearTimeout(hoverTimer);
+            var delayMs = wrap.classList.contains('cp-hand-card') ? 320 : 520;
             hoverTimer = setTimeout(function () {
                 hoverTimer = null;
                 wrap.classList.add('cp-card-enlarged');
-            }, 500);
+                scheduleEnlargeViewportFit(wrap);
+            }, delayMs);
         }
         function motionOk() {
             try {
