@@ -62,6 +62,7 @@
             position: absolute; width: min(133px, 18.67vw); border-radius: 10px;
             box-shadow: 0 16px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.12);
             cursor: grab; user-select: none; touch-action: none;
+            transform-origin: center center;
         }
         .cp-card-on-field:active { cursor: grabbing; }
         .cp-card-on-field img { display: block; width: 100%; height: auto; border-radius: 10px; vertical-align: top; pointer-events: none; }
@@ -102,11 +103,11 @@
                 </div>
                 <div class="cp-mp">
                     <h2>Online (2 players)</h2>
-                    <p id="cpMpHttpsWarn" class="cp-muted" hidden style="padding:12px 14px;border-radius:12px;border:1px solid rgba(251,191,36,0.45);background:rgba(120,53,15,0.35);color:#fde68a;line-height:1.5"><strong>Playing from GitHub Pages:</strong> this site is HTTPS, so you must use <code style="color:#fcd34d">wss://</code> (not <code style="color:#fcd34d">ws://</code>). On the host PC run <code style="color:#fcd34d">npm start</code> (from the CardMaker folder, after <code style="color:#fcd34d">npm install</code>), then in another terminal run <code style="color:#fcd34d">cloudflared tunnel --url http://127.0.0.1:8765</code> (install <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noopener" style="color:#fbbf24">cloudflared</a>) or <code style="color:#fcd34d">ngrok http 8765</code>. Copy the tunnel’s hostname and paste <strong><code style="color:#fcd34d">wss://THAT-HOST</code></strong> below (same host as the https:// line, only the scheme is wss). Optional: share <code style="color:#fcd34d">card-player.html?mp=wss%3A%2F%2Fyour-tunnel…</code> so the URL is prefilled.</p>
-                    <p class="cp-muted"><strong>LAN:</strong> run <code style="color:#93c5fd">npm start</code> and use the printed <code style="color:#93c5fd">ws://…</code> from <code style="color:#93c5fd">http://…:8765/card-player.html</code>. <strong>Internet + this Pages URL:</strong> host runs the game server + a tunnel; everyone keeps using GitHub Pages for the UI and puts the tunnel’s <code style="color:#93c5fd">wss://…</code> in the box. Firewall: allow TCP <strong>8765</strong> on the host where Node runs. Same card data on each side (imports OK).</p>
+                    <p id="cpMpHttpsWarn" class="cp-muted" hidden style="padding:12px 14px;border-radius:12px;border:1px solid rgba(251,191,36,0.45);background:rgba(120,53,15,0.35);color:#fde68a;line-height:1.5"><strong>You’re on GitHub Pages (HTTPS).</strong> This browser blocks <code style="color:#fcd34d">ws://</code> from a secure page. <strong>No tunnel tools needed:</strong> on the host run <code style="color:#fcd34d">npm start</code>, then open the <strong><code style="color:#fcd34d">http://…:8765/card-player.html</code></strong> link from the terminal (same Wi‑Fi → use the LAN IP). Everyone uses that <strong>http</strong> URL for the game and <strong><code style="color:#fcd34d">ws://…:8765</code></strong> here—works with no extra installs. <strong>Friends elsewhere:</strong> forward TCP port <strong>8765</strong> on your router to the host PC, then share <code style="color:#fcd34d">http://YOUR_PUBLIC_IP:8765/card-player.html</code> and the matching <code style="color:#fcd34d">ws://</code> URL. <strong>Stay on this GitHub Pages tab:</strong> run <code style="color:#fcd34d">multiplayer-server.js</code> with real TLS (no tunnel apps) — follow <strong><code style="color:#fcd34d">MULTIPLAYER-TLS.md</code></strong> in the repo (Let's Encrypt + <code style="color:#fcd34d">SSL_KEY_PATH</code> / <code style="color:#fcd34d">SSL_CERT_PATH</code>), then paste <code style="color:#fcd34d">wss://your-domain…</code> below. Optional <code style="color:#fcd34d">?mp=wss%3A%2F%2F…</code> pre-fills.</p>
+                    <p class="cp-muted"><strong>Typical play:</strong> <code style="color:#93c5fd">npm start</code> on the host → everyone opens <code style="color:#93c5fd">http://…:8765/card-player.html</code> and <code style="color:#93c5fd">ws://…:8765</code> from the terminal. Allow TCP <strong>8765</strong> through the host firewall; for players off your network, port-forward 8765 on the router. Same cards on each side (imports OK). Optional: <code style="color:#93c5fd">?mp=ws%3A%2F%2F192.168…</code> pre-fills WebSocket for <code style="color:#93c5fd">ws://</code>.</p>
                     <div class="cp-row">
                         <label for="cpWsUrl">WebSocket</label>
-                        <input type="text" id="cpWsUrl" autocomplete="off" placeholder="wss://abc.trycloudflare.com or ws://192.168.1.5:8765" />
+                        <input type="text" id="cpWsUrl" autocomplete="off" placeholder="ws://192.168.1.5:8765" />
                     </div>
                     <div class="cp-actions">
                         <button type="button" class="cp-btn cp-btn-primary" id="cpMpHost">Host room</button>
@@ -142,7 +143,7 @@
 
             <div class="cp-panel" style="padding: 0; overflow: hidden;">
                 <div class="cp-field-wrap">
-                    <span class="cp-field-label" id="cpFieldLabel">Playing field · drag cards</span>
+                    <span class="cp-field-label" id="cpFieldLabel">Playing field · drag · right-click rotates</span>
                     <div class="cp-field" id="cpPlayingField" aria-label="Playing field"></div>
                 </div>
             </div>
@@ -203,12 +204,12 @@
         var u = String(wsUrl || '').trim();
         if (!u) {
             if (typeof location !== 'undefined' && location.protocol === 'https:') {
-                return 'Set WebSocket to wss:// from your tunnel (cloudflared / ngrok). Example in the yellow box above, or add ?mp=wss://… to this page URL.';
+                return 'Open http://HOST:8765/card-player.html from npm start (then ws works), or set wss:// if you run the server with SSL_KEY_PATH / SSL_CERT_PATH — see yellow box.';
             }
-            return 'Paste a WebSocket URL: wss://… for GitHub Pages (tunnel), or ws://… for LAN (npm start on host).';
+            return 'Paste WebSocket URL: ws://… from npm start (http:// page), or wss://… only if you run the server with TLS.';
         }
         if (typeof location !== 'undefined' && location.protocol === 'https:' && /^ws:\/\//i.test(u)) {
-            return 'This page is HTTPS: use wss:// (tunnel to the host game server), not ws:// — see yellow box.';
+            return 'This page is HTTPS: ws:// is blocked. Open http://HOST:8765/card-player.html from the host terminal, or use wss:// with your own SSL — see yellow box.';
         }
         return null;
     }
@@ -344,11 +345,11 @@
         }
         var lbl = document.getElementById('cpFieldLabel');
         if (isGuest) {
-            lbl.textContent = 'Playing field · guest (host draws)';
+            lbl.textContent = 'Playing field · guest · drag · right-click rotates';
         } else if (conn && mpIsHost) {
-            lbl.textContent = 'Playing field · host · drag cards';
+            lbl.textContent = 'Playing field · host · drag · right-click rotates';
         } else {
-            lbl.textContent = 'Playing field · drag cards';
+            lbl.textContent = 'Playing field · drag · right-click rotates';
         }
     }
 
@@ -382,7 +383,7 @@
             var p = window.renderCardMakerProjectToDataUrl(c.state);
             if (!p || typeof p.then !== 'function') return;
             p.then(function (url) {
-                if (url) placeCardOnField(url, { left: msg.left, top: msg.top, instId: msg.instId });
+                if (url) placeCardOnField(url, { left: msg.left, top: msg.top, instId: msg.instId, rot: msg.rot });
             });
             updateMpUi();
             return;
@@ -401,6 +402,21 @@
                 el.style.left = msg.left + 'px';
                 el.style.top = msg.top + 'px';
             }
+            return;
+        }
+        if (a === 'rotate_card') {
+            var wantR = String(msg.instId);
+            var rotN = Number(msg.rot);
+            if (!isFinite(rotN)) return;
+            var nodesR = cpPlayingField.querySelectorAll('[data-inst-id]');
+            var elR = null;
+            for (var ri = 0; ri < nodesR.length; ri++) {
+                if (nodesR[ri].getAttribute('data-inst-id') === wantR) {
+                    elR = nodesR[ri];
+                    break;
+                }
+            }
+            if (elR) applyCardRotation(elR, rotN);
             return;
         }
         if (a === 'clear_field') {
@@ -484,7 +500,7 @@
                 var p = window.renderCardMakerProjectToDataUrl(c.state);
                 if (!p || typeof p.then !== 'function') return;
                 return p.then(function (url) {
-                    if (url) placeCardOnField(url, { left: item.left, top: item.top, instId: item.instId });
+                    if (url) placeCardOnField(url, { left: item.left, top: item.top, instId: item.instId, rot: item.rot });
                 });
             });
         });
@@ -657,10 +673,37 @@
         setStatus('Shuffled ' + deck.length + ' cards.');
     }
 
+    function normalizeRot(deg) {
+        var n = Math.round(Number(deg)) % 360;
+        if (n < 0) n += 360;
+        return n;
+    }
+
+    function applyCardRotation(el, rotDeg) {
+        if (!el) return;
+        var r = normalizeRot(rotDeg);
+        el.setAttribute('data-rotation', String(r));
+        el.style.transform = 'rotate(' + r + 'deg)';
+    }
+
+    function bindCardContextRotate(wrap, instId) {
+        wrap.addEventListener('contextmenu', function (e) {
+            e.preventDefault();
+            var cur = parseInt(wrap.getAttribute('data-rotation'), 10);
+            if (!isFinite(cur)) cur = 0;
+            var next = (cur + 90) % 360;
+            applyCardRotation(wrap, next);
+            if (mpRoom && mpWs && mpWs.readyState === 1) {
+                mpSend({ type: 'op', room: mpRoom, action: 'rotate_card', instId: instId, rot: next });
+            }
+        });
+    }
+
     function makeDraggable(el, field, instId) {
         var dragging = false;
         var startX = 0, startY = 0, origLeft = 0, origTop = 0;
         function down(ev) {
+            if (ev.button !== 0) return;
             dragging = true;
             startX = ev.clientX;
             startY = ev.clientY;
@@ -715,6 +758,9 @@
         img.alt = 'Card';
         wrap.appendChild(img);
         field.appendChild(wrap);
+        var rot0 = opts.rot != null ? normalizeRot(opts.rot) : 0;
+        applyCardRotation(wrap, rot0);
+        bindCardContextRotate(wrap, instId);
         makeDraggable(wrap, field, instId);
         return wrap;
     }
@@ -748,6 +794,7 @@
                     instId: wrap.getAttribute('data-inst-id'),
                     left: wrap.offsetLeft,
                     top: wrap.offsetTop,
+                    rot: 0,
                     deckIds: deck.map(function (c) { return c.id; })
                 });
             }
@@ -810,11 +857,11 @@
             if (hadRoom) {
                 setStatus('Disconnected from server.');
             } else if (ev && (ev.code === 1006 || ev.code === 1002)) {
-                setStatus('Could not connect. GitHub Pages needs wss:// (tunnel). LAN needs ws:// to host IP. Check tunnel is up and firewall allows port 8765 on the host.');
+                setStatus('Could not connect. Use ws:// and http://HOST:8765/card-player.html from npm start, or forward port 8765. If stuck on github.io https, you need wss + TLS on the server.');
             }
         };
         ws.onerror = function () {
-            setStatus('WebSocket failed — host running npm start + tunnel? On GitHub Pages use wss:// from cloudflared/ngrok, not ws://.');
+            setStatus('WebSocket failed — npm start running? From GitHub Pages, open http://HOST:8765/card-player.html (see terminal) so ws:// is allowed, or use wss:// with your own TLS.');
         };
         ws.onopen = function () {
             onConnected();

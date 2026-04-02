@@ -1,0 +1,5 @@
+# TLS keys and local secrets — never commit
+*.pem
+certs/
+.env
+.env.local

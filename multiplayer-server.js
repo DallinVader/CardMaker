@@ -3,10 +3,7 @@
  *
  * Local / LAN: npm start → use ws://LAN_IP:8765 from http://LAN_IP:8765/card-player.html
  *
- * GitHub Pages (https): browsers only allow wss:// from an https page. Options:
- *   1) Tunnel (easiest): run this server, then e.g. `cloudflared tunnel --url http://127.0.0.1:8765`
- *      and in Card Player paste wss://YOUR_SUBDOMAIN.trycloudflare.com (same host as the tunnel URL, wss not https).
- *   2) Native TLS: set SSL_KEY_PATH + SSL_CERT_PATH to PEM files, restart; use wss://your-host:PORT
+ * From https:// (e.g. github.io): ws:// is blocked unless you use TLS here. Option A: open http:// this-server / card-player. Option B (TLS): SSL_KEY_PATH + SSL_CERT_PATH (PEM) — see MULTIPLAYER-TLS.md. Optional SERVER_PUBLIC_HOST for log output.
  */
 'use strict';
 
@@ -128,10 +125,32 @@ function handleStaticFile(req, res) {
   });
 }
 
-const keyPath = process.env.SSL_KEY_PATH || '';
-const certPath = process.env.SSL_CERT_PATH || '';
-const useTls =
-  Boolean(keyPath && certPath && fs.existsSync(keyPath) && fs.existsSync(certPath));
+const keyPath = (process.env.SSL_KEY_PATH || '').trim();
+const certPath = (process.env.SSL_CERT_PATH || '').trim();
+const tlsRequested = Boolean(keyPath || certPath);
+
+if (tlsRequested) {
+  if (!keyPath || !certPath) {
+    console.error('TLS: set both SSL_KEY_PATH and SSL_CERT_PATH to your PEM files.');
+    process.exit(1);
+  }
+  if (!fs.existsSync(keyPath)) {
+    console.error('TLS: SSL_KEY_PATH not found:', keyPath);
+    process.exit(1);
+  }
+  if (!fs.existsSync(certPath)) {
+    console.error('TLS: SSL_CERT_PATH not found:', certPath);
+    process.exit(1);
+  }
+}
+
+const useTls = tlsRequested;
+
+function publicOrigin(proto, host, port) {
+  if (!host) return '';
+  if (port === 443) return proto + '://' + host;
+  return proto + '://' + host + ':' + port;
+}
 
 const server = useTls
   ? https.createServer(
@@ -233,9 +252,12 @@ wss.on('connection', (ws) => {
         const left = Number(msg.left);
         const top = Number(msg.top);
         if (!cardId || !instId || !Number.isFinite(left) || !Number.isFinite(top)) return;
+        let rot = Number(msg.rot);
+        if (!Number.isFinite(rot)) rot = 0;
+        rot = ((Math.round(rot) % 360) + 360) % 360;
         const deckIds = Array.isArray(msg.deckIds) ? msg.deckIds.map((id) => String(id)) : [];
         room.state.deckIds = deckIds;
-        room.state.field.push({ instId, cardId, left, top });
+        room.state.field.push({ instId, cardId, left, top, rot });
         broadcast(ws.cmRoom, {
           type: 'op',
           action: 'draw',
@@ -243,8 +265,20 @@ wss.on('connection', (ws) => {
           instId,
           left,
           top,
+          rot,
           deckIds: room.state.deckIds.slice()
         }, ws);
+        return;
+      }
+
+      if (a === 'rotate_card') {
+        const instId = String(msg.instId || '');
+        let rot = Number(msg.rot);
+        if (!instId || !Number.isFinite(rot)) return;
+        rot = ((Math.round(rot) % 360) + 360) % 360;
+        const f = room.state.field.find((x) => x.instId === instId);
+        if (f) f.rot = rot;
+        broadcast(ws.cmRoom, { type: 'op', action: 'rotate_card', instId, rot }, ws);
         return;
       }
 
@@ -298,7 +332,7 @@ server.on('error', (err) => {
     console.error('  Windows cmd:         set PORT=8766 && npm start');
     console.error('  macOS/Linux:         PORT=8766 npm start');
     console.error('');
-    console.error('If you use e.g. PORT=8766, use that same port in the game WebSocket URL and in cloudflared (--url http://127.0.0.1:8766).');
+    console.error('If you use e.g. PORT=8766, use that port in the browser URL and WebSocket (and in router port-forward if applicable).');
     console.error('');
     process.exit(1);
   }
@@ -312,7 +346,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(
     'Listening on 0.0.0.0:' + PORT + (useTls ? ' (HTTPS + WSS)' : ' (HTTP + WS)')
   );
-  console.log('GitHub Pages: use a tunnel for wss:// → this port, or set SSL_* env for wss:// here.');
+  console.log('On https://github.io: open the http:// links below for this game (ws:// works there), or set SSL_* for wss://.');
   console.log('If Windows asks, allow Node.js / inbound TCP ' + PORT + '.');
   console.log('');
   const ips = listLanIPv4s();
@@ -329,9 +363,22 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('');
   if (!useTls) {
     console.log(
-      'Tunnel example (Cloudflare): cloudflared tunnel --url http://127.0.0.1:' + PORT
+      'Remote players: forward router TCP ' + PORT + ' to this PC, then share http://YOUR_PUBLIC_IP:' + PORT + '/card-player.html'
     );
-    console.log('Then on https://YOUR.github.io/.../card-player use WebSocket wss://SUBDOMAIN.trycloudflare.com');
+  } else {
+    const pubHost = (process.env.SERVER_PUBLIC_HOST || '').trim();
+    if (pubHost) {
+      console.log('GitHub Pages / public TLS host (use these in Card Player):');
+      console.log(
+        '  Page:   ' + publicOrigin(httpProto, pubHost, PORT) + '/card-player.html'
+      );
+      console.log('  Socket: ' + publicOrigin(wsProto, pubHost, PORT));
+    } else {
+      console.log(
+        'TLS on: paste wss://YOUR_DOMAIN:' + PORT + ' in Card Player on GitHub Pages (matching cert name).'
+      );
+      console.log('Set SERVER_PUBLIC_HOST=your.hostname for ready-to-copy URLs above.');
+    }
   }
   console.log('');
 });
