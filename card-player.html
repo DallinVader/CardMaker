@@ -46,39 +46,118 @@
         .cp-list .cp-card-title { font-weight: 800; color: #f1f5f9; word-break: break-word; }
         .cp-list .cp-card-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
         .cp-field-wrap {
-            position: relative; border-radius: 16px; border: 1px solid rgba(34,197,94,0.35);
-            background:
-                radial-gradient(ellipse 120% 80% at 50% 20%, rgba(22,101,52,0.45), transparent 55%),
-                linear-gradient(160deg, #0f3d24 0%, #052e16 45%, #022c18 100%);
+            position: relative; border-radius: 16px; border: none;
+            background: rgba(15,23,42,0.55);
             min-height: min(70vh, 640px); overflow: hidden;
-            box-shadow: inset 0 0 80px rgba(0,0,0,0.35);
+            box-shadow: none;
+        }
+        .cp-panel.cp-panel-play {
+            border: none;
+            box-shadow: none;
+            background: transparent;
         }
         .cp-field-label {
             position: absolute; top: 12px; left: 16px; font-size: 11px; text-transform: uppercase;
-            letter-spacing: 0.1em; color: rgba(187,247,208,0.65); font-weight: 800; pointer-events: none; z-index: 0;
+            letter-spacing: 0.1em; color: rgba(148,163,184,0.75); font-weight: 800; pointer-events: none; z-index: 0;
         }
-        .cp-field { position: relative; width: 100%; height: min(70vh, 640px); z-index: 1; }
+        .cp-field {
+            position: relative; width: 100%; height: min(70vh, 640px); z-index: 1;
+            perspective: min(1600px, 200vw);
+            perspective-origin: 50% 45%;
+        }
+        .cp-draw-zone {
+            position: absolute; left: 14px; bottom: 14px;
+            width: min(118px, 22vw); height: min(165px, 29vw);
+            background: #050505; border: 2px solid #2a2a2a; border-radius: 12px; z-index: 5;
+            box-shadow: inset 0 0 24px rgba(0,0,0,0.65), 0 8px 24px rgba(0,0,0,0.35);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+            cursor: grab; user-select: none; touch-action: none; color: #94a3b8;
+        }
+        .cp-draw-zone:active { cursor: grabbing; }
+        .cp-discard-zone {
+            position: absolute; right: 14px; bottom: 14px;
+            width: min(168px, 30vw); height: min(190px, 34vw);
+            background: linear-gradient(145deg, #94a3b8 0%, #64748b 55%, #475569 100%);
+            border: 2px solid #475569; border-radius: 12px; z-index: 5;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 8px 24px rgba(0,0,0,0.3);
+            pointer-events: none;
+        }
+        .cp-zone-label {
+            font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em;
+            color: rgba(226,232,240,0.75); pointer-events: none;
+        }
+        .cp-draw-zone .cp-zone-label { color: rgba(148,163,184,0.95); }
+        .cp-discard-zone .cp-zone-label {
+            position: absolute; top: 10px; left: 0; right: 0; text-align: center; pointer-events: none;
+            color: rgba(15,23,42,0.75);
+        }
+        .cp-zone-count { font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; color: #e2e8f0; pointer-events: none; }
+        .cp-deck-drag-ghost {
+            position: fixed; width: min(88px, 16vw); aspect-ratio: 5 / 7;
+            background: #0f0f0f; border: 2px solid #3f3f46; border-radius: 8px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.5); pointer-events: none; z-index: 100000;
+            display: none; left: 0; top: 0; transform: translate(-50%, -50%);
+        }
         .cp-card-on-field {
             position: absolute; width: min(133px, 18.67vw); border-radius: 10px;
-            box-shadow: 0 16px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.12);
+            box-shadow: none;
+            outline: none;
+            border: none;
             cursor: grab; user-select: none; touch-action: none;
+            transform-style: preserve-3d;
+            transform: scale(1);
             transform-origin: center center;
+            transition: transform 0.35s ease;
+        }
+        .cp-card-on-field.cp-card-enlarged {
+            transform: scale(1.75);
+            z-index: 6500 !important;
+        }
+        .cp-card-rot {
+            width: 100%;
+            transform-origin: center center;
+            transform: rotate(0deg);
+            transform-style: preserve-3d;
         }
         .cp-card-on-field:active { cursor: grabbing; }
-        .cp-card-on-field img { display: block; width: 100%; height: auto; border-radius: 10px; vertical-align: top; pointer-events: none; }
+        .cp-flip-inner {
+            position: relative;
+            width: 100%;
+            transform-style: preserve-3d;
+            transition: transform 0.55s cubic-bezier(0.4, 0.0, 0.2, 1);
+        }
+        .cp-flip-inner.cp-flip-inner--back {
+            transform: rotateY(180deg);
+        }
+        .cp-flip-face {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .cp-flip-face-front {
+            position: relative;
+            z-index: 1;
+        }
+        .cp-flip-face-back {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            transform: rotateY(180deg);
+        }
+        .cp-flip-face img {
+            display: block; width: 100%; height: auto; border-radius: 10px;
+            vertical-align: top; pointer-events: none;
+            outline: none;
+            border: none;
+            box-shadow: none;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .cp-flip-inner { transition: none; }
+            .cp-card-on-field { transition: none; }
+            .cp-card-on-field.cp-card-enlarged { transform: scale(1); }
+        }
         .cp-status { margin-top: 10px; font-size: 12px; color: #93c5fd; min-height: 1.25em; }
         .cp-file-input { display: none; }
-        .cp-mp { margin-top: 8px; padding-top: 16px; border-top: 1px solid rgba(148,163,184,0.2); }
-        .cp-mp .cp-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
-        .cp-mp label { font-size: 12px; font-weight: 700; color: #94a3b8; }
-        .cp-mp input[type="text"] {
-            flex: 1; min-width: 180px; padding: 9px 11px; border-radius: 10px;
-            border: 1px solid rgba(255,255,255,0.14); background: rgba(15,23,42,0.45); color: #e2e8f0; font-weight: 600;
-        }
-        .cp-mp-badge {
-            font-size: 12px; font-weight: 800; padding: 6px 10px; border-radius: 8px;
-            background: rgba(99,102,241,0.2); border: 1px solid rgba(129,140,248,0.35); color: #c7d2fe;
-        }
     </style>
 </head>
 <body>
@@ -95,35 +174,14 @@
         <div class="cp-main">
             <div class="cp-panel">
                 <h2>Saved cards</h2>
-                <p class="cp-muted">The library is stored <strong>only in this browser</strong> for <strong id="cpOriginHint">this site</strong>. It does not carry over from <code style="color:#93c5fd">localhost</code> to GitHub Pages (different origins). To fill the cache here: open <a href="saved-projects.html" style="color:#93c5fd">Saved projects</a> on <em>this same URL</em>, sign in to Google, and wait until all saves finish loading. Your Google Cloud OAuth “Authorized JavaScript origins” must include this origin or sign-in will fail on Pages. Alternatively, use <strong>Import JSON</strong> — imports are saved in the browser so they persist after refresh (watch storage limits if art is huge).</p>
+                <p class="cp-muted">Loads cards from the same cache as <strong>Saved projects</strong> (open that page once while signed in so downloads are cached). You can also import <code style="color:#93c5fd">.cardmaker.json</code> files.</p>
                 <div class="cp-stats">
                     <span id="cpStatLibrary">Library: —</span>
                     <span id="cpStatDeck">Deck: 0</span>
-                    <span id="cpStatOnline" class="cp-muted" style="display:none;font-size:12px;padding:8px 12px;border-radius:10px;border:1px solid rgba(148,163,184,0.15);background:rgba(15,23,42,0.5);font-weight:700;color:#a5b4fc"></span>
-                </div>
-                <div class="cp-mp">
-                    <h2>Online (2 players)</h2>
-                    <p id="cpMpHttpsWarn" class="cp-muted" hidden style="padding:12px 14px;border-radius:12px;border:1px solid rgba(251,191,36,0.45);background:rgba(120,53,15,0.35);color:#fde68a;line-height:1.5"><strong>You’re on GitHub Pages (HTTPS).</strong> This browser blocks <code style="color:#fcd34d">ws://</code> from a secure page. <strong>No tunnel tools needed:</strong> on the host run <code style="color:#fcd34d">npm start</code>, then open the <strong><code style="color:#fcd34d">http://…:8765/card-player.html</code></strong> link from the terminal (same Wi‑Fi → use the LAN IP). Everyone uses that <strong>http</strong> URL for the game and <strong><code style="color:#fcd34d">ws://…:8765</code></strong> here—works with no extra installs. <strong>Friends elsewhere:</strong> forward TCP port <strong>8765</strong> on your router to the host PC, then share <code style="color:#fcd34d">http://YOUR_PUBLIC_IP:8765/card-player.html</code> and the matching <code style="color:#fcd34d">ws://</code> URL. <strong>Stay on this GitHub Pages tab:</strong> run <code style="color:#fcd34d">multiplayer-server.js</code> with real TLS (no tunnel apps) — follow <strong><code style="color:#fcd34d">MULTIPLAYER-TLS.md</code></strong> in the repo (Let's Encrypt + <code style="color:#fcd34d">SSL_KEY_PATH</code> / <code style="color:#fcd34d">SSL_CERT_PATH</code>), then paste <code style="color:#fcd34d">wss://your-domain…</code> below. Optional <code style="color:#fcd34d">?mp=wss%3A%2F%2F…</code> pre-fills.</p>
-                    <p class="cp-muted"><strong>Typical play:</strong> <code style="color:#93c5fd">npm start</code> on the host → everyone opens <code style="color:#93c5fd">http://…:8765/card-player.html</code> and <code style="color:#93c5fd">ws://…:8765</code> from the terminal. Allow TCP <strong>8765</strong> through the host firewall; for players off your network, port-forward 8765 on the router. Same cards on each side (imports OK). Optional: <code style="color:#93c5fd">?mp=ws%3A%2F%2F192.168…</code> pre-fills WebSocket for <code style="color:#93c5fd">ws://</code>.</p>
-                    <div class="cp-row">
-                        <label for="cpWsUrl">WebSocket</label>
-                        <input type="text" id="cpWsUrl" autocomplete="off" placeholder="ws://192.168.1.5:8765" />
-                    </div>
-                    <div class="cp-actions">
-                        <button type="button" class="cp-btn cp-btn-primary" id="cpMpHost">Host room</button>
-                        <button type="button" class="cp-btn" id="cpMpJoin">Join room</button>
-                        <button type="button" class="cp-btn" id="cpMpDisconnect" disabled>Disconnect</button>
-                    </div>
-                    <div class="cp-row">
-                        <label for="cpRoomCode">Room code</label>
-                        <input type="text" id="cpRoomCode" autocomplete="off" placeholder="Host creates · guest pastes code" maxlength="8" style="text-transform:uppercase;letter-spacing:0.12em;font-weight:900" />
-                        <span class="cp-mp-badge" id="cpMpRole" hidden>—</span>
-                    </div>
                 </div>
                 <div class="cp-actions">
                     <button type="button" class="cp-btn" id="cpRefresh">Refresh library</button>
                     <button type="button" class="cp-btn" id="cpImportBtn">Import JSON…</button>
-                    <button type="button" class="cp-btn" id="cpClearImports">Clear saved imports</button>
                     <input type="file" class="cp-file-input" id="cpImportFile" accept=".json,application/json" multiple />
                     <button type="button" class="cp-btn" id="cpSelectAll">Select all</button>
                     <button type="button" class="cp-btn" id="cpSelectNone">Select none</button>
@@ -141,10 +199,19 @@
                 <p class="cp-status" id="cpStatus" aria-live="polite"></p>
             </div>
 
-            <div class="cp-panel" style="padding: 0; overflow: hidden;">
+            <div class="cp-panel cp-panel-play" style="padding: 0; overflow: hidden;">
                 <div class="cp-field-wrap">
-                    <span class="cp-field-label" id="cpFieldLabel">Playing field · drag · right-click rotates</span>
-                    <div class="cp-field" id="cpPlayingField" aria-label="Playing field"></div>
+                    <span class="cp-field-label">Playing field · drag · right-click rotates · middle-click flips · deck left · discard right</span>
+                    <div class="cp-field" id="cpPlayingField" aria-label="Playing field">
+                        <div class="cp-draw-zone" id="cpDrawZone" title="Drag out to draw. Drop a card here to put it back on the deck.">
+                            <span class="cp-zone-label">Deck</span>
+                            <span class="cp-zone-count" id="cpDeckCountZone">0</span>
+                        </div>
+                        <div class="cp-discard-zone" id="cpDiscardZone" title="Discard — drop cards here face up">
+                            <span class="cp-zone-label">Discard</span>
+                        </div>
+                    </div>
+                    <div class="cp-deck-drag-ghost" id="cpDeckDragGhost" aria-hidden="true"></div>
                 </div>
             </div>
         </div>
@@ -156,364 +223,26 @@
     var SPM_IDB_NAME = 'cardmaker-spm-saves';
     var SPM_IDB_STORE = 'byFileId';
     var SPM_IDB_VERSION = 1;
-    var WS_STORAGE = 'cardmaker_mp_ws_v1';
-    var IMPORTS_STORAGE_KEY = 'cardmaker_player_imports_v1';
 
     var library = [];
     var imported = [];
     var deck = [];
-    var mpWs = null;
-    var mpRoom = '';
-    var mpIsHost = false;
-    var mpRemoteDeckIds = null;
     var libraryListEl = document.getElementById('cpLibraryList');
     var cpStatLibrary = document.getElementById('cpStatLibrary');
     var cpStatDeck = document.getElementById('cpStatDeck');
     var cpStatus = document.getElementById('cpStatus');
     var cpDraw = document.getElementById('cpDraw');
     var cpPlayingField = document.getElementById('cpPlayingField');
+    var cpDrawZone = document.getElementById('cpDrawZone');
+    var cpDiscardZone = document.getElementById('cpDiscardZone');
+    var cpDeckCountZone = document.getElementById('cpDeckCountZone');
+    var cpDeckDragGhost = document.getElementById('cpDeckDragGhost');
     var cpImportFile = document.getElementById('cpImportFile');
 
-    function defaultWsUrl() {
-        if (typeof location === 'undefined') return '';
-        if (location.protocol === 'https:') {
-            return '';
-        }
-        if (location.protocol === 'http:' && location.hostname) {
-            return 'ws://' + location.hostname + ':8765';
-        }
-        return 'ws://localhost:8765';
-    }
-
-    function loadWsUrl() {
-        try {
-            var s = localStorage.getItem(WS_STORAGE);
-            if (s && s.trim()) return s.trim();
-        } catch (e) { /* ignore */ }
-        return defaultWsUrl();
-    }
-
-    function resolveWebSocketUrlInput() {
-        var el = document.getElementById('cpWsUrl');
-        var raw = el && el.value ? el.value.trim() : '';
-        if (raw) return raw;
-        return defaultWsUrl();
-    }
-
-    function validateMultiplayerWs(wsUrl) {
-        var u = String(wsUrl || '').trim();
-        if (!u) {
-            if (typeof location !== 'undefined' && location.protocol === 'https:') {
-                return 'Open http://HOST:8765/card-player.html from npm start (then ws works), or set wss:// if you run the server with SSL_KEY_PATH / SSL_CERT_PATH — see yellow box.';
-            }
-            return 'Paste WebSocket URL: ws://… from npm start (http:// page), or wss://… only if you run the server with TLS.';
-        }
-        if (typeof location !== 'undefined' && location.protocol === 'https:' && /^ws:\/\//i.test(u)) {
-            return 'This page is HTTPS: ws:// is blocked. Open http://HOST:8765/card-player.html from the host terminal, or use wss:// with your own SSL — see yellow box.';
-        }
-        return null;
-    }
-
-    function showMultiplayerHttpsWarning() {
-        var w = document.getElementById('cpMpHttpsWarn');
-        if (!w || typeof location === 'undefined') return;
-        w.hidden = location.protocol !== 'https:';
-    }
-
-    function applyMpQueryParam() {
-        try {
-            if (typeof location === 'undefined' || !location.search) return;
-            var params = new URLSearchParams(location.search);
-            var relay = params.get('mp') || params.get('wss') || params.get('relay');
-            if (!relay || !String(relay).trim()) return;
-            relay = String(relay).trim();
-            if (!/^wss:\/\//i.test(relay) && !/^ws:\/\//i.test(relay)) return;
-            var inp = document.getElementById('cpWsUrl');
-            if (inp) inp.value = relay;
-            try {
-                localStorage.setItem(WS_STORAGE, relay);
-            } catch (e) { /* ignore */ }
-        } catch (e) { /* ignore */ }
-    }
+    var deckDrag = { active: false, moved: false, startX: 0, startY: 0 };
 
     function setStatus(msg) {
         cpStatus.textContent = msg || '';
-    }
-
-    function mpSend(obj) {
-        if (mpWs && mpWs.readyState === 1) {
-            mpWs.send(JSON.stringify(obj));
-        }
-    }
-
-    function resetMpClient() {
-        mpWs = null;
-        mpRoom = '';
-        mpIsHost = false;
-        mpRemoteDeckIds = null;
-        updateStats();
-    }
-
-    function mpDisconnect() {
-        if (mpWs) {
-            try {
-                mpWs.close();
-            } catch (e) { /* ignore */ }
-        }
-        resetMpClient();
-    }
-
-    function stableImportIdFromState(state) {
-        var f = (state && state.fields) || {};
-        var parts = [
-            String(f.Title || ''),
-            String(f.CardSetNumber || ''),
-            String(f.CardSetTotal || ''),
-            String((state && state.updatedAt) || ''),
-            String(f.CardMakerSetId || '')
-        ].join('\t');
-        var h = 5381;
-        for (var si = 0; si < parts.length; si++) {
-            h = ((h << 5) + h) ^ parts.charCodeAt(si);
-        }
-        return 'imp_' + (h >>> 0).toString(36);
-    }
-
-    function loadImportsFromStorage() {
-        imported = [];
-        try {
-            var raw = localStorage.getItem(IMPORTS_STORAGE_KEY);
-            if (!raw) return;
-            var j = JSON.parse(raw);
-            var arr = Array.isArray(j) ? j : (j && Array.isArray(j.cards) ? j.cards : []);
-            var byId = {};
-            arr.forEach(function (row) {
-                if (!row || typeof row.state !== 'object' || !row.state.fields) return;
-                var id = (row.id && String(row.id).trim()) || stableImportIdFromState(row.state);
-                byId[id] = { id: id, state: row.state, source: 'file' };
-            });
-            imported = Object.keys(byId).map(function (k) { return byId[k]; });
-        } catch (e) {
-            imported = [];
-        }
-    }
-
-    function saveImportsToStorage() {
-        try {
-            var payload = {
-                v: 1,
-                cards: imported.map(function (c) {
-                    return { id: c.id, state: c.state };
-                })
-            };
-            localStorage.setItem(IMPORTS_STORAGE_KEY, JSON.stringify(payload));
-        } catch (e) {
-            if (e && e.name === 'QuotaExceededError') {
-                setStatus('Storage full: trim card art or import fewer cards.');
-            }
-        }
-    }
-
-    function getCardById(id) {
-        var want = String(id);
-        var all = allCards();
-        for (var i = 0; i < all.length; i++) {
-            if (all[i].id === want) return all[i];
-        }
-        return null;
-    }
-
-    function updateMpUi() {
-        var conn = !!(mpWs && mpWs.readyState === 1);
-        var isGuest = conn && mpRoom && !mpIsHost;
-        document.getElementById('cpMpDisconnect').disabled = !conn;
-        document.getElementById('cpMpHost').disabled = conn;
-        document.getElementById('cpMpJoin').disabled = conn;
-        document.getElementById('cpBuildDeck').disabled = isGuest;
-        document.getElementById('cpUseAll').disabled = isGuest;
-        document.getElementById('cpShuffle').disabled = isGuest || deck.length === 0;
-        var badge = document.getElementById('cpMpRole');
-        var online = document.getElementById('cpStatOnline');
-        if (conn && mpRoom) {
-            badge.hidden = false;
-            badge.textContent = mpIsHost ? 'Host' : 'Guest';
-            online.style.display = '';
-            online.textContent = 'Online · ' + mpRoom;
-        } else {
-            badge.hidden = true;
-            online.style.display = 'none';
-        }
-        var lbl = document.getElementById('cpFieldLabel');
-        if (isGuest) {
-            lbl.textContent = 'Playing field · guest · drag · right-click rotates';
-        } else if (conn && mpIsHost) {
-            lbl.textContent = 'Playing field · host · drag · right-click rotates';
-        } else {
-            lbl.textContent = 'Playing field · drag · right-click rotates';
-        }
-    }
-
-    function applyRemoteOp(msg) {
-        if (!msg || !msg.action) return;
-        var a = msg.action;
-        if (a === 'set_deck') {
-            if (mpIsHost) return;
-            mpRemoteDeckIds = (msg.ids || []).slice();
-            updateStats();
-            updateMpUi();
-            return;
-        }
-        if (a === 'shuffle_deck') {
-            if (mpIsHost) return;
-            mpRemoteDeckIds = (msg.ids || []).slice();
-            updateStats();
-            updateMpUi();
-            return;
-        }
-        if (a === 'draw') {
-            if (mpIsHost) return;
-            mpRemoteDeckIds = (msg.deckIds || []).slice();
-            updateStats();
-            var c = getCardById(msg.cardId);
-            if (!c) {
-                setStatus('Missing card in library — import the same .cardmaker.json files as the host (IDs must match).');
-                updateMpUi();
-                return;
-            }
-            var p = window.renderCardMakerProjectToDataUrl(c.state);
-            if (!p || typeof p.then !== 'function') return;
-            p.then(function (url) {
-                if (url) placeCardOnField(url, { left: msg.left, top: msg.top, instId: msg.instId, rot: msg.rot });
-            });
-            updateMpUi();
-            return;
-        }
-        if (a === 'move_card') {
-            var want = String(msg.instId);
-            var nodes = cpPlayingField.querySelectorAll('[data-inst-id]');
-            var el = null;
-            for (var mi = 0; mi < nodes.length; mi++) {
-                if (nodes[mi].getAttribute('data-inst-id') === want) {
-                    el = nodes[mi];
-                    break;
-                }
-            }
-            if (el) {
-                el.style.left = msg.left + 'px';
-                el.style.top = msg.top + 'px';
-            }
-            return;
-        }
-        if (a === 'rotate_card') {
-            var wantR = String(msg.instId);
-            var rotN = Number(msg.rot);
-            if (!isFinite(rotN)) return;
-            var nodesR = cpPlayingField.querySelectorAll('[data-inst-id]');
-            var elR = null;
-            for (var ri = 0; ri < nodesR.length; ri++) {
-                if (nodesR[ri].getAttribute('data-inst-id') === wantR) {
-                    elR = nodesR[ri];
-                    break;
-                }
-            }
-            if (elR) applyCardRotation(elR, rotN);
-            return;
-        }
-        if (a === 'clear_field') {
-            cpPlayingField.innerHTML = '';
-            setStatus('Field cleared.');
-            return;
-        }
-    }
-
-    function handleWsMessage(ev) {
-        var msg;
-        try {
-            msg = JSON.parse(ev.data);
-        } catch (e) {
-            return;
-        }
-        if (!msg || typeof msg !== 'object') return;
-        if (msg.type === 'created') {
-            mpRoom = msg.room;
-            mpIsHost = true;
-            mpRemoteDeckIds = null;
-            document.getElementById('cpRoomCode').value = mpRoom;
-            applyFullState(msg.state || { deckIds: [], field: [] });
-            setStatus('Hosting room ' + mpRoom + '. Share the code with your guest.');
-            updateStats();
-            updateMpUi();
-            return;
-        }
-        if (msg.type === 'joined') {
-            mpRoom = msg.room;
-            mpIsHost = false;
-            mpRemoteDeckIds = (msg.state && msg.state.deckIds) ? msg.state.deckIds.slice() : [];
-            document.getElementById('cpRoomCode').value = mpRoom;
-            setStatus('Joined ' + mpRoom + '. Syncing table…');
-            applyFullState(msg.state || { deckIds: [], field: [] }).then(function () {
-                setStatus('Joined ' + mpRoom + '.');
-            });
-            updateStats();
-            updateMpUi();
-            return;
-        }
-        if (msg.type === 'op') {
-            applyRemoteOp(msg);
-            updateMpUi();
-            return;
-        }
-        if (msg.type === 'peer_joined') {
-            setStatus('Guest connected.');
-            return;
-        }
-        if (msg.type === 'host_left') {
-            setStatus('Host left — session ended.');
-            try {
-                if (mpWs) mpWs.close();
-            } catch (e) { /* ignore */ }
-            resetMpClient();
-            return;
-        }
-        if (msg.type === 'error') {
-            setStatus(msg.message || 'Server error');
-            try {
-                if (mpWs) mpWs.close();
-            } catch (e) { /* ignore */ }
-            resetMpClient();
-            return;
-        }
-    }
-
-    function applyFullState(state) {
-        if (!state) return Promise.resolve();
-        if (!mpIsHost) {
-            mpRemoteDeckIds = Array.isArray(state.deckIds) ? state.deckIds.slice() : [];
-        }
-        cpPlayingField.innerHTML = '';
-        var field = state.field || [];
-        var seq = Promise.resolve();
-        field.forEach(function (item) {
-            seq = seq.then(function () {
-                var c = getCardById(item.cardId);
-                if (!c) return;
-                var p = window.renderCardMakerProjectToDataUrl(c.state);
-                if (!p || typeof p.then !== 'function') return;
-                return p.then(function (url) {
-                    if (url) placeCardOnField(url, { left: item.left, top: item.top, instId: item.instId, rot: item.rot });
-                });
-            });
-        });
-        return seq.then(function () {
-            updateStats();
-            updateMpUi();
-        });
-    }
-
-    function syncDeckToRoomIfHost() {
-        if (mpRoom && mpWs && mpWs.readyState === 1 && mpIsHost) {
-            mpSend({ type: 'op', room: mpRoom, action: 'set_deck', ids: deck.map(function (c) { return c.id; }) });
-        }
     }
 
     function cardTitleFromState(state) {
@@ -597,26 +326,84 @@
 
     function updateStats() {
         var n = allCards().length;
-        var libLine = 'Library: ' + n;
-        if (n > 0) {
-            libLine += ' (' + library.length + ' cache + ' + imported.length + ' imported)';
+        cpStatLibrary.textContent = 'Library: ' + n + (n ? '' : ' (open Saved projects to cache cards)');
+        cpStatDeck.textContent = 'Deck: ' + deck.length;
+        cpDraw.disabled = deck.length === 0;
+        if (cpDeckCountZone) cpDeckCountZone.textContent = String(deck.length);
+    }
+
+    function pointInEl(clientX, clientY, el) {
+        if (!el) return false;
+        var r = el.getBoundingClientRect();
+        return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
+    }
+
+    function relayoutDiscardPile() {
+        var cards = Array.from(cpPlayingField.querySelectorAll('.cp-card-on-field[data-cp-discard="1"]'));
+        var zone = cpDiscardZone.getBoundingClientRect();
+        var fieldR = cpPlayingField.getBoundingClientRect();
+        var baseL = zone.left - fieldR.left + 12;
+        var baseT = zone.top - fieldR.top + 36;
+        cards.forEach(function (w, i) {
+            w.style.left = Math.max(0, baseL + i * 5) + 'px';
+            w.style.top = Math.max(0, baseT + i * 4) + 'px';
+            w.style.zIndex = String(24 + i);
+        });
+    }
+
+    function snapCardToDiscardIfInside(wrap) {
+        var r = wrap.getBoundingClientRect();
+        var cx = (r.left + r.right) / 2;
+        var cy = (r.top + r.bottom) / 2;
+        if (pointInEl(cx, cy, cpDiscardZone)) {
+            wrap.setAttribute('data-cp-discard', '1');
+            relayoutDiscardPile();
+            return true;
         }
-        cpStatLibrary.textContent = libLine;
-        var conn = !!(mpWs && mpWs.readyState === 1);
-        var isGuest = conn && mpRoom && !mpIsHost;
-        var deckCount = isGuest
-            ? (mpRemoteDeckIds ? mpRemoteDeckIds.length : 0)
-            : deck.length;
-        cpStatDeck.textContent = 'Deck: ' + deckCount;
-        cpDraw.disabled = isGuest || deckCount === 0;
-        updateMpUi();
+        return false;
+    }
+
+    function drawCardToFieldAt(clientX, clientY) {
+        if (deck.length === 0) return;
+        var card = deck.pop();
+        updateStats();
+        setStatus('Drawing…');
+        var fieldR = cpPlayingField.getBoundingClientRect();
+        var halfW = 66;
+        var halfH = 92;
+        var x = clientX - fieldR.left - halfW;
+        var y = clientY - fieldR.top - halfH;
+        x = Math.max(0, Math.min(cpPlayingField.clientWidth - 107, x));
+        y = Math.max(0, Math.min(cpPlayingField.clientHeight - 147, y));
+        var p = window.renderCardMakerProjectToDataUrl(card.state);
+        if (!p || typeof p.then !== 'function') {
+            deck.push(card);
+            updateStats();
+            setStatus('Renderer not available.');
+            return;
+        }
+        p.then(function (url) {
+            if (!url) {
+                deck.push(card);
+                updateStats();
+                setStatus('Could not render card.');
+                return;
+            }
+            var wrap = placeCardOnField(url, card, x, y);
+            if (wrap) snapCardToDiscardIfInside(wrap);
+            setStatus('Drew: ' + cardTitleFromState(card.state) + ' · ' + deck.length + ' left in deck.');
+        }).catch(function () {
+            deck.push(card);
+            updateStats();
+            setStatus('Render failed.');
+        });
     }
 
     function renderLibraryList() {
         var cards = allCards();
         libraryListEl.innerHTML = '';
         if (cards.length === 0) {
-            libraryListEl.innerHTML = '<div class="cp-muted" style="padding:12px 14px">No cards yet. On this origin, open <strong>Saved projects</strong> and load your Drive saves, or use <strong>Import JSON</strong> (saved in this browser).</div>';
+            libraryListEl.innerHTML = '<div class="cp-muted" style="padding:12px 14px">No cards yet. Refresh after using Saved projects, or import JSON.</div>';
             updateStats();
             return;
         }
@@ -650,14 +437,12 @@
         var idxs = getSelectedIndices();
         deck = idxs.filter(function (i) { return i >= 0 && i < cards.length; }).map(function (i) { return cards[i]; });
         setStatus('Deck: ' + deck.length + ' cards from selection.');
-        syncDeckToRoomIfHost();
         updateStats();
     }
 
     function useAllAsDeck() {
         deck = allCards().slice();
         setStatus('Deck: all ' + deck.length + ' cards.');
-        syncDeckToRoomIfHost();
         updateStats();
     }
 
@@ -667,39 +452,10 @@
             return;
         }
         shuffleInPlace(deck);
-        if (mpRoom && mpWs && mpWs.readyState === 1 && mpIsHost) {
-            mpSend({ type: 'op', room: mpRoom, action: 'shuffle_deck', ids: deck.map(function (c) { return c.id; }) });
-        }
         setStatus('Shuffled ' + deck.length + ' cards.');
     }
 
-    function normalizeRot(deg) {
-        var n = Math.round(Number(deg)) % 360;
-        if (n < 0) n += 360;
-        return n;
-    }
-
-    function applyCardRotation(el, rotDeg) {
-        if (!el) return;
-        var r = normalizeRot(rotDeg);
-        el.setAttribute('data-rotation', String(r));
-        el.style.transform = 'rotate(' + r + 'deg)';
-    }
-
-    function bindCardContextRotate(wrap, instId) {
-        wrap.addEventListener('contextmenu', function (e) {
-            e.preventDefault();
-            var cur = parseInt(wrap.getAttribute('data-rotation'), 10);
-            if (!isFinite(cur)) cur = 0;
-            var next = (cur + 90) % 360;
-            applyCardRotation(wrap, next);
-            if (mpRoom && mpWs && mpWs.readyState === 1) {
-                mpSend({ type: 'op', room: mpRoom, action: 'rotate_card', instId: instId, rot: next });
-            }
-        });
-    }
-
-    function makeDraggable(el, field, instId) {
+    function makeDraggable(el, field) {
         var dragging = false;
         var startX = 0, startY = 0, origLeft = 0, origTop = 0;
         function down(ev) {
@@ -719,18 +475,29 @@
             el.style.left = Math.max(0, Math.min(field.clientWidth - el.offsetWidth, origLeft + dx)) + 'px';
             el.style.top = Math.max(0, Math.min(field.clientHeight - el.offsetHeight, origTop + dy)) + 'px';
         }
-        function up() {
+        function up(ev) {
             if (!dragging) return;
             dragging = false;
-            if (mpRoom && mpWs && mpWs.readyState === 1) {
-                mpSend({
-                    type: 'op',
-                    room: mpRoom,
-                    action: 'move_card',
-                    instId: instId,
-                    left: el.offsetLeft,
-                    top: el.offsetTop
-                });
+            if (ev) {
+                var r = el.getBoundingClientRect();
+                var cx = (r.left + r.right) / 2;
+                var cy = (r.top + r.bottom) / 2;
+                if (pointInEl(cx, cy, cpDrawZone) && el._cpDeckEntry) {
+                    deck.push(el._cpDeckEntry);
+                    el.remove();
+                    updateStats();
+                    relayoutDiscardPile();
+                    return;
+                }
+                if (pointInEl(cx, cy, cpDiscardZone)) {
+                    el.setAttribute('data-cp-discard', '1');
+                    relayoutDiscardPile();
+                    return;
+                }
+                if (el.getAttribute('data-cp-discard') === '1') {
+                    el.removeAttribute('data-cp-discard');
+                    relayoutDiscardPile();
+                }
             }
         }
         el.addEventListener('pointerdown', down);
@@ -739,76 +506,194 @@
         window.addEventListener('pointercancel', up);
     }
 
-    function placeCardOnField(dataUrl, opts) {
-        opts = opts || {};
+    function attachDrawZoneDrag() {
+        function onDeckPointerMove(ev) {
+            if (!deckDrag.active) return;
+            var dx = ev.clientX - deckDrag.startX;
+            var dy = ev.clientY - deckDrag.startY;
+            if (Math.abs(dx) + Math.abs(dy) > 8) deckDrag.moved = true;
+            if (deckDrag.moved && cpDeckDragGhost) {
+                cpDeckDragGhost.style.display = 'block';
+                cpDeckDragGhost.style.left = ev.clientX + 'px';
+                cpDeckDragGhost.style.top = ev.clientY + 'px';
+            }
+        }
+        function onDeckPointerUp(ev) {
+            if (!deckDrag.active) return;
+            deckDrag.active = false;
+            if (cpDeckDragGhost) cpDeckDragGhost.style.display = 'none';
+            window.removeEventListener('pointermove', onDeckPointerMove);
+            window.removeEventListener('pointerup', onDeckPointerUp);
+            window.removeEventListener('pointercancel', onDeckPointerUp);
+            if (!deckDrag.moved) return;
+            if (pointInEl(ev.clientX, ev.clientY, cpDrawZone)) {
+                setStatus('Drag out of the deck, then release to draw a card.');
+                return;
+            }
+            drawCardToFieldAt(ev.clientX, ev.clientY);
+        }
+        cpDrawZone.addEventListener('pointerdown', function (ev) {
+            if (ev.button !== 0) return;
+            if (deck.length === 0) {
+                setStatus('Deck is empty — build a deck in the sidebar.');
+                return;
+            }
+            deckDrag.active = true;
+            deckDrag.moved = false;
+            deckDrag.startX = ev.clientX;
+            deckDrag.startY = ev.clientY;
+            ev.preventDefault();
+            window.addEventListener('pointermove', onDeckPointerMove);
+            window.addEventListener('pointerup', onDeckPointerUp);
+            window.addEventListener('pointercancel', onDeckPointerUp);
+        });
+    }
+
+    function attachRotateOnRightClick(wrap, rotLayer) {
+        wrap._cpRotationDeg = 0;
+        wrap.addEventListener('contextmenu', function (ev) {
+            ev.preventDefault();
+            wrap._cpRotationDeg = (wrap._cpRotationDeg + 90) % 360;
+            rotLayer.style.transform = 'rotate(' + wrap._cpRotationDeg + 'deg)';
+        });
+    }
+
+    function cardBackImageSrc() {
+        try {
+            return new URL('Card Back.png', location.href).href;
+        } catch (e) {
+            return 'Card%20Back.png';
+        }
+    }
+
+    function attachMiddleClickFlip(wrap, flipInner) {
+        wrap._cpShowingBack = false;
+        wrap.addEventListener('auxclick', function (ev) {
+            if (ev.button !== 1) return;
+            ev.preventDefault();
+            wrap._cpShowingBack = !wrap._cpShowingBack;
+            flipInner.classList.toggle('cp-flip-inner--back', wrap._cpShowingBack);
+        });
+        wrap.addEventListener('mousedown', function (ev) {
+            if (ev.button === 1) ev.preventDefault();
+        });
+    }
+
+    function attachHoverEnlarge(wrap) {
+        var hoverTimer = null;
+        function clearEnlarge() {
+            if (hoverTimer != null) {
+                clearTimeout(hoverTimer);
+                hoverTimer = null;
+            }
+            wrap.classList.remove('cp-card-enlarged');
+        }
+        function armIdleEnlarge() {
+            if (hoverTimer != null) clearTimeout(hoverTimer);
+            hoverTimer = setTimeout(function () {
+                hoverTimer = null;
+                wrap.classList.add('cp-card-enlarged');
+            }, 500);
+        }
+        function motionOk() {
+            try {
+                return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            } catch (e) {
+                return true;
+            }
+        }
+        wrap.addEventListener('pointerenter', function () {
+            if (!motionOk()) return;
+            clearEnlarge();
+            armIdleEnlarge();
+        });
+        wrap.addEventListener('pointermove', function () {
+            if (!motionOk()) return;
+            if (wrap.classList.contains('cp-card-enlarged')) return;
+            armIdleEnlarge();
+        });
+        wrap.addEventListener('pointerleave', clearEnlarge);
+        wrap.addEventListener('pointerdown', function (ev) {
+            if (ev.button === 0) clearEnlarge();
+        });
+    }
+
+    function placeCardOnField(dataUrl, cardEntry, left, top) {
         var field = cpPlayingField;
         var wrap = document.createElement('div');
         wrap.className = 'cp-card-on-field';
-        var instId = opts.instId || ('c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9));
-        wrap.setAttribute('data-inst-id', instId);
+        wrap._cpDeckEntry = cardEntry || null;
         var margin = 24;
         var maxX = Math.max(margin, field.clientWidth - margin - 107);
         var maxY = Math.max(margin, field.clientHeight - margin - 147);
-        var left = opts.left != null ? opts.left : (margin + Math.random() * Math.max(1, maxX - margin));
-        var top = opts.top != null ? opts.top : (margin + Math.random() * Math.max(1, maxY - margin));
-        wrap.style.left = left + 'px';
-        wrap.style.top = top + 'px';
-        var img = document.createElement('img');
-        img.src = dataUrl;
-        img.alt = 'Card';
-        wrap.appendChild(img);
+        if (typeof left === 'number' && typeof top === 'number') {
+            wrap.style.left = left + 'px';
+            wrap.style.top = top + 'px';
+        } else {
+            wrap.style.left = (margin + Math.random() * Math.max(1, maxX - margin)) + 'px';
+            wrap.style.top = (margin + Math.random() * Math.max(1, maxY - margin)) + 'px';
+        }
+        var flipInner = document.createElement('div');
+        flipInner.className = 'cp-flip-inner';
+        var faceFront = document.createElement('div');
+        faceFront.className = 'cp-flip-face cp-flip-face-front';
+        var imgFace = document.createElement('img');
+        imgFace.src = dataUrl;
+        imgFace.alt = 'Card';
+        faceFront.appendChild(imgFace);
+        var faceBack = document.createElement('div');
+        faceBack.className = 'cp-flip-face cp-flip-face-back';
+        var imgBack = document.createElement('img');
+        imgBack.src = cardBackImageSrc();
+        imgBack.alt = 'Card back';
+        faceBack.appendChild(imgBack);
+        flipInner.appendChild(faceFront);
+        flipInner.appendChild(faceBack);
+        var rotLayer = document.createElement('div');
+        rotLayer.className = 'cp-card-rot';
+        rotLayer.appendChild(flipInner);
+        wrap.appendChild(rotLayer);
         field.appendChild(wrap);
-        var rot0 = opts.rot != null ? normalizeRot(opts.rot) : 0;
-        applyCardRotation(wrap, rot0);
-        bindCardContextRotate(wrap, instId);
-        makeDraggable(wrap, field, instId);
+        makeDraggable(wrap, field);
+        attachRotateOnRightClick(wrap, rotLayer);
+        attachMiddleClickFlip(wrap, flipInner);
+        attachHoverEnlarge(wrap);
         return wrap;
     }
 
     function drawOne() {
-        if (mpRoom && mpWs && mpWs.readyState === 1 && !mpIsHost) {
-            setStatus('Only the host can draw while online.');
-            return;
-        }
         if (deck.length === 0) return;
         var card = deck.pop();
         updateStats();
         setStatus('Rendering card…');
         var p = window.renderCardMakerProjectToDataUrl(card.state);
         if (!p || typeof p.then !== 'function') {
+            deck.push(card);
+            updateStats();
             setStatus('Renderer not available.');
             return;
         }
         p.then(function (url) {
             if (!url) {
+                deck.push(card);
+                updateStats();
                 setStatus('Could not render card (check images / CORS).');
                 return;
             }
-            var wrap = placeCardOnField(url, {});
-            if (mpRoom && mpWs && mpWs.readyState === 1 && mpIsHost) {
-                mpSend({
-                    type: 'op',
-                    room: mpRoom,
-                    action: 'draw',
-                    cardId: card.id,
-                    instId: wrap.getAttribute('data-inst-id'),
-                    left: wrap.offsetLeft,
-                    top: wrap.offsetTop,
-                    rot: 0,
-                    deckIds: deck.map(function (c) { return c.id; })
-                });
-            }
+            var wrap = placeCardOnField(url, card);
+            if (wrap) snapCardToDiscardIfInside(wrap);
             setStatus('Drew: ' + cardTitleFromState(card.state) + ' · ' + deck.length + ' left in deck.');
         }).catch(function () {
+            deck.push(card);
+            updateStats();
             setStatus('Render failed.');
         });
     }
 
     function clearField() {
-        cpPlayingField.innerHTML = '';
-        if (mpRoom && mpWs && mpWs.readyState === 1) {
-            mpSend({ type: 'op', room: mpRoom, action: 'clear_field' });
-        }
+        cpPlayingField.querySelectorAll('.cp-card-on-field').forEach(function (el) {
+            el.remove();
+        });
         setStatus('Field cleared.');
     }
 
@@ -818,11 +703,7 @@
             .then(function (rows) {
                 library = rows;
                 renderLibraryList();
-                var msg = library.length + ' from IndexedDB cache + ' + imported.length + ' imported.';
-                if (library.length === 0 && imported.length === 0) {
-                    msg = 'No cards for ' + (typeof location !== 'undefined' ? location.origin : 'this site') + '. Use Saved projects (same URL) or Import JSON.';
-                }
-                setStatus(msg);
+                setStatus('Library: ' + library.length + ' from cache + ' + imported.length + ' imported.');
             })
             .catch(function () {
                 setStatus('Could not read card cache.');
@@ -844,85 +725,6 @@
     document.getElementById('cpDraw').addEventListener('click', drawOne);
     document.getElementById('cpClearField').addEventListener('click', clearField);
 
-    document.getElementById('cpWsUrl').value = loadWsUrl();
-    applyMpQueryParam();
-    showMultiplayerHttpsWarning();
-
-    function attachMpSocketHandlers(ws, onConnected) {
-        ws.onmessage = handleWsMessage;
-        ws.onclose = function (ev) {
-            if (mpWs !== this) return;
-            var hadRoom = !!mpRoom;
-            resetMpClient();
-            if (hadRoom) {
-                setStatus('Disconnected from server.');
-            } else if (ev && (ev.code === 1006 || ev.code === 1002)) {
-                setStatus('Could not connect. Use ws:// and http://HOST:8765/card-player.html from npm start, or forward port 8765. If stuck on github.io https, you need wss + TLS on the server.');
-            }
-        };
-        ws.onerror = function () {
-            setStatus('WebSocket failed — npm start running? From GitHub Pages, open http://HOST:8765/card-player.html (see terminal) so ws:// is allowed, or use wss:// with your own TLS.');
-        };
-        ws.onopen = function () {
-            onConnected();
-        };
-    }
-
-    document.getElementById('cpMpHost').addEventListener('click', function () {
-        var url = resolveWebSocketUrlInput();
-        var err = validateMultiplayerWs(url);
-        if (err) {
-            setStatus(err);
-            return;
-        }
-        try {
-            localStorage.setItem(WS_STORAGE, url);
-        } catch (e) { /* ignore */ }
-        if (mpWs) {
-            try {
-                mpWs.close();
-            } catch (e) { /* ignore */ }
-        }
-        mpWs = new WebSocket(url);
-        attachMpSocketHandlers(mpWs, function () {
-            mpWs.send(JSON.stringify({ type: 'create' }));
-        });
-    });
-
-    document.getElementById('cpMpJoin').addEventListener('click', function () {
-        var code = document.getElementById('cpRoomCode').value.trim().toUpperCase();
-        if (!code) {
-            setStatus('Enter the room code from the host.');
-            return;
-        }
-        var url = resolveWebSocketUrlInput();
-        var err = validateMultiplayerWs(url);
-        if (err) {
-            setStatus(err);
-            return;
-        }
-        try {
-            localStorage.setItem(WS_STORAGE, url);
-        } catch (e) { /* ignore */ }
-        if (mpWs) {
-            try {
-                mpWs.close();
-            } catch (e) { /* ignore */ }
-        }
-        mpWs = new WebSocket(url);
-        attachMpSocketHandlers(mpWs, function () {
-            mpWs.send(JSON.stringify({ type: 'join', room: code }));
-        });
-    });
-
-    document.getElementById('cpMpDisconnect').addEventListener('click', function () {
-        if (mpWs) {
-            try {
-                mpWs.close();
-            } catch (e) { /* ignore */ }
-        }
-    });
-
     document.getElementById('cpImportBtn').addEventListener('click', function () {
         cpImportFile.click();
     });
@@ -942,7 +744,7 @@
                             return;
                         }
                         resolve({
-                            id: stableImportIdFromState(state),
+                            id: 'import_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7),
                             state: state,
                             source: 'file'
                         });
@@ -958,39 +760,22 @@
             var added = 0;
             results.forEach(function (r) {
                 if (r) {
-                    imported = imported.filter(function (x) { return x.id !== r.id; });
                     imported.push(r);
                     added++;
                 }
             });
             cpImportFile.value = '';
-            saveImportsToStorage();
             renderLibraryList();
             setStatus('Imported ' + added + ' file(s). Total library: ' + allCards().length + '.');
         });
-    });
-
-    document.getElementById('cpClearImports').addEventListener('click', function () {
-        imported = [];
-        try {
-            localStorage.removeItem(IMPORTS_STORAGE_KEY);
-        } catch (e) { /* ignore */ }
-        renderLibraryList();
-        setStatus('Cleared imported cards from this browser.');
     });
 
     try {
         document.fonts.load('200px Medieval').catch(function () {});
     } catch (e) {}
 
-    (function boot() {
-        var oh = document.getElementById('cpOriginHint');
-        if (oh && typeof location !== 'undefined') {
-            oh.textContent = location.origin;
-        }
-        loadImportsFromStorage();
-        refreshLibrary();
-    })();
+    attachDrawZoneDrag();
+    refreshLibrary();
 })();
     </script>
 </body>
