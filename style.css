@@ -1799,6 +1799,54 @@ canvas{
     font-weight: 600;
 }
 
+/* Indeterminate save progress (Drive modal + Saved Projects edit) */
+.cm-save-progress {
+    margin-top: 10px;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.1);
+    overflow: hidden;
+}
+
+.cm-save-progress[hidden] {
+    display: none !important;
+}
+
+.cm-save-progress-fill {
+    height: 100%;
+    width: 42%;
+    max-width: 200px;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #667eea, #8b5cf6, #667eea);
+    animation: cm-save-progress-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes cm-save-progress-slide {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(380%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cm-save-progress-fill {
+        animation: none;
+        width: 100%;
+        opacity: 0.55;
+    }
+}
+
+.spm-modal-panel .cm-save-progress {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.spm-modal-panel .cm-save-progress-fill {
+    background: linear-gradient(90deg, #6366f1, #a78bfa, #6366f1);
+}
+
 @media (max-width: 640px) {
     .drive-modal-saves-split {
         flex-direction: column;

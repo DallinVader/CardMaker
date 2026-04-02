@@ -48,6 +48,9 @@
                         <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="driveModalSaveBtn">Save to Drive</button>
                     </div>
                     <small class="drive-modal-suffix">Saved as <code class="drive-code">name.cardmaker.json</code></small>
+                    <div id="driveSaveProgressBar" class="cm-save-progress" hidden role="progressbar" aria-label="Saving to Google Drive">
+                        <div class="cm-save-progress-fill" aria-hidden="true"></div>
+                    </div>
                 </div>
 
                 <div class="drive-modal-section drive-modal-section-grow">
@@ -1878,6 +1881,9 @@
                             setDriveModalMessage('Enter a project name before saving.', true);
                             return;
                         }
+                        const progressEl = document.getElementById('driveSaveProgressBar');
+                        saveBtn.disabled = true;
+                        if (progressEl) progressEl.hidden = false;
                         setDriveModalMessage('Saving…', false);
                         try {
                             await saveProjectToDriveWithName(name);
@@ -1889,6 +1895,9 @@
                             const msg = err && err.message ? err.message : String(err);
                             setDriveModalMessage('Save failed: ' + msg, true);
                             alert('Could not save to Google Drive.\n\n' + msg);
+                        } finally {
+                            saveBtn.disabled = false;
+                            if (progressEl) progressEl.hidden = true;
                         }
                     })();
                 });

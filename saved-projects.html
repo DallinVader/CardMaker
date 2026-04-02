@@ -1089,6 +1089,9 @@
                 <select id="spmEditRarity" class="spm-select"></select>
             </div>
             <p id="spmEditError" class="spm-modal-error" hidden></p>
+            <div id="spmEditSaveProgress" class="cm-save-progress" hidden role="progressbar" aria-label="Saving changes">
+                <div class="cm-save-progress-fill" aria-hidden="true"></div>
+            </div>
             <div class="spm-modal-actions">
                 <button type="button" class="spm-btn spm-ghost" data-spm-edit-close>Cancel</button>
                 <button type="button" class="spm-btn spm-primary" id="spmEditSaveBtn">Save changes</button>
@@ -2111,7 +2114,7 @@
                     showDamageStats: true
                 },
                 images: {
-                    cardBaseSrc: '',
+                    cardBaseSrc: 'CardFrame.png',
                     artSrc: ''
                 }
             };
@@ -3289,7 +3292,9 @@
             }
 
             var btn = document.getElementById('spmEditSaveBtn');
+            var prog = document.getElementById('spmEditSaveProgress');
             if (btn) btn.disabled = true;
+            if (prog) prog.hidden = false;
             try {
                 if (newFullName !== project.file.name) {
                     var meta = await driveRenameFile(project.file.id, newFullName);
@@ -3317,6 +3322,7 @@
                 showErr((e && e.message) ? e.message : String(e));
             } finally {
                 if (btn) btn.disabled = false;
+                if (prog) prog.hidden = true;
             }
         }
 

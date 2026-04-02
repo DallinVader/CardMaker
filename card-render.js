@@ -10,6 +10,16 @@
      * Loads pixels in a way that keeps an offscreen canvas exportable (toDataURL).
      * Remote http(s) URLs use CORS fetch + ImageBitmap when possible; data/blob URLs use Image.
      */
+    /** Same-directory default as index.html / saved-projects (preview when save has no usable frame). */
+    function defaultCardFrameSrc() {
+        try {
+            if (typeof location !== 'undefined' && location.href) {
+                return new URL('CardFrame.png', location.href).href;
+            }
+        } catch (e) { /* ignore */ }
+        return 'CardFrame.png';
+    }
+
     function loadImage(src) {
         return new Promise(function (resolve) {
             if (!src || String(src).length < 8) {
@@ -132,8 +142,12 @@
         var mainSrc = images.cardBaseSrc;
         var artSrc = images.artSrc;
 
+        var artPromise = loadImage(artSrc);
         var mainImg = await loadImage(mainSrc);
-        var artImg = await loadImage(artSrc);
+        if (!mainImg) {
+            mainImg = await loadImage(defaultCardFrameSrc());
+        }
+        var artImg = await artPromise;
         if (!mainImg && !artImg) return null;
 
         var canvas = document.createElement('canvas');
