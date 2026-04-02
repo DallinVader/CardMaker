@@ -1,0 +1,11 @@
+{
+  "name": "cardmaker",
+  "private": true,
+  "description": "Card Maker static tools + optional multiplayer server for card-player",
+  "scripts": {
+    "multiplayer": "node multiplayer-server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

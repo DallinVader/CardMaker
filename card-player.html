@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Card Player – Card Maker</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { margin: 0; background: #0b1220; color: #e2e8f0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; min-height: 100vh; }
+        .cp-wrap { max-width: min(1600px, calc(100vw - 24px)); margin: 0 auto; padding: 20px 16px 48px; }
+        .cp-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 20px; }
+        .cp-top h1 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; }
+        .cp-nav { display: flex; flex-wrap: wrap; gap: 10px; }
+        .cp-btn {
+            padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14);
+            background: rgba(255,255,255,0.07); color: #e2e8f0; cursor: pointer; font-weight: 700;
+            font-size: 13px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center;
+        }
+        .cp-btn:hover { filter: brightness(1.08); }
+        .cp-btn:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
+        .cp-btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: rgba(255,255,255,0.2);
+        }
+        .cp-main { display: grid; grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); gap: 20px; align-items: start; }
+        @media (max-width: 900px) { .cp-main { grid-template-columns: 1fr; } }
+        .cp-panel {
+            background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px; padding: 18px; box-shadow: 0 12px 40px rgba(0,0,0,0.22);
+        }
+        .cp-panel h2 { margin: 0 0 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #93c5fd; }
+        .cp-muted { color: #94a3b8; font-size: 13px; line-height: 1.45; margin: 0 0 12px; }
+        .cp-stats { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; font-size: 13px; font-weight: 700; }
+        .cp-stats span { background: rgba(15,23,42,0.5); padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(148,163,184,0.15); }
+        .cp-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+        .cp-list {
+            max-height: min(42vh, 360px); overflow: auto; border-radius: 12px; border: 1px solid rgba(148,163,184,0.14);
+            background: rgba(15,23,42,0.35); padding: 8px 4px;
+        }
+        .cp-list label {
+            display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; cursor: pointer;
+            border-radius: 8px; margin: 0 4px 2px; font-size: 13px; line-height: 1.35;
+        }
+        .cp-list label:hover { background: rgba(102,126,234,0.12); }
+        .cp-list input { margin-top: 3px; flex-shrink: 0; }
+        .cp-list .cp-card-title { font-weight: 800; color: #f1f5f9; word-break: break-word; }
+        .cp-list .cp-card-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+        .cp-field-wrap {
+            position: relative; border-radius: 16px; border: 1px solid rgba(34,197,94,0.35);
+            background:
+                radial-gradient(ellipse 120% 80% at 50% 20%, rgba(22,101,52,0.45), transparent 55%),
+                linear-gradient(160deg, #0f3d24 0%, #052e16 45%, #022c18 100%);
+            min-height: min(70vh, 640px); overflow: hidden;
+            box-shadow: inset 0 0 80px rgba(0,0,0,0.35);
+        }
+        .cp-field-label {
+            position: absolute; top: 12px; left: 16px; font-size: 11px; text-transform: uppercase;
+            letter-spacing: 0.1em; color: rgba(187,247,208,0.65); font-weight: 800; pointer-events: none; z-index: 0;
+        }
+        .cp-field { position: relative; width: 100%; height: min(70vh, 640px); z-index: 1; }
+        .cp-card-on-field {
+            position: absolute; width: min(133px, 18.67vw); border-radius: 10px;
+            box-shadow: 0 16px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.12);
+            cursor: grab; user-select: none; touch-action: none;
+        }
+        .cp-card-on-field:active { cursor: grabbing; }
+        .cp-card-on-field img { display: block; width: 100%; height: auto; border-radius: 10px; vertical-align: top; pointer-events: none; }
+        .cp-status { margin-top: 10px; font-size: 12px; color: #93c5fd; min-height: 1.25em; }
+        .cp-file-input { display: none; }
+        .cp-mp { margin-top: 8px; padding-top: 16px; border-top: 1px solid rgba(148,163,184,0.2); }
+        .cp-mp .cp-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+        .cp-mp label { font-size: 12px; font-weight: 700; color: #94a3b8; }
+        .cp-mp input[type="text"] {
+            flex: 1; min-width: 180px; padding: 9px 11px; border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.14); background: rgba(15,23,42,0.45); color: #e2e8f0; font-weight: 600;
+        }
+        .cp-mp-badge {
+            font-size: 12px; font-weight: 800; padding: 6px 10px; border-radius: 8px;
+            background: rgba(99,102,241,0.2); border: 1px solid rgba(129,140,248,0.35); color: #c7d2fe;
+        }
+    </style>
+</head>
+<body>
+    <div class="cp-wrap">
+        <header class="cp-top">
+            <h1>Card player</h1>
+            <nav class="cp-nav" aria-label="App sections">
+                <a class="cp-btn" href="index.html">Card Maker</a>
+                <a class="cp-btn" href="saved-projects.html">Saved projects</a>
+                <a class="cp-btn" href="card-grid.html">Print</a>
+            </nav>
+        </header>
+
+        <div class="cp-main">
+            <div class="cp-panel">
+                <h2>Saved cards</h2>
+                <p class="cp-muted">Loads cards from the same cache as <strong>Saved projects</strong> (open that page once while signed in so downloads are cached). You can also import <code style="color:#93c5fd">.cardmaker.json</code> files.</p>
+                <div class="cp-stats">
+                    <span id="cpStatLibrary">Library: —</span>
+                    <span id="cpStatDeck">Deck: 0</span>
+                    <span id="cpStatOnline" class="cp-muted" style="display:none;font-size:12px;padding:8px 12px;border-radius:10px;border:1px solid rgba(148,163,184,0.15);background:rgba(15,23,42,0.5);font-weight:700;color:#a5b4fc"></span>
+                </div>
+                <div class="cp-mp">
+                    <h2>Online (2 players)</h2>
+                    <p class="cp-muted">Run <code style="color:#93c5fd">npm install</code> then <code style="color:#93c5fd">npm run multiplayer</code> on one machine. Others open <code style="color:#93c5fd">http://&lt;that-computer-ip&gt;:8765/card-player.html</code> and use the same WebSocket URL (see server log). Host builds the deck and draws; both can move cards. Each player needs the same card files in their library (cache + imports).</p>
+                    <div class="cp-row">
+                        <label for="cpWsUrl">WebSocket</label>
+                        <input type="text" id="cpWsUrl" autocomplete="off" placeholder="ws://192.168.1.5:8765" />
+                    </div>
+                    <div class="cp-actions">
+                        <button type="button" class="cp-btn cp-btn-primary" id="cpMpHost">Host room</button>
+                        <button type="button" class="cp-btn" id="cpMpJoin">Join room</button>
+                        <button type="button" class="cp-btn" id="cpMpDisconnect" disabled>Disconnect</button>
+                    </div>
+                    <div class="cp-row">
+                        <label for="cpRoomCode">Room code</label>
+                        <input type="text" id="cpRoomCode" autocomplete="off" placeholder="Host creates · guest pastes code" maxlength="8" style="text-transform:uppercase;letter-spacing:0.12em;font-weight:900" />
+                        <span class="cp-mp-badge" id="cpMpRole" hidden>—</span>
+                    </div>
+                </div>
+                <div class="cp-actions">
+                    <button type="button" class="cp-btn" id="cpRefresh">Refresh library</button>
+                    <button type="button" class="cp-btn" id="cpImportBtn">Import JSON…</button>
+                    <input type="file" class="cp-file-input" id="cpImportFile" accept=".json,application/json" multiple />
+                    <button type="button" class="cp-btn" id="cpSelectAll">Select all</button>
+                    <button type="button" class="cp-btn" id="cpSelectNone">Select none</button>
+                </div>
+                <div class="cp-actions">
+                    <button type="button" class="cp-btn cp-btn-primary" id="cpBuildDeck">Build deck from selection</button>
+                    <button type="button" class="cp-btn" id="cpUseAll">Use entire library as deck</button>
+                </div>
+                <div class="cp-actions">
+                    <button type="button" class="cp-btn" id="cpShuffle">Shuffle deck</button>
+                    <button type="button" class="cp-btn cp-btn-primary" id="cpDraw" disabled>Draw to field</button>
+                    <button type="button" class="cp-btn" id="cpClearField">Clear field</button>
+                </div>
+                <div class="cp-list" id="cpLibraryList" role="group" aria-label="Card library"></div>
+                <p class="cp-status" id="cpStatus" aria-live="polite"></p>
+            </div>
+
+            <div class="cp-panel" style="padding: 0; overflow: hidden;">
+                <div class="cp-field-wrap">
+                    <span class="cp-field-label" id="cpFieldLabel">Playing field · drag cards</span>
+                    <div class="cp-field" id="cpPlayingField" aria-label="Playing field"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="card-render.js"></script>
+    <script>
+(function () {
+    var SPM_IDB_NAME = 'cardmaker-spm-saves';
+    var SPM_IDB_STORE = 'byFileId';
+    var SPM_IDB_VERSION = 1;
+    var WS_STORAGE = 'cardmaker_mp_ws_v1';
+
+    var library = [];
+    var imported = [];
+    var deck = [];
+    var mpWs = null;
+    var mpRoom = '';
+    var mpIsHost = false;
+    var mpRemoteDeckIds = null;
+    var libraryListEl = document.getElementById('cpLibraryList');
+    var cpStatLibrary = document.getElementById('cpStatLibrary');
+    var cpStatDeck = document.getElementById('cpStatDeck');
+    var cpStatus = document.getElementById('cpStatus');
+    var cpDraw = document.getElementById('cpDraw');
+    var cpPlayingField = document.getElementById('cpPlayingField');
+    var cpImportFile = document.getElementById('cpImportFile');
+
+    function defaultWsUrl() {
+        if (typeof location !== 'undefined' && location.protocol === 'http:' && location.hostname) {
+            return 'ws://' + location.hostname + ':8765';
+        }
+        return 'ws://localhost:8765';
+    }
+
+    function loadWsUrl() {
+        try {
+            var s = localStorage.getItem(WS_STORAGE);
+            if (s && s.trim()) return s.trim();
+        } catch (e) { /* ignore */ }
+        return defaultWsUrl();
+    }
+
+    function setStatus(msg) {
+        cpStatus.textContent = msg || '';
+    }
+
+    function mpSend(obj) {
+        if (mpWs && mpWs.readyState === 1) {
+            mpWs.send(JSON.stringify(obj));
+        }
+    }
+
+    function resetMpClient() {
+        mpWs = null;
+        mpRoom = '';
+        mpIsHost = false;
+        mpRemoteDeckIds = null;
+        updateStats();
+    }
+
+    function mpDisconnect() {
+        if (mpWs) {
+            try {
+                mpWs.close();
+            } catch (e) { /* ignore */ }
+        }
+        resetMpClient();
+    }
+
+    function stableImportIdFromState(state) {
+        var f = (state && state.fields) || {};
+        var parts = [
+            String(f.Title || ''),
+            String(f.CardSetNumber || ''),
+            String(f.CardSetTotal || ''),
+            String((state && state.updatedAt) || ''),
+            String(f.CardMakerSetId || '')
+        ].join('\t');
+        var h = 5381;
+        for (var si = 0; si < parts.length; si++) {
+            h = ((h << 5) + h) ^ parts.charCodeAt(si);
+        }
+        return 'imp_' + (h >>> 0).toString(36);
+    }
+
+    function getCardById(id) {
+        var want = String(id);
+        var all = allCards();
+        for (var i = 0; i < all.length; i++) {
+            if (all[i].id === want) return all[i];
+        }
+        return null;
+    }
+
+    function updateMpUi() {
+        var conn = !!(mpWs && mpWs.readyState === 1);
+        var isGuest = conn && mpRoom && !mpIsHost;
+        document.getElementById('cpMpDisconnect').disabled = !conn;
+        document.getElementById('cpMpHost').disabled = conn;
+        document.getElementById('cpMpJoin').disabled = conn;
+        document.getElementById('cpBuildDeck').disabled = isGuest;
+        document.getElementById('cpUseAll').disabled = isGuest;
+        document.getElementById('cpShuffle').disabled = isGuest || deck.length === 0;
+        var badge = document.getElementById('cpMpRole');
+        var online = document.getElementById('cpStatOnline');
+        if (conn && mpRoom) {
+            badge.hidden = false;
+            badge.textContent = mpIsHost ? 'Host' : 'Guest';
+            online.style.display = '';
+            online.textContent = 'Online · ' + mpRoom;
+        } else {
+            badge.hidden = true;
+            online.style.display = 'none';
+        }
+        var lbl = document.getElementById('cpFieldLabel');
+        if (isGuest) {
+            lbl.textContent = 'Playing field · guest (host draws)';
+        } else if (conn && mpIsHost) {
+            lbl.textContent = 'Playing field · host · drag cards';
+        } else {
+            lbl.textContent = 'Playing field · drag cards';
+        }
+    }
+
+    function applyRemoteOp(msg) {
+        if (!msg || !msg.action) return;
+        var a = msg.action;
+        if (a === 'set_deck') {
+            if (mpIsHost) return;
+            mpRemoteDeckIds = (msg.ids || []).slice();
+            updateStats();
+            updateMpUi();
+            return;
+        }
+        if (a === 'shuffle_deck') {
+            if (mpIsHost) return;
+            mpRemoteDeckIds = (msg.ids || []).slice();
+            updateStats();
+            updateMpUi();
+            return;
+        }
+        if (a === 'draw') {
+            if (mpIsHost) return;
+            mpRemoteDeckIds = (msg.deckIds || []).slice();
+            updateStats();
+            var c = getCardById(msg.cardId);
+            if (!c) {
+                setStatus('Missing card in library — import the same .cardmaker.json files as the host (IDs must match).');
+                updateMpUi();
+                return;
+            }
+            var p = window.renderCardMakerProjectToDataUrl(c.state);
+            if (!p || typeof p.then !== 'function') return;
+            p.then(function (url) {
+                if (url) placeCardOnField(url, { left: msg.left, top: msg.top, instId: msg.instId });
+            });
+            updateMpUi();
+            return;
+        }
+        if (a === 'move_card') {
+            var want = String(msg.instId);
+            var nodes = cpPlayingField.querySelectorAll('[data-inst-id]');
+            var el = null;
+            for (var mi = 0; mi < nodes.length; mi++) {
+                if (nodes[mi].getAttribute('data-inst-id') === want) {
+                    el = nodes[mi];
+                    break;
+                }
+            }
+            if (el) {
+                el.style.left = msg.left + 'px';
+                el.style.top = msg.top + 'px';
+            }
+            return;
+        }
+        if (a === 'clear_field') {
+            cpPlayingField.innerHTML = '';
+            setStatus('Field cleared.');
+            return;
+        }
+    }
+
+    function handleWsMessage(ev) {
+        var msg;
+        try {
+            msg = JSON.parse(ev.data);
+        } catch (e) {
+            return;
+        }
+        if (!msg || typeof msg !== 'object') return;
+        if (msg.type === 'created') {
+            mpRoom = msg.room;
+            mpIsHost = true;
+            mpRemoteDeckIds = null;
+            document.getElementById('cpRoomCode').value = mpRoom;
+            applyFullState(msg.state || { deckIds: [], field: [] });
+            setStatus('Hosting room ' + mpRoom + '. Share the code with your guest.');
+            updateStats();
+            updateMpUi();
+            return;
+        }
+        if (msg.type === 'joined') {
+            mpRoom = msg.room;
+            mpIsHost = false;
+            mpRemoteDeckIds = (msg.state && msg.state.deckIds) ? msg.state.deckIds.slice() : [];
+            document.getElementById('cpRoomCode').value = mpRoom;
+            setStatus('Joined ' + mpRoom + '. Syncing table…');
+            applyFullState(msg.state || { deckIds: [], field: [] }).then(function () {
+                setStatus('Joined ' + mpRoom + '.');
+            });
+            updateStats();
+            updateMpUi();
+            return;
+        }
+        if (msg.type === 'op') {
+            applyRemoteOp(msg);
+            updateMpUi();
+            return;
+        }
+        if (msg.type === 'peer_joined') {
+            setStatus('Guest connected.');
+            return;
+        }
+        if (msg.type === 'host_left') {
+            setStatus('Host left — session ended.');
+            try {
+                if (mpWs) mpWs.close();
+            } catch (e) { /* ignore */ }
+            resetMpClient();
+            return;
+        }
+        if (msg.type === 'error') {
+            setStatus(msg.message || 'Server error');
+            try {
+                if (mpWs) mpWs.close();
+            } catch (e) { /* ignore */ }
+            resetMpClient();
+            return;
+        }
+    }
+
+    function applyFullState(state) {
+        if (!state) return Promise.resolve();
+        if (!mpIsHost) {
+            mpRemoteDeckIds = Array.isArray(state.deckIds) ? state.deckIds.slice() : [];
+        }
+        cpPlayingField.innerHTML = '';
+        var field = state.field || [];
+        var seq = Promise.resolve();
+        field.forEach(function (item) {
+            seq = seq.then(function () {
+                var c = getCardById(item.cardId);
+                if (!c) return;
+                var p = window.renderCardMakerProjectToDataUrl(c.state);
+                if (!p || typeof p.then !== 'function') return;
+                return p.then(function (url) {
+                    if (url) placeCardOnField(url, { left: item.left, top: item.top, instId: item.instId });
+                });
+            });
+        });
+        return seq.then(function () {
+            updateStats();
+            updateMpUi();
+        });
+    }
+
+    function syncDeckToRoomIfHost() {
+        if (mpRoom && mpWs && mpWs.readyState === 1 && mpIsHost) {
+            mpSend({ type: 'op', room: mpRoom, action: 'set_deck', ids: deck.map(function (c) { return c.id; }) });
+        }
+    }
+
+    function cardTitleFromState(state) {
+        var f = state && state.fields;
+        if (!f || f.Title == null) return '(untitled)';
+        var t = String(f.Title).trim();
+        return t || '(untitled)';
+    }
+
+    function cardSubtitle(state, id) {
+        var f = state && state.fields;
+        var parts = [];
+        if (f && f.Type) parts.push(String(f.Type).trim());
+        if (f && f.Rarity) parts.push(String(f.Rarity).trim());
+        var tail = id.length > 12 ? id.slice(0, 8) + '…' : id;
+        parts.push(tail);
+        return parts.filter(Boolean).join(' · ');
+    }
+
+    function openSpmIdb() {
+        return new Promise(function (resolve) {
+            if (!window.indexedDB) {
+                resolve(null);
+                return;
+            }
+            var req = indexedDB.open(SPM_IDB_NAME, SPM_IDB_VERSION);
+            req.onerror = function () { resolve(null); };
+            req.onsuccess = function () { resolve(req.result); };
+            req.onupgradeneeded = function (e) {
+                var db = e.target.result;
+                if (!db.objectStoreNames.contains(SPM_IDB_STORE)) {
+                    db.createObjectStore(SPM_IDB_STORE);
+                }
+            };
+        });
+    }
+
+    function idbReadAllStates() {
+        return openSpmIdb().then(function (db) {
+            if (!db) return [];
+            return new Promise(function (resolve, reject) {
+                var out = [];
+                try {
+                    var tx = db.transaction(SPM_IDB_STORE, 'readonly');
+                    var req = tx.objectStore(SPM_IDB_STORE).openCursor();
+                    req.onsuccess = function (e) {
+                        var cur = e.target.result;
+                        if (!cur) {
+                            resolve(out);
+                            return;
+                        }
+                        var rec = cur.value;
+                        if (rec && rec.state && typeof rec.state === 'object') {
+                            out.push({ id: String(cur.key), state: rec.state, source: 'cache' });
+                        }
+                        cur.continue();
+                    };
+                    req.onerror = function () { reject(req.error); };
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        });
+    }
+
+    function shuffleInPlace(arr) {
+        var i = arr.length;
+        while (i > 1) {
+            var j = Math.floor(Math.random() * i);
+            i--;
+            var t = arr[i];
+            arr[i] = arr[j];
+            arr[j] = t;
+        }
+        return arr;
+    }
+
+    function allCards() {
+        return library.concat(imported);
+    }
+
+    function updateStats() {
+        var n = allCards().length;
+        cpStatLibrary.textContent = 'Library: ' + n + (n ? '' : ' (open Saved projects to cache cards)');
+        var conn = !!(mpWs && mpWs.readyState === 1);
+        var isGuest = conn && mpRoom && !mpIsHost;
+        var deckCount = isGuest
+            ? (mpRemoteDeckIds ? mpRemoteDeckIds.length : 0)
+            : deck.length;
+        cpStatDeck.textContent = 'Deck: ' + deckCount;
+        cpDraw.disabled = isGuest || deckCount === 0;
+        updateMpUi();
+    }
+
+    function renderLibraryList() {
+        var cards = allCards();
+        libraryListEl.innerHTML = '';
+        if (cards.length === 0) {
+            libraryListEl.innerHTML = '<div class="cp-muted" style="padding:12px 14px">No cards yet. Refresh after using Saved projects, or import JSON.</div>';
+            updateStats();
+            return;
+        }
+        cards.forEach(function (c, idx) {
+            var title = cardTitleFromState(c.state);
+            var sub = cardSubtitle(c.state, c.id);
+            var id = 'cp-lib-' + idx;
+            var label = document.createElement('label');
+            label.setAttribute('for', id);
+            label.innerHTML =
+                '<input type="checkbox" id="' + id + '" data-cp-idx="' + idx + '" checked />' +
+                '<span><span class="cp-card-title"></span><span class="cp-card-sub"></span></span>';
+            label.querySelector('.cp-card-title').textContent = title;
+            label.querySelector('.cp-card-sub').textContent = sub;
+            libraryListEl.appendChild(label);
+        });
+        updateStats();
+    }
+
+    function getSelectedIndices() {
+        var boxes = libraryListEl.querySelectorAll('input[type="checkbox"][data-cp-idx]');
+        var idxs = [];
+        boxes.forEach(function (b) {
+            if (b.checked) idxs.push(parseInt(b.getAttribute('data-cp-idx'), 10));
+        });
+        return idxs;
+    }
+
+    function buildDeckFromSelection() {
+        var cards = allCards();
+        var idxs = getSelectedIndices();
+        deck = idxs.filter(function (i) { return i >= 0 && i < cards.length; }).map(function (i) { return cards[i]; });
+        setStatus('Deck: ' + deck.length + ' cards from selection.');
+        syncDeckToRoomIfHost();
+        updateStats();
+    }
+
+    function useAllAsDeck() {
+        deck = allCards().slice();
+        setStatus('Deck: all ' + deck.length + ' cards.');
+        syncDeckToRoomIfHost();
+        updateStats();
+    }
+
+    function shuffleDeck() {
+        if (deck.length === 0) {
+            setStatus('Deck is empty. Build a deck first.');
+            return;
+        }
+        shuffleInPlace(deck);
+        if (mpRoom && mpWs && mpWs.readyState === 1 && mpIsHost) {
+            mpSend({ type: 'op', room: mpRoom, action: 'shuffle_deck', ids: deck.map(function (c) { return c.id; }) });
+        }
+        setStatus('Shuffled ' + deck.length + ' cards.');
+    }
+
+    function makeDraggable(el, field, instId) {
+        var dragging = false;
+        var startX = 0, startY = 0, origLeft = 0, origTop = 0;
+        function down(ev) {
+            dragging = true;
+            startX = ev.clientX;
+            startY = ev.clientY;
+            origLeft = el.offsetLeft;
+            origTop = el.offsetTop;
+            el.style.zIndex = String(4000 + (Date.now() % 1000));
+            ev.preventDefault();
+        }
+        function move(ev) {
+            if (!dragging) return;
+            var dx = ev.clientX - startX;
+            var dy = ev.clientY - startY;
+            el.style.left = Math.max(0, Math.min(field.clientWidth - el.offsetWidth, origLeft + dx)) + 'px';
+            el.style.top = Math.max(0, Math.min(field.clientHeight - el.offsetHeight, origTop + dy)) + 'px';
+        }
+        function up() {
+            if (!dragging) return;
+            dragging = false;
+            if (mpRoom && mpWs && mpWs.readyState === 1) {
+                mpSend({
+                    type: 'op',
+                    room: mpRoom,
+                    action: 'move_card',
+                    instId: instId,
+                    left: el.offsetLeft,
+                    top: el.offsetTop
+                });
+            }
+        }
+        el.addEventListener('pointerdown', down);
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+        window.addEventListener('pointercancel', up);
+    }
+
+    function placeCardOnField(dataUrl, opts) {
+        opts = opts || {};
+        var field = cpPlayingField;
+        var wrap = document.createElement('div');
+        wrap.className = 'cp-card-on-field';
+        var instId = opts.instId || ('c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9));
+        wrap.setAttribute('data-inst-id', instId);
+        var margin = 24;
+        var maxX = Math.max(margin, field.clientWidth - margin - 107);
+        var maxY = Math.max(margin, field.clientHeight - margin - 147);
+        var left = opts.left != null ? opts.left : (margin + Math.random() * Math.max(1, maxX - margin));
+        var top = opts.top != null ? opts.top : (margin + Math.random() * Math.max(1, maxY - margin));
+        wrap.style.left = left + 'px';
+        wrap.style.top = top + 'px';
+        var img = document.createElement('img');
+        img.src = dataUrl;
+        img.alt = 'Card';
+        wrap.appendChild(img);
+        field.appendChild(wrap);
+        makeDraggable(wrap, field, instId);
+        return wrap;
+    }
+
+    function drawOne() {
+        if (mpRoom && mpWs && mpWs.readyState === 1 && !mpIsHost) {
+            setStatus('Only the host can draw while online.');
+            return;
+        }
+        if (deck.length === 0) return;
+        var card = deck.pop();
+        updateStats();
+        setStatus('Rendering card…');
+        var p = window.renderCardMakerProjectToDataUrl(card.state);
+        if (!p || typeof p.then !== 'function') {
+            setStatus('Renderer not available.');
+            return;
+        }
+        p.then(function (url) {
+            if (!url) {
+                setStatus('Could not render card (check images / CORS).');
+                return;
+            }
+            var wrap = placeCardOnField(url, {});
+            if (mpRoom && mpWs && mpWs.readyState === 1 && mpIsHost) {
+                mpSend({
+                    type: 'op',
+                    room: mpRoom,
+                    action: 'draw',
+                    cardId: card.id,
+                    instId: wrap.getAttribute('data-inst-id'),
+                    left: wrap.offsetLeft,
+                    top: wrap.offsetTop,
+                    deckIds: deck.map(function (c) { return c.id; })
+                });
+            }
+            setStatus('Drew: ' + cardTitleFromState(card.state) + ' · ' + deck.length + ' left in deck.');
+        }).catch(function () {
+            setStatus('Render failed.');
+        });
+    }
+
+    function clearField() {
+        cpPlayingField.innerHTML = '';
+        if (mpRoom && mpWs && mpWs.readyState === 1) {
+            mpSend({ type: 'op', room: mpRoom, action: 'clear_field' });
+        }
+        setStatus('Field cleared.');
+    }
+
+    function refreshLibrary() {
+        setStatus('Loading cached saves…');
+        idbReadAllStates()
+            .then(function (rows) {
+                library = rows;
+                renderLibraryList();
+                setStatus('Library: ' + library.length + ' from cache + ' + imported.length + ' imported.');
+            })
+            .catch(function () {
+                setStatus('Could not read card cache.');
+                library = [];
+                renderLibraryList();
+            });
+    }
+
+    document.getElementById('cpRefresh').addEventListener('click', refreshLibrary);
+    document.getElementById('cpSelectAll').addEventListener('click', function () {
+        libraryListEl.querySelectorAll('input[type="checkbox"]').forEach(function (b) { b.checked = true; });
+    });
+    document.getElementById('cpSelectNone').addEventListener('click', function () {
+        libraryListEl.querySelectorAll('input[type="checkbox"]').forEach(function (b) { b.checked = false; });
+    });
+    document.getElementById('cpBuildDeck').addEventListener('click', buildDeckFromSelection);
+    document.getElementById('cpUseAll').addEventListener('click', useAllAsDeck);
+    document.getElementById('cpShuffle').addEventListener('click', shuffleDeck);
+    document.getElementById('cpDraw').addEventListener('click', drawOne);
+    document.getElementById('cpClearField').addEventListener('click', clearField);
+
+    document.getElementById('cpWsUrl').value = loadWsUrl();
+
+    document.getElementById('cpMpHost').addEventListener('click', function () {
+        var url = document.getElementById('cpWsUrl').value.trim() || defaultWsUrl();
+        try {
+            localStorage.setItem(WS_STORAGE, url);
+        } catch (e) { /* ignore */ }
+        if (mpWs) {
+            try {
+                mpWs.close();
+            } catch (e) { /* ignore */ }
+        }
+        mpWs = new WebSocket(url);
+        mpWs.onmessage = handleWsMessage;
+        mpWs.onclose = function () {
+            if (mpWs !== this) return;
+            var was = !!mpRoom;
+            resetMpClient();
+            if (was) setStatus('Disconnected from server.');
+        };
+        mpWs.onerror = function () {
+            setStatus('WebSocket error — is the multiplayer server running?');
+        };
+        mpWs.onopen = function () {
+            mpWs.send(JSON.stringify({ type: 'create' }));
+        };
+    });
+
+    document.getElementById('cpMpJoin').addEventListener('click', function () {
+        var code = document.getElementById('cpRoomCode').value.trim().toUpperCase();
+        if (!code) {
+            setStatus('Enter the room code from the host.');
+            return;
+        }
+        var url = document.getElementById('cpWsUrl').value.trim() || defaultWsUrl();
+        try {
+            localStorage.setItem(WS_STORAGE, url);
+        } catch (e) { /* ignore */ }
+        if (mpWs) {
+            try {
+                mpWs.close();
+            } catch (e) { /* ignore */ }
+        }
+        mpWs = new WebSocket(url);
+        mpWs.onmessage = handleWsMessage;
+        mpWs.onclose = function () {
+            if (mpWs !== this) return;
+            var was = !!mpRoom;
+            resetMpClient();
+            if (was) setStatus('Disconnected from server.');
+        };
+        mpWs.onerror = function () {
+            setStatus('WebSocket error — is the multiplayer server running?');
+        };
+        mpWs.onopen = function () {
+            mpWs.send(JSON.stringify({ type: 'join', room: code }));
+        };
+    });
+
+    document.getElementById('cpMpDisconnect').addEventListener('click', function () {
+        if (mpWs) {
+            try {
+                mpWs.close();
+            } catch (e) { /* ignore */ }
+        }
+    });
+
+    document.getElementById('cpImportBtn').addEventListener('click', function () {
+        cpImportFile.click();
+    });
+
+    cpImportFile.addEventListener('change', function () {
+        var files = cpImportFile.files;
+        if (!files || !files.length) return;
+        setStatus('Importing…');
+        var readPromises = Array.from(files).map(function (file) {
+            return new Promise(function (resolve) {
+                var reader = new FileReader();
+                reader.onload = function () {
+                    try {
+                        var state = JSON.parse(String(reader.result || '{}'));
+                        if (!state || typeof state !== 'object' || !state.fields) {
+                            resolve(null);
+                            return;
+                        }
+                        resolve({
+                            id: stableImportIdFromState(state),
+                            state: state,
+                            source: 'file'
+                        });
+                    } catch (e) {
+                        resolve(null);
+                    }
+                };
+                reader.onerror = function () { resolve(null); };
+                reader.readAsText(file);
+            });
+        });
+        Promise.all(readPromises).then(function (results) {
+            var added = 0;
+            results.forEach(function (r) {
+                if (r) {
+                    imported.push(r);
+                    added++;
+                }
+            });
+            cpImportFile.value = '';
+            renderLibraryList();
+            setStatus('Imported ' + added + ' file(s). Total library: ' + allCards().length + '.');
+        });
+    });
+
+    try {
+        document.fonts.load('200px Medieval').catch(function () {});
+    } catch (e) {}
+
+    refreshLibrary();
+})();
+    </script>
+</body>
+</html>
