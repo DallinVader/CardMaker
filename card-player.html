@@ -58,7 +58,7 @@
         .cp-field-wrap {
             position: relative; border-radius: 16px; border: none;
             background: rgba(15,23,42,0.55);
-            min-height: min(70vh, 640px); overflow: hidden;
+            min-height: min(86vh, 920px); overflow: hidden;
             box-shadow: none;
         }
         .cp-panel.cp-panel-play {
@@ -71,7 +71,7 @@
             letter-spacing: 0.1em; color: rgba(148,163,184,0.75); font-weight: 800; pointer-events: none; z-index: 0;
         }
         .cp-field {
-            position: relative; width: 100%; height: min(70vh, 640px); z-index: 1;
+            position: relative; width: 100%; height: min(86vh, 920px); z-index: 1;
             perspective: min(1600px, 200vw);
             perspective-origin: 50% 45%;
         }
@@ -84,6 +84,32 @@
             cursor: grab; user-select: none; touch-action: none; color: #94a3b8;
         }
         .cp-draw-zone:active { cursor: grabbing; }
+        .cp-hand-zone {
+            position: absolute;
+            left: clamp(132px, 26vw, 200px);
+            right: clamp(178px, 34vw, 220px);
+            bottom: 14px;
+            height: min(172px, 30vw);
+            border: 1px dashed rgba(129, 140, 248, 0.45);
+            border-radius: 12px;
+            background: rgba(30, 27, 75, 0.25);
+            z-index: 5;
+            pointer-events: none;
+        }
+        .cp-hand-zone .cp-zone-label {
+            position: absolute;
+            top: 8px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            pointer-events: none;
+            color: rgba(165, 180, 252, 0.85);
+            letter-spacing: 0.14em;
+        }
+        .cp-card-on-field.cp-hand-card {
+            width: min(92px, 13vw);
+            z-index: 28;
+        }
         .cp-discard-zone {
             position: absolute; right: 14px; bottom: 14px;
             width: min(168px, 30vw); height: min(190px, 34vw);
@@ -91,6 +117,19 @@
             border: 2px solid #475569; border-radius: 12px; z-index: 5;
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 8px 24px rgba(0,0,0,0.3);
             pointer-events: none;
+        }
+        .cp-commander-zone {
+            position: absolute; right: 14px; top: 42px;
+            width: min(168px, 30vw); height: min(280px, 50vw);
+            background: linear-gradient(145deg, #7c3aed 0%, #6d28d9 40%, #4c1d95 100%);
+            border: 2px solid #a78bfa; border-radius: 12px; z-index: 5;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 24px rgba(0,0,0,0.35);
+            pointer-events: none;
+        }
+        .cp-commander-zone .cp-zone-label {
+            position: absolute; top: 10px; left: 0; right: 0; text-align: center; pointer-events: none;
+            color: rgba(237, 233, 254, 0.92);
+            letter-spacing: 0.1em;
         }
         .cp-zone-label {
             font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em;
@@ -192,6 +231,11 @@
                     <span id="cpStatLibrary">Library: —</span>
                     <span id="cpStatDeck">Deck: 0</span>
                 </div>
+                <p class="cp-muted" style="margin-top:0;margin-bottom:10px;">Commander: <strong id="cpCommanderName">—</strong></p>
+                <div class="cp-actions">
+                    <button type="button" class="cp-btn" id="cpSelectCommander">Select commander…</button>
+                    <button type="button" class="cp-btn" id="cpClearCommander" disabled>Clear commander</button>
+                </div>
                 <div class="cp-actions">
                     <button type="button" class="cp-btn" id="cpRefresh">Refresh library</button>
                     <button type="button" class="cp-btn" id="cpImportBtn">Import JSON…</button>
@@ -211,9 +255,15 @@
 
             <div class="cp-panel cp-panel-play" style="padding: 0; overflow: hidden;">
                 <div class="cp-field-wrap">
-                    <span class="cp-field-label">Playing field · drag · right-click rotates · middle-click flips · deck left · discard right</span>
+                    <span class="cp-field-label">Playing field · commander zone (top right) · click deck → hand · drag → field</span>
                     <div class="cp-field" id="cpPlayingField" aria-label="Playing field">
-                        <div class="cp-draw-zone" id="cpDrawZone" title="Drag out to draw. Drop a card here to put it back on the deck.">
+                        <div class="cp-commander-zone" id="cpCommanderZone" title="Commander — set from the sidebar; drag your commander here to dock">
+                            <span class="cp-zone-label">Commander</span>
+                        </div>
+                        <div class="cp-hand-zone" id="cpHandZone" title="Hand — cards drawn by clicking the deck">
+                            <span class="cp-zone-label">Hand</span>
+                        </div>
+                        <div class="cp-draw-zone" id="cpDrawZone" title="Click to draw to hand. Drag out to place on the field. Drop a card here to return to the deck.">
                             <span class="cp-zone-label">Deck</span>
                             <span class="cp-zone-count" id="cpDeckCountZone">0</span>
                         </div>
@@ -232,7 +282,7 @@
         <div class="drive-modal-panel" role="dialog" aria-modal="true" aria-labelledby="cpDeckModalTitle">
             <button type="button" class="drive-modal-close" id="cpDeckModalClose" aria-label="Close">&times;</button>
             <h2 id="cpDeckModalTitle" class="drive-modal-title">Deck builder</h2>
-            <p class="drive-modal-hint">Set <strong>Qty</strong> for each card. <strong>Apply to play deck</strong> loads those counts into the table deck. Deck files are stored in Google Drive <strong>hidden app data</strong> as <code class="drive-code">name.cardmaker-deck.json</code> (same place as card saves).</p>
+            <p class="drive-modal-hint">Set <strong>Qty</strong> for each card. <strong>Apply to play deck</strong> loads those counts into the table deck. Choose your <strong>commander</strong> in the sidebar — it is saved with the deck on Drive. Deck files use <code class="drive-code">name.cardmaker-deck.json</code> in hidden app data.</p>
 
             <div class="cp-deck-modal-scroll">
                 <div class="drive-modal-section">
@@ -277,6 +327,23 @@
         </div>
     </div>
 
+    <div id="cpCommanderModal" class="drive-modal" aria-hidden="true">
+        <div class="drive-modal-backdrop" id="cpCommanderModalBackdrop" aria-hidden="true"></div>
+        <div class="drive-modal-panel" role="dialog" aria-modal="true" aria-labelledby="cpCommanderModalTitle" style="max-width:min(480px,94vw);">
+            <button type="button" class="drive-modal-close" id="cpCommanderModalClose" aria-label="Close">&times;</button>
+            <h2 id="cpCommanderModalTitle" class="drive-modal-title">Select commander</h2>
+            <p class="drive-modal-hint">Pick one card from your library. This is saved with deck files on Drive and remembered on this device.</p>
+            <div class="drive-modal-section">
+                <label class="drive-modal-label" for="cpCommanderSelect">Card</label>
+                <select id="cpCommanderSelect" class="drive-modal-input" style="width:100%;max-width:none;"></select>
+            </div>
+            <div class="drive-modal-section" style="display:flex;flex-wrap:wrap;gap:10px;">
+                <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="cpCommanderApply">Set commander</button>
+                <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="cpCommanderModalCancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="card-render.js"></script>
@@ -290,8 +357,11 @@
     var library = [];
     var imported = [];
     var deck = [];
+    /** @type {{id:string,state:object,source?:string}|null} */
+    var commanderCard = null;
     var libraryListEl = document.getElementById('cpDeckModalLibrary');
     var DECK_NAME_STORAGE_KEY = 'cardmaker_cp_deck_name_v1';
+    var COMMANDER_ID_STORAGE_KEY = 'cardmaker_cp_commander_id_v1';
     var cpStatLibrary = document.getElementById('cpStatLibrary');
     var cpStatDeck = document.getElementById('cpStatDeck');
     var cpStatus = document.getElementById('cpStatus');
@@ -299,6 +369,8 @@
     var cpPlayingField = document.getElementById('cpPlayingField');
     var cpDrawZone = document.getElementById('cpDrawZone');
     var cpDiscardZone = document.getElementById('cpDiscardZone');
+    var cpCommanderZone = document.getElementById('cpCommanderZone');
+    var cpHandZone = document.getElementById('cpHandZone');
     var cpDeckCountZone = document.getElementById('cpDeckCountZone');
     var cpDeckDragGhost = document.getElementById('cpDeckDragGhost');
     var cpImportFile = document.getElementById('cpImportFile');
@@ -415,6 +487,24 @@
         });
     }
 
+    function relayoutCommanderZone() {
+        if (!cpCommanderZone || !cpPlayingField) return;
+        var cards = Array.from(cpPlayingField.querySelectorAll(
+            '.cp-card-on-field[data-cp-commander="1"][data-cp-commander-in-zone="1"]'
+        )).filter(function (w) {
+            return w.getAttribute('data-cp-discard') !== '1';
+        });
+        var zone = cpCommanderZone.getBoundingClientRect();
+        var fieldR = cpPlayingField.getBoundingClientRect();
+        var baseL = zone.left - fieldR.left + 10;
+        var baseT = zone.top - fieldR.top + 36;
+        cards.forEach(function (w, i) {
+            w.style.left = Math.max(0, baseL + i * 5) + 'px';
+            w.style.top = Math.max(0, baseT + i * 4) + 'px';
+            w.style.zIndex = String(48 + i);
+        });
+    }
+
     function snapCardToDiscardIfInside(wrap) {
         var r = wrap.getBoundingClientRect();
         var cx = (r.left + r.right) / 2;
@@ -514,6 +604,85 @@
         return null;
     }
 
+    function updateCommanderUi() {
+        var nameEl = document.getElementById('cpCommanderName');
+        var clearBtn = document.getElementById('cpClearCommander');
+        if (nameEl) {
+            nameEl.textContent = commanderCard ? cardTitleFromState(commanderCard.state) : '—';
+        }
+        if (clearBtn) clearBtn.disabled = !commanderCard;
+    }
+
+    function persistCommanderId() {
+        try {
+            if (commanderCard && commanderCard.id) {
+                localStorage.setItem(COMMANDER_ID_STORAGE_KEY, commanderCard.id);
+            } else {
+                localStorage.removeItem(COMMANDER_ID_STORAGE_KEY);
+            }
+        } catch (e) { /* ignore */ }
+    }
+
+    function restoreCommanderFromLibrary() {
+        try {
+            var raw = localStorage.getItem(COMMANDER_ID_STORAGE_KEY);
+            if (!raw) {
+                commanderCard = null;
+                updateCommanderUi();
+                return;
+            }
+            if (allCards().length === 0) {
+                commanderCard = null;
+                updateCommanderUi();
+                return;
+            }
+            var c = cardById(raw);
+            commanderCard = c || null;
+            if (!c) localStorage.removeItem(COMMANDER_ID_STORAGE_KEY);
+        } catch (e) {
+            commanderCard = null;
+        }
+        updateCommanderUi();
+        syncCommanderToPlayingField();
+    }
+
+    function openCommanderModal() {
+        var modal = document.getElementById('cpCommanderModal');
+        var sel = document.getElementById('cpCommanderSelect');
+        if (!modal || !sel) return;
+        var cards = allCards();
+        if (cards.length === 0) {
+            setStatus('Add cards to your library first (Saved projects cache or import).');
+            return;
+        }
+        sel.innerHTML = '';
+        var o0 = document.createElement('option');
+        o0.value = '';
+        o0.textContent = '— No commander —';
+        sel.appendChild(o0);
+        cards.forEach(function (c) {
+            var o = document.createElement('option');
+            o.value = c.id;
+            o.textContent = cardTitleFromState(c.state);
+            sel.appendChild(o);
+        });
+        sel.value = commanderCard && commanderCard.id ? commanderCard.id : '';
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeCommanderModal() {
+        var modal = document.getElementById('cpCommanderModal');
+        if (!modal) return;
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        var deckM = document.getElementById('cpDeckModal');
+        if (!deckM || !deckM.classList.contains('is-open')) {
+            document.body.style.overflow = '';
+        }
+    }
+
     function buildDeckFromSelection() {
         var map = {};
         allCards().forEach(function (c) { map[c.id] = c; });
@@ -575,19 +744,48 @@
                 var cy = (r.top + r.bottom) / 2;
                 if (pointInEl(cx, cy, cpDrawZone) && el._cpDeckEntry) {
                     deck.push(el._cpDeckEntry);
+                    el.classList.remove('cp-hand-card');
                     el.remove();
                     updateStats();
+                    relayoutHandCards();
                     relayoutDiscardPile();
+                    relayoutCommanderZone();
                     return;
                 }
                 if (pointInEl(cx, cy, cpDiscardZone)) {
+                    el.classList.remove('cp-hand-card');
+                    relayoutHandCards();
                     el.setAttribute('data-cp-discard', '1');
                     relayoutDiscardPile();
+                    relayoutCommanderZone();
                     return;
                 }
-                if (el.getAttribute('data-cp-discard') === '1') {
+                var wasHand = el.classList.contains('cp-hand-card');
+                var inHand = cpHandZone && pointInEl(cx, cy, cpHandZone);
+                if (wasHand && !inHand) {
+                    el.classList.remove('cp-hand-card');
+                    relayoutHandCards();
+                } else if (!wasHand && inHand) {
+                    el.classList.add('cp-hand-card');
+                    el.removeAttribute('data-cp-discard');
+                    relayoutHandCards();
+                    relayoutDiscardPile();
+                    relayoutCommanderZone();
+                }
+                if (el.getAttribute('data-cp-discard') === '1' && !pointInEl(cx, cy, cpDiscardZone)) {
                     el.removeAttribute('data-cp-discard');
                     relayoutDiscardPile();
+                    relayoutCommanderZone();
+                }
+                if (el.getAttribute('data-cp-commander') === '1' && el.getAttribute('data-cp-discard') !== '1') {
+                    if (cpCommanderZone && pointInEl(cx, cy, cpCommanderZone)) {
+                        el.setAttribute('data-cp-commander-in-zone', '1');
+                        el.classList.remove('cp-hand-card');
+                        relayoutHandCards();
+                    } else {
+                        el.removeAttribute('data-cp-commander-in-zone');
+                    }
+                    relayoutCommanderZone();
                 }
             }
         }
@@ -616,7 +814,10 @@
             window.removeEventListener('pointermove', onDeckPointerMove);
             window.removeEventListener('pointerup', onDeckPointerUp);
             window.removeEventListener('pointercancel', onDeckPointerUp);
-            if (!deckDrag.moved) return;
+            if (!deckDrag.moved) {
+                drawCardToHand();
+                return;
+            }
             if (pointInEl(ev.clientX, ev.clientY, cpDrawZone)) {
                 setStatus('Drag out of the deck, then release to draw a card.');
                 return;
@@ -709,21 +910,10 @@
         });
     }
 
-    function placeCardOnField(dataUrl, cardEntry, left, top) {
-        var field = cpPlayingField;
+    function buildCardWrap(dataUrl, cardEntry) {
         var wrap = document.createElement('div');
         wrap.className = 'cp-card-on-field';
         wrap._cpDeckEntry = cardEntry || null;
-        var margin = 24;
-        var maxX = Math.max(margin, field.clientWidth - margin - 107);
-        var maxY = Math.max(margin, field.clientHeight - margin - 147);
-        if (typeof left === 'number' && typeof top === 'number') {
-            wrap.style.left = left + 'px';
-            wrap.style.top = top + 'px';
-        } else {
-            wrap.style.left = (margin + Math.random() * Math.max(1, maxX - margin)) + 'px';
-            wrap.style.top = (margin + Math.random() * Math.max(1, maxY - margin)) + 'px';
-        }
         var flipInner = document.createElement('div');
         flipInner.className = 'cp-flip-inner';
         var faceFront = document.createElement('div');
@@ -744,12 +934,126 @@
         rotLayer.className = 'cp-card-rot';
         rotLayer.appendChild(flipInner);
         wrap.appendChild(rotLayer);
-        field.appendChild(wrap);
-        makeDraggable(wrap, field);
+        return { wrap: wrap, rotLayer: rotLayer, flipInner: flipInner };
+    }
+
+    function wireCardInteractions(wrap, rotLayer, flipInner) {
+        makeDraggable(wrap, cpPlayingField);
         attachRotateOnRightClick(wrap, rotLayer);
         attachMiddleClickFlip(wrap, flipInner);
         attachHoverEnlarge(wrap);
+    }
+
+    function relayoutHandCards() {
+        if (!cpHandZone || !cpPlayingField) return;
+        var list = Array.prototype.slice.call(cpPlayingField.querySelectorAll('.cp-card-on-field.cp-hand-card'));
+        var zr = cpHandZone.getBoundingClientRect();
+        var fr = cpPlayingField.getBoundingClientRect();
+        var baseLeft = zr.left - fr.left + 8;
+        var baseTop = zr.top - fr.top + 26;
+        var step = 40;
+        var maxW = Math.max(40, zr.width - 20);
+        if (list.length > 1) {
+            step = Math.min(48, Math.max(28, (maxW - 56) / (list.length - 1)));
+        }
+        list.forEach(function (w, i) {
+            w.style.left = Math.max(0, baseLeft + i * step) + 'px';
+            w.style.top = Math.max(0, baseTop) + 'px';
+            w.style.zIndex = String(28 + i);
+        });
+    }
+
+    function placeCardOnField(dataUrl, cardEntry, left, top) {
+        var field = cpPlayingField;
+        var parts = buildCardWrap(dataUrl, cardEntry);
+        var wrap = parts.wrap;
+        var margin = 24;
+        var maxX = Math.max(margin, field.clientWidth - margin - 107);
+        var maxY = Math.max(margin, field.clientHeight - margin - 147);
+        if (typeof left === 'number' && typeof top === 'number') {
+            wrap.style.left = left + 'px';
+            wrap.style.top = top + 'px';
+        } else {
+            wrap.style.left = (margin + Math.random() * Math.max(1, maxX - margin)) + 'px';
+            wrap.style.top = (margin + Math.random() * Math.max(1, maxY - margin)) + 'px';
+        }
+        field.appendChild(wrap);
+        wireCardInteractions(wrap, parts.rotLayer, parts.flipInner);
         return wrap;
+    }
+
+    function placeCardInHand(dataUrl, cardEntry) {
+        var parts = buildCardWrap(dataUrl, cardEntry);
+        var wrap = parts.wrap;
+        wrap.classList.add('cp-hand-card');
+        cpPlayingField.appendChild(wrap);
+        wireCardInteractions(wrap, parts.rotLayer, parts.flipInner);
+        relayoutHandCards();
+        return wrap;
+    }
+
+    function removeCommanderPiecesFromField() {
+        if (!cpPlayingField) return;
+        var list = cpPlayingField.querySelectorAll('.cp-card-on-field[data-cp-commander="1"]');
+        if (!list.length) return;
+        list.forEach(function (el) { el.remove(); });
+        relayoutHandCards();
+        relayoutDiscardPile();
+        relayoutCommanderZone();
+    }
+
+    /** Places or removes the commander token on the field (not part of the deck pile). */
+    function syncCommanderToPlayingField() {
+        removeCommanderPiecesFromField();
+        if (!commanderCard || !commanderCard.state) return;
+        var card = commanderCard;
+        var p = window.renderCardMakerProjectToDataUrl(card.state);
+        if (!p || typeof p.then !== 'function') return;
+        p.then(function (url) {
+            if (!url) return;
+            if (!commanderCard || commanderCard.id !== card.id) return;
+            var field = cpPlayingField;
+            var parts = buildCardWrap(url, null);
+            var wrap = parts.wrap;
+            wrap.setAttribute('data-cp-commander', '1');
+            wrap.setAttribute('data-cp-commander-in-zone', '1');
+            wrap.style.left = '0px';
+            wrap.style.top = '0px';
+            field.appendChild(wrap);
+            wireCardInteractions(wrap, parts.rotLayer, parts.flipInner);
+            relayoutCommanderZone();
+        }).catch(function () {});
+    }
+
+    function drawCardToHand() {
+        if (deck.length === 0) {
+            setStatus('Deck is empty — build a deck first.');
+            return;
+        }
+        var card = deck.pop();
+        updateStats();
+        setStatus('Drawing to hand…');
+        var p = window.renderCardMakerProjectToDataUrl(card.state);
+        if (!p || typeof p.then !== 'function') {
+            deck.push(card);
+            updateStats();
+            setStatus('Renderer not available.');
+            return;
+        }
+        p.then(function (url) {
+            if (!url) {
+                deck.push(card);
+                updateStats();
+                setStatus('Could not render card.');
+                return;
+            }
+            placeCardInHand(url, card);
+            setStatus('Drew to hand: ' + cardTitleFromState(card.state) + ' · ' + deck.length + ' left in deck.');
+        }).catch(function () {
+            deck.push(card);
+            updateStats();
+            setStatus('Render failed.');
+        });
     }
 
     function drawOne() {
@@ -786,6 +1090,7 @@
             el.remove();
         });
         setStatus('Field cleared.');
+        syncCommanderToPlayingField();
     }
 
     function refreshLibrary() {
@@ -794,12 +1099,14 @@
             .then(function (rows) {
                 library = rows;
                 renderLibraryList();
+                restoreCommanderFromLibrary();
                 setStatus('Library: ' + library.length + ' from cache + ' + imported.length + ' imported.');
             })
             .catch(function () {
                 setStatus('Could not read card cache.');
                 library = [];
                 renderLibraryList();
+                restoreCommanderFromLibrary();
             });
     }
 
@@ -860,13 +1167,15 @@
 
     function buildDeckJsonString(displayName) {
         var name = String(displayName || '').trim() || 'Deck';
-        return JSON.stringify({
+        var o = {
             version: 1,
             kind: 'cardmaker-deck',
             name: name,
             updatedAt: new Date().toISOString(),
             entries: collectDeckEntriesForSave()
-        });
+        };
+        if (commanderCard && commanderCard.id) o.commanderId = commanderCard.id;
+        return JSON.stringify(o);
     }
 
     function buildJsonStringForSave(nameForDoc) {
@@ -895,6 +1204,15 @@
             inp.value = byId[id] != null ? String(byId[id]) : '0';
         });
         if (doc.name && cpDeckNameInput) cpDeckNameInput.value = String(doc.name).trim();
+        if (doc.commanderId != null && String(doc.commanderId).trim()) {
+            var cmd = cardById(String(doc.commanderId).trim());
+            commanderCard = cmd || null;
+        } else {
+            commanderCard = null;
+        }
+        persistCommanderId();
+        updateCommanderUi();
+        syncCommanderToPlayingField();
     }
 
     function formatDriveListDate(iso) {
@@ -988,7 +1306,10 @@
         } catch (e) { /* ignore */ }
         cpDeckModal.classList.remove('is-open');
         cpDeckModal.setAttribute('aria-hidden', 'true');
-        document.body.style.overflow = '';
+        var cmdM = document.getElementById('cpCommanderModal');
+        if (!cmdM || !cmdM.classList.contains('is-open')) {
+            document.body.style.overflow = '';
+        }
     }
 
     function refreshDriveDeckListUi() {
@@ -1142,6 +1463,11 @@
 
     document.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape') return;
+        var cmdM = document.getElementById('cpCommanderModal');
+        if (cmdM && cmdM.classList.contains('is-open')) {
+            closeCommanderModal();
+            return;
+        }
         if (cpDeckModal && cpDeckModal.classList.contains('is-open')) closeDeckModal();
     });
 
@@ -1192,8 +1518,36 @@
             });
             cpImportFile.value = '';
             renderLibraryList();
+            restoreCommanderFromLibrary();
             setStatus('Imported ' + added + ' file(s). Total library: ' + allCards().length + '.');
         });
+    });
+
+    document.getElementById('cpSelectCommander').addEventListener('click', openCommanderModal);
+    document.getElementById('cpClearCommander').addEventListener('click', function () {
+        commanderCard = null;
+        persistCommanderId();
+        updateCommanderUi();
+        syncCommanderToPlayingField();
+        setStatus('Commander cleared.');
+    });
+    document.getElementById('cpCommanderModalClose').addEventListener('click', closeCommanderModal);
+    document.getElementById('cpCommanderModalBackdrop').addEventListener('click', closeCommanderModal);
+    document.getElementById('cpCommanderModalCancel').addEventListener('click', closeCommanderModal);
+    document.getElementById('cpCommanderApply').addEventListener('click', function () {
+        var sel = document.getElementById('cpCommanderSelect');
+        if (!sel) return;
+        var v = sel.value;
+        if (!v) {
+            commanderCard = null;
+        } else {
+            commanderCard = cardById(v);
+        }
+        persistCommanderId();
+        updateCommanderUi();
+        syncCommanderToPlayingField();
+        closeCommanderModal();
+        setStatus(commanderCard ? 'Commander: ' + cardTitleFromState(commanderCard.state) : 'Commander cleared.');
     });
 
     try {
