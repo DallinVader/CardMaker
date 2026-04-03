@@ -66,6 +66,46 @@
             box-shadow: none;
             background: transparent;
         }
+        .cp-play-stacks {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        /* Same footprint as P1’s field; inner layer is rotated 180° like sitting across the table. */
+        .cp-field-wrap--p2 {
+            position: relative;
+            border-radius: 16px;
+            border: none;
+            background: rgba(15,23,42,0.45);
+            min-height: min(86vh, 920px);
+            overflow: hidden;
+            box-shadow: none;
+        }
+        .cp-field-wrap--p2 .cp-field-label {
+            position: absolute;
+            top: 12px;
+            left: 16px;
+            right: 16px;
+            text-align: center;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: rgba(148,163,184,0.8);
+            font-weight: 800;
+            pointer-events: none;
+            z-index: 2;
+        }
+        .cp-field-rot-p2 {
+            width: 100%;
+            height: min(86vh, 920px);
+            transform: rotate(180deg);
+            transform-origin: center center;
+        }
+        .cp-field-rot-p2 .cp-field {
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+        }
         .cp-field-label {
             position: absolute; top: 12px; left: 16px; font-size: 11px; text-transform: uppercase;
             letter-spacing: 0.1em; color: rgba(148,163,184,0.75); font-weight: 800; pointer-events: none; z-index: 0;
@@ -240,6 +280,12 @@
             }
         }
         .cp-status { margin-top: 10px; font-size: 12px; color: #93c5fd; min-height: 1.25em; }
+        .cp-firebase-room {
+            flex: 1; min-width: 140px; padding: 8px 10px; border-radius: 10px;
+            border: 1px solid rgba(148,163,184,0.28); background: rgba(15,23,42,0.55); color: #e2e8f0;
+            font-size: 14px;
+        }
+        .cp-firebase-room:focus { outline: 2px solid rgba(129,140,248,0.45); outline-offset: 1px; }
         .cp-file-input { display: none; }
         #cpDeckModal .drive-modal-panel { max-width: min(920px, 96vw); max-height: min(92vh, 900px); display: flex; flex-direction: column; }
         #cpDeckModal .cp-deck-modal-scroll { flex: 1; min-height: 0; overflow-y: auto; }
@@ -284,28 +330,61 @@
                     <button type="button" class="cp-btn cp-btn-primary" id="cpDraw" disabled>Draw to field</button>
                     <button type="button" class="cp-btn" id="cpClearField">Clear field</button>
                 </div>
+                <h2 style="margin-top:16px;">Play online</h2>
+                <p class="cp-muted" style="font-size:12px;margin-bottom:10px;">Realtime sync via <strong>Firebase</strong> (static site + Firestore). Put your web app keys in <code style="color:#93c5fd">firebase-config.js</code>, enable <strong>Anonymous</strong> sign-in and deploy <code style="color:#93c5fd">firestore.rules.example</code> rules. Both players need the <strong>same card library</strong> (same Saved projects cache / imports).</p>
+                <div class="cp-actions" style="align-items:center;">
+                    <input type="text" class="cp-firebase-room" id="cpRoomId" placeholder="Room name (e.g. friday-game)" maxlength="48" autocomplete="off" aria-label="Room name" />
+                </div>
+                <div class="cp-actions">
+                    <button type="button" class="cp-btn cp-btn-primary" id="cpFirebaseConnect">Connect</button>
+                    <button type="button" class="cp-btn" id="cpFirebaseDisconnect" disabled>Disconnect</button>
+                </div>
+                <p class="cp-muted" id="cpFirebaseStatus" style="font-size:12px;margin-top:6px;">Firebase: not configured</p>
                 <p class="cp-status" id="cpStatus" aria-live="polite"></p>
             </div>
 
             <div class="cp-panel cp-panel-play" style="padding: 0; overflow: hidden;">
-                <div class="cp-field-wrap">
-                    <span class="cp-field-label">Playing field · commander zone (top right) · click deck → hand · drag → field</span>
-                    <div class="cp-field" id="cpPlayingField" aria-label="Playing field">
-                        <div class="cp-commander-zone" id="cpCommanderZone" title="Commander — set from the sidebar; drag your commander here to dock">
-                            <span class="cp-zone-label">Commander</span>
+                <div class="cp-play-stacks">
+                    <div class="cp-field-wrap cp-field-wrap--p2">
+                        <span class="cp-field-label">Player 2 · same size as P1, flipped 180° (opponent view)</span>
+                        <div class="cp-field-rot-p2">
+                            <div class="cp-field" id="cpPlayingFieldP2" aria-label="Player 2 playing field">
+                                <div class="cp-commander-zone" id="cpCommanderZoneP2" title="Commander zone">
+                                    <span class="cp-zone-label">Commander</span>
+                                </div>
+                                <div class="cp-hand-zone" id="cpHandZoneP2" title="Hand">
+                                    <span class="cp-zone-label">Hand</span>
+                                </div>
+                                <div class="cp-draw-zone" id="cpDrawZoneP2" title="Deck — click / drag">
+                                    <span class="cp-zone-label">Deck</span>
+                                    <span class="cp-zone-count" id="cpDeckCountZoneP2">0</span>
+                                </div>
+                                <div class="cp-discard-zone" id="cpDiscardZoneP2" title="Discard">
+                                    <span class="cp-zone-label">Discard</span>
+                                </div>
+                            </div>
                         </div>
-                        <div class="cp-hand-zone" id="cpHandZone" title="Hand — cards drawn by clicking the deck">
-                            <span class="cp-zone-label">Hand</span>
-                        </div>
-                        <div class="cp-draw-zone" id="cpDrawZone" title="Click to draw to hand. Drag out to place on the field. Drop a card here to return to the deck.">
-                            <span class="cp-zone-label">Deck</span>
-                            <span class="cp-zone-count" id="cpDeckCountZone">0</span>
-                        </div>
-                        <div class="cp-discard-zone" id="cpDiscardZone" title="Discard — drop cards here face up">
-                            <span class="cp-zone-label">Discard</span>
-                        </div>
+                        <div class="cp-deck-drag-ghost" id="cpDeckDragGhostP2" aria-hidden="true"></div>
                     </div>
-                    <div class="cp-deck-drag-ghost" id="cpDeckDragGhost" aria-hidden="true"></div>
+                    <div class="cp-field-wrap cp-field-wrap--p1">
+                        <span class="cp-field-label">Player 1 · commander top right · click deck → hand · drag → field</span>
+                        <div class="cp-field" id="cpPlayingField" aria-label="Playing field">
+                            <div class="cp-commander-zone" id="cpCommanderZone" title="Commander — set from the sidebar; drag your commander here to dock">
+                                <span class="cp-zone-label">Commander</span>
+                            </div>
+                            <div class="cp-hand-zone" id="cpHandZone" title="Hand — cards drawn by clicking the deck">
+                                <span class="cp-zone-label">Hand</span>
+                            </div>
+                            <div class="cp-draw-zone" id="cpDrawZone" title="Click to draw to hand. Drag out to place on the field. Drop a card here to return to the deck.">
+                                <span class="cp-zone-label">Deck</span>
+                                <span class="cp-zone-count" id="cpDeckCountZone">0</span>
+                            </div>
+                            <div class="cp-discard-zone" id="cpDiscardZone" title="Discard — drop cards here face up">
+                                <span class="cp-zone-label">Discard</span>
+                            </div>
+                        </div>
+                        <div class="cp-deck-drag-ghost" id="cpDeckDragGhost" aria-hidden="true"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -380,6 +459,10 @@
 
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
     <script src="card-render.js"></script>
     <script src="card-player-decks-drive.js"></script>
     <script>
@@ -391,6 +474,8 @@
     var library = [];
     var imported = [];
     var deck = [];
+    /** Independent draw pile for player 2 (mirrors P1 when you build or shuffle). */
+    var deckP2 = [];
     /** @type {{id:string,state:object,source?:string}|null} */
     var commanderCard = null;
     var libraryListEl = document.getElementById('cpDeckModalLibrary');
@@ -407,9 +492,51 @@
     var cpHandZone = document.getElementById('cpHandZone');
     var cpDeckCountZone = document.getElementById('cpDeckCountZone');
     var cpDeckDragGhost = document.getElementById('cpDeckDragGhost');
+    var cpPlayingFieldP2 = document.getElementById('cpPlayingFieldP2');
+    var cpDrawZoneP2 = document.getElementById('cpDrawZoneP2');
+    var cpDiscardZoneP2 = document.getElementById('cpDiscardZoneP2');
+    var cpCommanderZoneP2 = document.getElementById('cpCommanderZoneP2');
+    var cpHandZoneP2 = document.getElementById('cpHandZoneP2');
+    var cpDeckCountZoneP2 = document.getElementById('cpDeckCountZoneP2');
+    var cpDeckDragGhostP2 = document.getElementById('cpDeckDragGhostP2');
     var cpImportFile = document.getElementById('cpImportFile');
 
-    var deckDrag = { active: false, moved: false, startX: 0, startY: 0 };
+    var boardP1 = {
+        id: 'p1',
+        field: cpPlayingField,
+        drawZone: cpDrawZone,
+        handZone: cpHandZone,
+        discardZone: cpDiscardZone,
+        commanderZone: cpCommanderZone,
+        deckCountEl: cpDeckCountZone,
+        ghost: cpDeckDragGhost,
+        deck: null,
+        deckDrag: { active: false, moved: false, startX: 0, startY: 0 }
+    };
+    var boardP2 = {
+        id: 'p2',
+        field: cpPlayingFieldP2,
+        drawZone: cpDrawZoneP2,
+        handZone: cpHandZoneP2,
+        discardZone: cpDiscardZoneP2,
+        commanderZone: cpCommanderZoneP2,
+        deckCountEl: cpDeckCountZoneP2,
+        ghost: cpDeckDragGhostP2,
+        deck: null,
+        deckDrag: { active: false, moved: false, startX: 0, startY: 0 }
+    };
+    boardP1.deck = deck;
+    boardP2.deck = deckP2;
+    var boards = [boardP1, boardP2];
+
+    var applyingRemoteFirestoreSync = false;
+    var firebaseMultiplayerUnsub = null;
+    var firebaseMultiplayerDbRef = null;
+    var firebaseMultiplayerPushTimer = null;
+
+    function newCpInstanceId() {
+        return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 11);
+    }
 
     function setStatus(msg) {
         cpStatus.textContent = msg || '';
@@ -495,11 +622,14 @@
     }
 
     function updateStats() {
+        boardP1.deck = deck;
+        boardP2.deck = deckP2;
         var n = allCards().length;
         cpStatLibrary.textContent = 'Library: ' + n + (n ? '' : ' (open Saved projects to cache cards)');
-        cpStatDeck.textContent = 'Deck: ' + deck.length;
+        cpStatDeck.textContent = 'Deck P1: ' + deck.length + ' · P2: ' + deckP2.length;
         cpDraw.disabled = deck.length === 0;
         if (cpDeckCountZone) cpDeckCountZone.textContent = String(deck.length);
+        if (cpDeckCountZoneP2) cpDeckCountZoneP2.textContent = String(deckP2.length);
     }
 
     function pointInEl(clientX, clientY, el) {
@@ -508,10 +638,11 @@
         return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
     }
 
-    function relayoutDiscardPile() {
-        var cards = Array.from(cpPlayingField.querySelectorAll('.cp-card-on-field[data-cp-discard="1"]'));
-        var zone = cpDiscardZone.getBoundingClientRect();
-        var fieldR = cpPlayingField.getBoundingClientRect();
+    function relayoutDiscardPileBoard(board) {
+        if (!board || !board.field || !board.discardZone) return;
+        var cards = Array.from(board.field.querySelectorAll('.cp-card-on-field[data-cp-discard="1"]'));
+        var zone = board.discardZone.getBoundingClientRect();
+        var fieldR = board.field.getBoundingClientRect();
         var baseL = zone.left - fieldR.left + 12;
         var baseT = zone.top - fieldR.top + 36;
         cards.forEach(function (w, i) {
@@ -521,15 +652,19 @@
         });
     }
 
-    function relayoutCommanderZone() {
-        if (!cpCommanderZone || !cpPlayingField) return;
-        var cards = Array.from(cpPlayingField.querySelectorAll(
+    function relayoutDiscardPile() {
+        boards.forEach(relayoutDiscardPileBoard);
+    }
+
+    function relayoutCommanderZoneBoard(board) {
+        if (!board || !board.commanderZone || !board.field) return;
+        var cards = Array.from(board.field.querySelectorAll(
             '.cp-card-on-field[data-cp-commander="1"][data-cp-commander-in-zone="1"]'
         )).filter(function (w) {
             return w.getAttribute('data-cp-discard') !== '1';
         });
-        var zone = cpCommanderZone.getBoundingClientRect();
-        var fieldR = cpPlayingField.getBoundingClientRect();
+        var zone = board.commanderZone.getBoundingClientRect();
+        var fieldR = board.field.getBoundingClientRect();
         var baseL = zone.left - fieldR.left + 10;
         var baseT = zone.top - fieldR.top + 36;
         cards.forEach(function (w, i) {
@@ -539,51 +674,62 @@
         });
     }
 
-    function snapCardToDiscardIfInside(wrap) {
+    function relayoutCommanderZone() {
+        boards.forEach(relayoutCommanderZoneBoard);
+    }
+
+    function snapCardToDiscardIfInside(wrap, board) {
+        board = board || wrap._cpBoard || boardP1;
+        if (!board || !board.discardZone) return false;
         var r = wrap.getBoundingClientRect();
         var cx = (r.left + r.right) / 2;
         var cy = (r.top + r.bottom) / 2;
-        if (pointInEl(cx, cy, cpDiscardZone)) {
+        if (pointInEl(cx, cy, board.discardZone)) {
             wrap.setAttribute('data-cp-discard', '1');
-            relayoutDiscardPile();
+            relayoutDiscardPileBoard(board);
             return true;
         }
         return false;
     }
 
-    function drawCardToFieldAt(clientX, clientY) {
-        if (deck.length === 0) return;
-        var card = deck.pop();
+    function drawCardToFieldAt(clientX, clientY, board) {
+        board = board || boardP1;
+        if (board.deck.length === 0) return;
+        var card = board.deck.pop();
         updateStats();
         setStatus('Drawing…');
-        var fieldR = cpPlayingField.getBoundingClientRect();
+        var fieldR = board.field.getBoundingClientRect();
         var halfW = 66;
         var halfH = 92;
         var x = clientX - fieldR.left - halfW;
         var y = clientY - fieldR.top - halfH;
-        x = Math.max(0, Math.min(cpPlayingField.clientWidth - 107, x));
-        y = Math.max(0, Math.min(cpPlayingField.clientHeight - 147, y));
+        x = Math.max(0, Math.min(board.field.clientWidth - 107, x));
+        y = Math.max(0, Math.min(board.field.clientHeight - 147, y));
         var p = window.renderCardMakerProjectToDataUrl(card.state);
         if (!p || typeof p.then !== 'function') {
-            deck.push(card);
+            board.deck.push(card);
             updateStats();
             setStatus('Renderer not available.');
+            scheduleMultiplayerPush();
             return;
         }
         p.then(function (url) {
             if (!url) {
-                deck.push(card);
+                board.deck.push(card);
                 updateStats();
                 setStatus('Could not render card.');
+                scheduleMultiplayerPush();
                 return;
             }
-            var wrap = placeCardOnField(url, card, x, y);
-            if (wrap) snapCardToDiscardIfInside(wrap);
-            setStatus('Drew: ' + cardTitleFromState(card.state) + ' · ' + deck.length + ' left in deck.');
+            var wrap = placeCardOnField(url, card, x, y, board);
+            if (wrap) snapCardToDiscardIfInside(wrap, board);
+            setStatus('Drew: ' + cardTitleFromState(card.state) + ' · P' + (board.id === 'p2' ? '2' : '1') + ' deck: ' + board.deck.length + ' left.');
+            scheduleMultiplayerPush();
         }).catch(function () {
-            deck.push(card);
+            board.deck.push(card);
             updateStats();
             setStatus('Render failed.');
+            scheduleMultiplayerPush();
         });
     }
 
@@ -730,14 +876,18 @@
             for (k = 0; k < n; k++) next.push(c);
         });
         deck = next;
-        setStatus('Deck: ' + deck.length + ' cards (from builder quantities).');
+        deckP2 = deck.slice();
+        setStatus('Deck: ' + deck.length + ' cards (from builder quantities). P2 deck copied.');
         updateStats();
+        scheduleMultiplayerPush();
     }
 
     function useAllAsDeck() {
         deck = allCards().slice();
-        setStatus('Deck: all ' + deck.length + ' cards.');
+        deckP2 = deck.slice();
+        setStatus('Deck: all ' + deck.length + ' cards (both players).');
         updateStats();
+        scheduleMultiplayerPush();
     }
 
     function shuffleDeck() {
@@ -746,10 +896,13 @@
             return;
         }
         shuffleInPlace(deck);
-        setStatus('Shuffled ' + deck.length + ' cards.');
+        if (deckP2.length > 0) shuffleInPlace(deckP2);
+        setStatus('Shuffled P1 (' + deck.length + '). P2: ' + deckP2.length + ' cards.');
+        scheduleMultiplayerPush();
     }
 
-    function makeDraggable(el, field) {
+    function makeDraggable(el, board) {
+        var field = board.field;
         var dragging = false;
         var startX = 0, startY = 0, origLeft = 0, origTop = 0;
         function down(ev) {
@@ -776,51 +929,54 @@
                 var r = el.getBoundingClientRect();
                 var cx = (r.left + r.right) / 2;
                 var cy = (r.top + r.bottom) / 2;
-                if (pointInEl(cx, cy, cpDrawZone) && el._cpDeckEntry) {
-                    deck.push(el._cpDeckEntry);
+                if (pointInEl(cx, cy, board.drawZone) && el._cpDeckEntry) {
+                    board.deck.push(el._cpDeckEntry);
                     el.classList.remove('cp-hand-card');
                     el.remove();
                     updateStats();
-                    relayoutHandCards();
-                    relayoutDiscardPile();
-                    relayoutCommanderZone();
+                    relayoutHandCardsBoard(board);
+                    relayoutDiscardPileBoard(board);
+                    relayoutCommanderZoneBoard(board);
+                    scheduleMultiplayerPush();
                     return;
                 }
-                if (pointInEl(cx, cy, cpDiscardZone)) {
+                if (pointInEl(cx, cy, board.discardZone)) {
                     el.classList.remove('cp-hand-card');
-                    relayoutHandCards();
+                    relayoutHandCardsBoard(board);
                     el.setAttribute('data-cp-discard', '1');
-                    relayoutDiscardPile();
-                    relayoutCommanderZone();
+                    relayoutDiscardPileBoard(board);
+                    relayoutCommanderZoneBoard(board);
+                    scheduleMultiplayerPush();
                     return;
                 }
                 var wasHand = el.classList.contains('cp-hand-card');
-                var inHand = cpHandZone && pointInEl(cx, cy, cpHandZone);
+                var inHand = board.handZone && pointInEl(cx, cy, board.handZone);
                 if (wasHand && !inHand) {
                     el.classList.remove('cp-hand-card');
-                    relayoutHandCards();
+                    relayoutHandCardsBoard(board);
                 } else if (!wasHand && inHand) {
                     el.classList.add('cp-hand-card');
                     el.removeAttribute('data-cp-discard');
-                    relayoutHandCards();
-                    relayoutDiscardPile();
-                    relayoutCommanderZone();
+                    relayoutHandCardsBoard(board);
+                    relayoutDiscardPileBoard(board);
+                    relayoutCommanderZoneBoard(board);
                 }
-                if (el.getAttribute('data-cp-discard') === '1' && !pointInEl(cx, cy, cpDiscardZone)) {
+                if (el.getAttribute('data-cp-discard') === '1' && !pointInEl(cx, cy, board.discardZone)) {
                     el.removeAttribute('data-cp-discard');
-                    relayoutDiscardPile();
-                    relayoutCommanderZone();
+                    relayoutDiscardPileBoard(board);
+                    relayoutCommanderZoneBoard(board);
                 }
                 if (el.getAttribute('data-cp-commander') === '1' && el.getAttribute('data-cp-discard') !== '1') {
-                    if (cpCommanderZone && pointInEl(cx, cy, cpCommanderZone)) {
+                    if (board.commanderZone && pointInEl(cx, cy, board.commanderZone)) {
                         el.setAttribute('data-cp-commander-in-zone', '1');
                         el.classList.remove('cp-hand-card');
-                        relayoutHandCards();
+                        relayoutHandCardsBoard(board);
                     } else {
                         el.removeAttribute('data-cp-commander-in-zone');
                     }
-                    relayoutCommanderZone();
+                    relayoutCommanderZoneBoard(board);
                 }
+                scheduleMultiplayerPush();
             }
         }
         el.addEventListener('pointerdown', down);
@@ -829,45 +985,49 @@
         window.addEventListener('pointercancel', up);
     }
 
-    function attachDrawZoneDrag() {
+    function attachDrawZoneDrag(board) {
+        if (!board || !board.drawZone) return;
         function onDeckPointerMove(ev) {
-            if (!deckDrag.active) return;
-            var dx = ev.clientX - deckDrag.startX;
-            var dy = ev.clientY - deckDrag.startY;
-            if (Math.abs(dx) + Math.abs(dy) > 8) deckDrag.moved = true;
-            if (deckDrag.moved && cpDeckDragGhost) {
-                cpDeckDragGhost.style.display = 'block';
-                cpDeckDragGhost.style.left = ev.clientX + 'px';
-                cpDeckDragGhost.style.top = ev.clientY + 'px';
+            var d = board.deckDrag;
+            if (!d.active) return;
+            var dx = ev.clientX - d.startX;
+            var dy = ev.clientY - d.startY;
+            if (Math.abs(dx) + Math.abs(dy) > 8) d.moved = true;
+            if (d.moved && board.ghost) {
+                board.ghost.style.display = 'block';
+                board.ghost.style.left = ev.clientX + 'px';
+                board.ghost.style.top = ev.clientY + 'px';
             }
         }
         function onDeckPointerUp(ev) {
-            if (!deckDrag.active) return;
-            deckDrag.active = false;
-            if (cpDeckDragGhost) cpDeckDragGhost.style.display = 'none';
+            var d = board.deckDrag;
+            if (!d.active) return;
+            d.active = false;
+            if (board.ghost) board.ghost.style.display = 'none';
             window.removeEventListener('pointermove', onDeckPointerMove);
             window.removeEventListener('pointerup', onDeckPointerUp);
             window.removeEventListener('pointercancel', onDeckPointerUp);
-            if (!deckDrag.moved) {
-                drawCardToHand();
+            if (!d.moved) {
+                drawCardToHand(board);
                 return;
             }
-            if (pointInEl(ev.clientX, ev.clientY, cpDrawZone)) {
+            if (pointInEl(ev.clientX, ev.clientY, board.drawZone)) {
                 setStatus('Drag out of the deck, then release to draw a card.');
                 return;
             }
-            drawCardToFieldAt(ev.clientX, ev.clientY);
+            drawCardToFieldAt(ev.clientX, ev.clientY, board);
         }
-        cpDrawZone.addEventListener('pointerdown', function (ev) {
+        board.drawZone.addEventListener('pointerdown', function (ev) {
             if (ev.button !== 0) return;
-            if (deck.length === 0) {
-                setStatus('Deck is empty — build a deck in the sidebar.');
+            if (board.deck.length === 0) {
+                setStatus(board.id === 'p2' ? 'Player 2 deck is empty — build a deck in the sidebar.' : 'Deck is empty — build a deck in the sidebar.');
                 return;
             }
-            deckDrag.active = true;
-            deckDrag.moved = false;
-            deckDrag.startX = ev.clientX;
-            deckDrag.startY = ev.clientY;
+            var d = board.deckDrag;
+            d.active = true;
+            d.moved = false;
+            d.startX = ev.clientX;
+            d.startY = ev.clientY;
             ev.preventDefault();
             window.addEventListener('pointermove', onDeckPointerMove);
             window.addEventListener('pointerup', onDeckPointerUp);
@@ -881,6 +1041,7 @@
             ev.preventDefault();
             wrap._cpRotationDeg = (wrap._cpRotationDeg + 90) % 360;
             rotLayer.style.transform = 'rotate(' + wrap._cpRotationDeg + 'deg)';
+            scheduleMultiplayerPush();
         });
     }
 
@@ -899,6 +1060,7 @@
             ev.preventDefault();
             wrap._cpShowingBack = !wrap._cpShowingBack;
             flipInner.classList.toggle('cp-flip-inner--back', wrap._cpShowingBack);
+            scheduleMultiplayerPush();
         });
         wrap.addEventListener('mousedown', function (ev) {
             if (ev.button === 1) ev.preventDefault();
@@ -983,6 +1145,8 @@
     function buildCardWrap(dataUrl, cardEntry) {
         var wrap = document.createElement('div');
         wrap.className = 'cp-card-on-field';
+        wrap.setAttribute('data-cp-instance-id', newCpInstanceId());
+        if (cardEntry && cardEntry.id) wrap.setAttribute('data-cp-card-lib-id', String(cardEntry.id));
         wrap._cpDeckEntry = cardEntry || null;
         var flipInner = document.createElement('div');
         flipInner.className = 'cp-flip-inner';
@@ -1007,18 +1171,20 @@
         return { wrap: wrap, rotLayer: rotLayer, flipInner: flipInner };
     }
 
-    function wireCardInteractions(wrap, rotLayer, flipInner) {
-        makeDraggable(wrap, cpPlayingField);
+    function wireCardInteractions(wrap, rotLayer, flipInner, board) {
+        board = board || boardP1;
+        wrap._cpBoard = board;
+        makeDraggable(wrap, board);
         attachRotateOnRightClick(wrap, rotLayer);
         attachMiddleClickFlip(wrap, flipInner);
         attachHoverEnlarge(wrap);
     }
 
-    function relayoutHandCards() {
-        if (!cpHandZone || !cpPlayingField) return;
-        var list = Array.prototype.slice.call(cpPlayingField.querySelectorAll('.cp-card-on-field.cp-hand-card'));
-        var zr = cpHandZone.getBoundingClientRect();
-        var fr = cpPlayingField.getBoundingClientRect();
+    function relayoutHandCardsBoard(board) {
+        if (!board || !board.handZone || !board.field) return;
+        var list = Array.prototype.slice.call(board.field.querySelectorAll('.cp-card-on-field.cp-hand-card'));
+        var zr = board.handZone.getBoundingClientRect();
+        var fr = board.field.getBoundingClientRect();
         var baseLeft = zr.left - fr.left + 8;
         var baseTop = zr.top - fr.top + 26;
         var step = 40;
@@ -1033,8 +1199,13 @@
         });
     }
 
-    function placeCardOnField(dataUrl, cardEntry, left, top) {
-        var field = cpPlayingField;
+    function relayoutHandCards() {
+        boards.forEach(relayoutHandCardsBoard);
+    }
+
+    function placeCardOnField(dataUrl, cardEntry, left, top, board) {
+        board = board || boardP1;
+        var field = board.field;
         var parts = buildCardWrap(dataUrl, cardEntry);
         var wrap = parts.wrap;
         var margin = 24;
@@ -1048,81 +1219,109 @@
             wrap.style.top = (margin + Math.random() * Math.max(1, maxY - margin)) + 'px';
         }
         field.appendChild(wrap);
-        wireCardInteractions(wrap, parts.rotLayer, parts.flipInner);
+        wireCardInteractions(wrap, parts.rotLayer, parts.flipInner, board);
         return wrap;
     }
 
-    function placeCardInHand(dataUrl, cardEntry) {
+    function placeCardInHand(dataUrl, cardEntry, board) {
+        board = board || boardP1;
         var parts = buildCardWrap(dataUrl, cardEntry);
         var wrap = parts.wrap;
         wrap.classList.add('cp-hand-card');
-        cpPlayingField.appendChild(wrap);
-        wireCardInteractions(wrap, parts.rotLayer, parts.flipInner);
-        relayoutHandCards();
+        board.field.appendChild(wrap);
+        wireCardInteractions(wrap, parts.rotLayer, parts.flipInner, board);
+        relayoutHandCardsBoard(board);
         return wrap;
     }
 
-    function removeCommanderPiecesFromField() {
-        if (!cpPlayingField) return;
-        var list = cpPlayingField.querySelectorAll('.cp-card-on-field[data-cp-commander="1"]');
+    function removeCommanderPiecesFromBoard(board) {
+        if (!board || !board.field) return;
+        var list = board.field.querySelectorAll('.cp-card-on-field[data-cp-commander="1"]');
         if (!list.length) return;
         list.forEach(function (el) { el.remove(); });
-        relayoutHandCards();
-        relayoutDiscardPile();
-        relayoutCommanderZone();
+        relayoutHandCardsBoard(board);
+        relayoutDiscardPileBoard(board);
+        relayoutCommanderZoneBoard(board);
     }
 
-    /** Places or removes the commander token on the field (not part of the deck pile). */
+    function removeCommanderPiecesFromField() {
+        boards.forEach(removeCommanderPiecesFromBoard);
+    }
+
+    /** Places or removes the commander token on each field (not part of the deck pile). */
     function syncCommanderToPlayingField() {
-        removeCommanderPiecesFromField();
-        if (!commanderCard || !commanderCard.state) return;
-        var card = commanderCard;
-        var p = window.renderCardMakerProjectToDataUrl(card.state);
-        if (!p || typeof p.then !== 'function') return;
-        p.then(function (url) {
-            if (!url) return;
-            if (!commanderCard || commanderCard.id !== card.id) return;
-            var field = cpPlayingField;
-            var parts = buildCardWrap(url, null);
-            var wrap = parts.wrap;
-            wrap.setAttribute('data-cp-commander', '1');
-            wrap.setAttribute('data-cp-commander-in-zone', '1');
-            wrap.style.left = '0px';
-            wrap.style.top = '0px';
-            field.appendChild(wrap);
-            wireCardInteractions(wrap, parts.rotLayer, parts.flipInner);
-            relayoutCommanderZone();
-        }).catch(function () {});
-    }
-
-    function drawCardToHand() {
-        if (deck.length === 0) {
-            setStatus('Deck is empty — build a deck first.');
+        boards.forEach(removeCommanderPiecesFromBoard);
+        if (!commanderCard || !commanderCard.state) {
+            scheduleMultiplayerPush();
             return;
         }
-        var card = deck.pop();
-        updateStats();
-        setStatus('Drawing to hand…');
+        var card = commanderCard;
         var p = window.renderCardMakerProjectToDataUrl(card.state);
         if (!p || typeof p.then !== 'function') {
-            deck.push(card);
-            updateStats();
-            setStatus('Renderer not available.');
+            scheduleMultiplayerPush();
             return;
         }
         p.then(function (url) {
             if (!url) {
-                deck.push(card);
-                updateStats();
-                setStatus('Could not render card.');
+                scheduleMultiplayerPush();
                 return;
             }
-            placeCardInHand(url, card);
-            setStatus('Drew to hand: ' + cardTitleFromState(card.state) + ' · ' + deck.length + ' left in deck.');
+            if (!commanderCard || commanderCard.id !== card.id) {
+                scheduleMultiplayerPush();
+                return;
+            }
+            boards.forEach(function (board) {
+                if (!board.field) return;
+                var parts = buildCardWrap(url, null);
+                var wrap = parts.wrap;
+                wrap.setAttribute('data-cp-commander', '1');
+                wrap.setAttribute('data-cp-commander-in-zone', '1');
+                wrap.setAttribute('data-cp-card-lib-id', String(card.id));
+                wrap.style.left = '0px';
+                wrap.style.top = '0px';
+                board.field.appendChild(wrap);
+                wireCardInteractions(wrap, parts.rotLayer, parts.flipInner, board);
+                relayoutCommanderZoneBoard(board);
+            });
+            scheduleMultiplayerPush();
         }).catch(function () {
-            deck.push(card);
+            scheduleMultiplayerPush();
+        });
+    }
+
+    function drawCardToHand(board) {
+        board = board || boardP1;
+        if (board.deck.length === 0) {
+            setStatus(board.id === 'p2' ? 'Player 2 deck is empty — build a deck first.' : 'Deck is empty — build a deck first.');
+            return;
+        }
+        var card = board.deck.pop();
+        updateStats();
+        setStatus('Drawing to hand…');
+        var p = window.renderCardMakerProjectToDataUrl(card.state);
+        if (!p || typeof p.then !== 'function') {
+            board.deck.push(card);
+            updateStats();
+            setStatus('Renderer not available.');
+            scheduleMultiplayerPush();
+            return;
+        }
+        p.then(function (url) {
+            if (!url) {
+                board.deck.push(card);
+                updateStats();
+                setStatus('Could not render card.');
+                scheduleMultiplayerPush();
+                return;
+            }
+            placeCardInHand(url, card, board);
+            setStatus('Drew to hand (P' + (board.id === 'p2' ? '2' : '1') + '): ' + cardTitleFromState(card.state) + ' · ' + board.deck.length + ' left.');
+            scheduleMultiplayerPush();
+        }).catch(function () {
+            board.deck.push(card);
             updateStats();
             setStatus('Render failed.');
+            scheduleMultiplayerPush();
         });
     }
 
@@ -1136,6 +1335,7 @@
             deck.push(card);
             updateStats();
             setStatus('Renderer not available.');
+            scheduleMultiplayerPush();
             return;
         }
         p.then(function (url) {
@@ -1143,24 +1343,262 @@
                 deck.push(card);
                 updateStats();
                 setStatus('Could not render card (check images / CORS).');
+                scheduleMultiplayerPush();
                 return;
             }
-            var wrap = placeCardOnField(url, card);
-            if (wrap) snapCardToDiscardIfInside(wrap);
+            var wrap = placeCardOnField(url, card, undefined, undefined, boardP1);
+            if (wrap) snapCardToDiscardIfInside(wrap, boardP1);
             setStatus('Drew: ' + cardTitleFromState(card.state) + ' · ' + deck.length + ' left in deck.');
+            scheduleMultiplayerPush();
         }).catch(function () {
             deck.push(card);
             updateStats();
             setStatus('Render failed.');
+            scheduleMultiplayerPush();
         });
     }
 
     function clearField() {
-        cpPlayingField.querySelectorAll('.cp-card-on-field').forEach(function (el) {
-            el.remove();
+        boards.forEach(function (b) {
+            b.field.querySelectorAll('.cp-card-on-field').forEach(function (el) {
+                el.remove();
+            });
         });
-        setStatus('Field cleared.');
+        setStatus('Both fields cleared.');
         syncCommanderToPlayingField();
+        scheduleMultiplayerPush();
+    }
+
+    function serializePlayStateForFirestore() {
+        var cards = [];
+        boards.forEach(function (board) {
+            board.field.querySelectorAll('.cp-card-on-field').forEach(function (w) {
+                var libId = w.getAttribute('data-cp-card-lib-id') || '';
+                if (!libId && w.getAttribute('data-cp-commander') === '1' && commanderCard) {
+                    libId = commanderCard.id;
+                }
+                cards.push({
+                    i: w.getAttribute('data-cp-instance-id') || '',
+                    lib: libId,
+                    b: board.id,
+                    l: parseFloat(w.style.left) || 0,
+                    t: parseFloat(w.style.top) || 0,
+                    h: w.classList.contains('cp-hand-card') ? 1 : 0,
+                    d: w.getAttribute('data-cp-discard') === '1' ? 1 : 0,
+                    cz: w.getAttribute('data-cp-commander') === '1' ? 1 : 0,
+                    czIn: w.getAttribute('data-cp-commander-in-zone') === '1' ? 1 : 0,
+                    rot: w._cpRotationDeg || 0,
+                    back: w._cpShowingBack ? 1 : 0,
+                    fromDeck: w._cpDeckEntry ? 1 : 0
+                });
+            });
+        });
+        return {
+            v: 1,
+            commanderId: commanderCard && commanderCard.id ? commanderCard.id : '',
+            deckIds: deck.map(function (x) { return x.id; }),
+            deckP2Ids: deckP2.map(function (x) { return x.id; }),
+            cards: cards
+        };
+    }
+
+    function restoreOneCardFromFirestoreEntry(entry) {
+        if (!entry || !entry.lib) return Promise.resolve();
+        var c = cardById(entry.lib);
+        if (!c) return Promise.resolve();
+        var board = entry.b === 'p2' ? boardP2 : boardP1;
+        var fromDeck = !!entry.fromDeck;
+        var p = window.renderCardMakerProjectToDataUrl(c.state);
+        if (!p || typeof p.then !== 'function') return Promise.resolve();
+        return p.then(function (url) {
+            if (!url) return;
+            var wrap = placeCardOnField(url, fromDeck ? c : null, entry.l, entry.t, board);
+            if (!wrap) return;
+            if (entry.i) wrap.setAttribute('data-cp-instance-id', entry.i);
+            wrap.setAttribute('data-cp-card-lib-id', entry.lib);
+            if (entry.h) wrap.classList.add('cp-hand-card'); else wrap.classList.remove('cp-hand-card');
+            if (entry.d) wrap.setAttribute('data-cp-discard', '1'); else wrap.removeAttribute('data-cp-discard');
+            if (entry.cz) wrap.setAttribute('data-cp-commander', '1'); else wrap.removeAttribute('data-cp-commander');
+            if (entry.czIn) wrap.setAttribute('data-cp-commander-in-zone', '1'); else wrap.removeAttribute('data-cp-commander-in-zone');
+            var rotLayer = wrap.querySelector('.cp-card-rot');
+            var flipInner = wrap.querySelector('.cp-flip-inner');
+            wrap._cpRotationDeg = entry.rot || 0;
+            if (rotLayer) rotLayer.style.transform = 'rotate(' + wrap._cpRotationDeg + 'deg)';
+            wrap._cpShowingBack = !!entry.back;
+            if (flipInner) flipInner.classList.toggle('cp-flip-inner--back', wrap._cpShowingBack);
+        });
+    }
+
+    function applyPlayStateFromFirestorePayload(d) {
+        return new Promise(function (resolve) {
+            if (!d || d.v !== 1) {
+                resolve();
+                return;
+            }
+            var cmdId = d.commanderId || '';
+            commanderCard = cmdId ? cardById(cmdId) : null;
+            persistCommanderId();
+            updateCommanderUi();
+            deck.length = 0;
+            (d.deckIds || []).forEach(function (id) {
+                var c = cardById(id);
+                if (c) deck.push(c);
+            });
+            deckP2.length = 0;
+            (d.deckP2Ids || []).forEach(function (id) {
+                var c = cardById(id);
+                if (c) deckP2.push(c);
+            });
+            updateStats();
+            boards.forEach(function (b) {
+                b.field.querySelectorAll('.cp-card-on-field').forEach(function (el) {
+                    el.remove();
+                });
+            });
+            var entries = d.cards || [];
+            var chain = Promise.resolve();
+            entries.forEach(function (entry) {
+                chain = chain.then(function () {
+                    return restoreOneCardFromFirestoreEntry(entry);
+                });
+            });
+            chain.then(function () {
+                relayoutHandCards();
+                relayoutDiscardPile();
+                relayoutCommanderZone();
+                resolve();
+            }).catch(function () {
+                resolve();
+            });
+        });
+    }
+
+    function scheduleMultiplayerPush() {
+        if (applyingRemoteFirestoreSync || !firebaseMultiplayerDbRef || !window.firebase) return;
+        if (firebaseMultiplayerPushTimer) clearTimeout(firebaseMultiplayerPushTimer);
+        firebaseMultiplayerPushTimer = setTimeout(function () {
+            firebaseMultiplayerPushTimer = null;
+            if (applyingRemoteFirestoreSync || !firebaseMultiplayerDbRef) return;
+            try {
+                var auth = firebase.auth();
+                var payload = serializePlayStateForFirestore();
+                payload.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+                payload.updatedBy = auth.currentUser ? auth.currentUser.uid : '';
+                firebaseMultiplayerDbRef.set(payload, { merge: true });
+            } catch (e) {
+                console.error(e);
+            }
+        }, 480);
+    }
+
+    function sanitizeFirebaseRoomId(raw) {
+        return String(raw || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 48);
+    }
+
+    function disconnectFirebaseMultiplayer() {
+        if (firebaseMultiplayerUnsub) {
+            firebaseMultiplayerUnsub();
+            firebaseMultiplayerUnsub = null;
+        }
+        firebaseMultiplayerDbRef = null;
+        if (firebaseMultiplayerPushTimer) {
+            clearTimeout(firebaseMultiplayerPushTimer);
+            firebaseMultiplayerPushTimer = null;
+        }
+        var btnC = document.getElementById('cpFirebaseConnect');
+        var btnD = document.getElementById('cpFirebaseDisconnect');
+        var roomInp = document.getElementById('cpRoomId');
+        var st = document.getElementById('cpFirebaseStatus');
+        if (btnC) btnC.disabled = false;
+        if (btnD) btnD.disabled = true;
+        if (roomInp) roomInp.disabled = false;
+        if (st) st.textContent = 'Offline';
+    }
+
+    function initCardPlayerFirebaseMultiplayer() {
+        var cfg = window.CardMakerFirebaseConfig;
+        var statusEl = document.getElementById('cpFirebaseStatus');
+        var btnConnect = document.getElementById('cpFirebaseConnect');
+        var btnDisc = document.getElementById('cpFirebaseDisconnect');
+        var roomInput = document.getElementById('cpRoomId');
+        if (!btnConnect || !btnDisc) return;
+        if (!cfg || !cfg.apiKey || String(cfg.apiKey).indexOf('YOUR_') === 0) {
+            if (statusEl) statusEl.textContent = 'Add your Firebase web config to firebase-config.js';
+            btnConnect.disabled = true;
+            return;
+        }
+        if (!window.firebase) {
+            if (statusEl) statusEl.textContent = 'Firebase scripts did not load.';
+            btnConnect.disabled = true;
+            return;
+        }
+        if (statusEl) statusEl.textContent = 'Ready — enter a room name and Connect';
+        var app;
+        try {
+            app = firebase.apps && firebase.apps.length ? firebase.app() : firebase.initializeApp(cfg);
+        } catch (e) {
+            if (statusEl) statusEl.textContent = 'Firebase init failed: ' + (e.message || e);
+            btnConnect.disabled = true;
+            return;
+        }
+        var auth = firebase.auth();
+        var db = firebase.firestore();
+
+        function setConnUi(connected) {
+            btnConnect.disabled = connected;
+            btnDisc.disabled = !connected;
+            if (roomInput) roomInput.disabled = connected;
+        }
+
+        btnDisc.addEventListener('click', function () {
+            disconnectFirebaseMultiplayer();
+        });
+
+        btnConnect.addEventListener('click', function () {
+            var rid = sanitizeFirebaseRoomId(roomInput && roomInput.value);
+            if (rid.length < 4) {
+                setStatus('Room name: use at least 4 letters or numbers.');
+                return;
+            }
+            if (statusEl) statusEl.textContent = 'Connecting…';
+            auth.signInAnonymously().then(function () {
+                var ref = db.collection('cardPlayerRooms').doc(rid);
+                firebaseMultiplayerDbRef = ref;
+                if (firebaseMultiplayerUnsub) {
+                    firebaseMultiplayerUnsub();
+                    firebaseMultiplayerUnsub = null;
+                }
+                firebaseMultiplayerUnsub = ref.onSnapshot(function (snap) {
+                    if (!snap.exists) {
+                        applyingRemoteFirestoreSync = true;
+                        var initial = serializePlayStateForFirestore();
+                        initial.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+                        initial.updatedBy = auth.currentUser ? auth.currentUser.uid : '';
+                        ref.set(initial, { merge: true }).then(function () {
+                            applyingRemoteFirestoreSync = false;
+                        }).catch(function () {
+                            applyingRemoteFirestoreSync = false;
+                        });
+                        return;
+                    }
+                    if (snap.metadata.hasPendingWrites) return;
+                    var dat = snap.data();
+                    if (!dat || dat.v !== 1) return;
+                    applyingRemoteFirestoreSync = true;
+                    applyPlayStateFromFirestorePayload(dat).then(function () {
+                        applyingRemoteFirestoreSync = false;
+                    }).catch(function () {
+                        applyingRemoteFirestoreSync = false;
+                    });
+                });
+                setConnUi(true);
+                if (statusEl) statusEl.textContent = 'Room “' + rid + '” — live sync';
+                scheduleMultiplayerPush();
+            }).catch(function (err) {
+                firebaseMultiplayerDbRef = null;
+                if (statusEl) statusEl.textContent = 'Firebase: ' + (err.message || String(err));
+            });
+        });
     }
 
     function refreshLibrary() {
@@ -1590,6 +2028,7 @@
             renderLibraryList();
             restoreCommanderFromLibrary();
             setStatus('Imported ' + added + ' file(s). Total library: ' + allCards().length + '.');
+            scheduleMultiplayerPush();
         });
     });
 
@@ -1631,8 +2070,10 @@
         updateDeckDriveUi();
     }).catch(function () {});
 
-    attachDrawZoneDrag();
+    attachDrawZoneDrag(boardP1);
+    attachDrawZoneDrag(boardP2);
     refreshLibrary();
+    initCardPlayerFirebaseMultiplayer();
 })();
     </script>
 </body>
