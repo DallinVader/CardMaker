@@ -80,6 +80,23 @@
             opacity: 0.88;
             filter: saturate(0.92);
         }
+        /* Cards still receive hover (enlarge) while deck/zones stay inert */
+        .cp-board-readonly .cp-card-on-field {
+            pointer-events: auto;
+            cursor: zoom-in;
+        }
+        .cp-board-readonly .cp-card-on-field:active {
+            cursor: zoom-in;
+        }
+        /* Blind opponent hand: at rest shows back; enlarged preview shows real face */
+        .cp-card-on-field.cp-card-enlarged[data-cp-opponent-hand="1"] .cp-flip-inner.cp-flip-inner--back {
+            transform: rotateY(0deg);
+        }
+        /* Opponent playmat lives in a 180°-rotated wrapper — un-rotate hover preview so text reads normally */
+        .cp-board-readonly .cp-card-on-field.cp-card-enlarged {
+            transform: translateY(var(--cp-enlarge-shift, 0px)) rotate(180deg);
+            transform-origin: center center;
+        }
         /* Same footprint as P1’s field; inner layer is rotated 180° like sitting across the table. */
         .cp-field-wrap--p2 {
             position: relative;
@@ -303,6 +320,9 @@
             }
             .cp-card-on-field.cp-hand-card.cp-card-enlarged {
                 width: min(92px, 13vw) !important;
+            }
+            .cp-board-readonly .cp-card-on-field.cp-card-enlarged {
+                transform: none;
             }
         }
         .cp-status { margin-top: 10px; font-size: 12px; color: #93c5fd; min-height: 1.25em; }
@@ -570,8 +590,105 @@
     var firebaseMultiplayerUnsub = null;
     var firebaseMultiplayerDbRef = null;
     var firebaseMultiplayerPushTimer = null;
+    /** Skip redundant Firestore applies (echo + unchanged opponent slice). */
+    var lastSyncedFirestoreSlices = { shared: null, p1: null, p2: null };
     /** 1, 2, or null when not in a Firebase seat */
     var localMultiplayerSeat = null;
+
+    function resetFirestoreSliceCache() {
+        lastSyncedFirestoreSlices = { shared: null, p1: null, p2: null };
+    }
+
+    /** Same logical doc must fingerprint the same (Firestore key order differs from JSON.stringify). */
+    function stableStringify(v) {
+        if (v === null) return 'null';
+        var t = typeof v;
+        if (t === 'number' || t === 'boolean') return JSON.stringify(v);
+        if (t === 'string') return JSON.stringify(v);
+        if (t !== 'object') return JSON.stringify(String(v));
+        if (Array.isArray(v)) return '[' + v.map(stableStringify).join(',') + ']';
+        var keys = Object.keys(v).sort();
+        return '{' + keys.map(function (k) {
+            return JSON.stringify(k) + ':' + stableStringify(v[k]);
+        }).join(',') + '}';
+    }
+
+    function firestoreSliceFingerprint(obj) {
+        try {
+            return stableStringify(obj == null ? {} : obj);
+        } catch (e) {
+            return '';
+        }
+    }
+
+    /** dataUrl cache for renderCardMakerProjectToDataUrl — big win for Firestore restore & duplicate IDs. */
+    var cpCardFaceUrlCache = Object.create(null);
+    var cpCardFaceUrlPending = Object.create(null);
+
+    function clearCardFaceUrlCache() {
+        cpCardFaceUrlCache = Object.create(null);
+        cpCardFaceUrlPending = Object.create(null);
+    }
+
+    function getOrRenderCardPlayFaceUrl(card) {
+        if (!card || !card.state) return Promise.resolve(null);
+        var id = String(card.id || '');
+        if (!id) {
+            var px = window.renderCardMakerProjectToDataUrl(card.state);
+            return px && typeof px.then === 'function' ? px : Promise.resolve(null);
+        }
+        var cached = cpCardFaceUrlCache[id];
+        if (cached) return Promise.resolve(cached);
+        var pend = cpCardFaceUrlPending[id];
+        if (pend) return pend;
+        var raw = window.renderCardMakerProjectToDataUrl(card.state);
+        if (!raw || typeof raw.then !== 'function') return Promise.resolve(null);
+        pend = raw.then(function (url) {
+            delete cpCardFaceUrlPending[id];
+            if (url) cpCardFaceUrlCache[id] = url;
+            return url || null;
+        }, function () {
+            delete cpCardFaceUrlPending[id];
+            return null;
+        });
+        cpCardFaceUrlPending[id] = pend;
+        return pend;
+    }
+
+    /** Pre-render faces in idle time so multiplayer / first draw feels instant. */
+    function warmCardFaceUrlCacheIdle() {
+        try {
+            var cards = allCards();
+            if (cards.length === 0 || cards.length > 150) return;
+            var n = Math.min(cards.length, 48);
+            var i = 0;
+            function runNext() {
+                if (i >= n) return;
+                var c = cards[i++];
+                getOrRenderCardPlayFaceUrl(c).then(
+                    function () {
+                        if (typeof requestIdleCallback !== 'undefined') {
+                            requestIdleCallback(runNext, { timeout: 2500 });
+                        } else {
+                            setTimeout(runNext, 12);
+                        }
+                    },
+                    function () {
+                        if (typeof requestIdleCallback !== 'undefined') {
+                            requestIdleCallback(runNext, { timeout: 2500 });
+                        } else {
+                            setTimeout(runNext, 12);
+                        }
+                    }
+                );
+            }
+            if (typeof requestIdleCallback !== 'undefined') {
+                requestIdleCallback(runNext, { timeout: 800 });
+            } else {
+                setTimeout(runNext, 100);
+            }
+        } catch (e) {}
+    }
 
     function getSelectedMultiplayerSeat() {
         var r = document.querySelector('input[name="cpMultiplayerSeat"]:checked');
@@ -590,6 +707,24 @@
         if (localMultiplayerSeat === 1) return board.id === 'p1';
         if (localMultiplayerSeat === 2) return board.id === 'p2';
         return true;
+    }
+
+    /** In online play, hide the opponent's hand faces (show Card Back.png via flip). */
+    function shouldHideOpponentHandFromLocal(board) {
+        if (!isFirebaseSeatLocked() || !board) return false;
+        return (localMultiplayerSeat === 1 && board.id === 'p2') ||
+            (localMultiplayerSeat === 2 && board.id === 'p1');
+    }
+
+    function applyOpponentHandPrivacy(wrap, board) {
+        if (!wrap || !board) return;
+        wrap.removeAttribute('data-cp-opponent-hand');
+        if (!wrap.classList.contains('cp-hand-card')) return;
+        if (!shouldHideOpponentHandFromLocal(board)) return;
+        wrap.setAttribute('data-cp-opponent-hand', '1');
+        var flipInner = wrap.querySelector('.cp-flip-inner');
+        wrap._cpShowingBack = true;
+        if (flipInner) flipInner.classList.add('cp-flip-inner--back');
     }
 
     function applyMultiplayerSeatUi() {
@@ -810,15 +945,7 @@
         var y = clientY - fieldR.top - halfH;
         x = Math.max(0, Math.min(board.field.clientWidth - 107, x));
         y = Math.max(0, Math.min(board.field.clientHeight - 147, y));
-        var p = window.renderCardMakerProjectToDataUrl(card.state);
-        if (!p || typeof p.then !== 'function') {
-            board.deck.push(card);
-            updateStats();
-            setStatus('Renderer not available.');
-            scheduleMultiplayerPush();
-            return;
-        }
-        p.then(function (url) {
+        getOrRenderCardPlayFaceUrl(card).then(function (url) {
             if (!url) {
                 board.deck.push(card);
                 updateStats();
@@ -1198,6 +1325,7 @@
         wrap.addEventListener('auxclick', function (ev) {
             if (ev.button !== 1) return;
             ev.preventDefault();
+            if (wrap.getAttribute('data-cp-opponent-hand') === '1') return;
             if (!canEditBoard(wrap._cpBoard)) return;
             wrap._cpShowingBack = !wrap._cpShowingBack;
             flipInner.classList.toggle('cp-flip-inner--back', wrap._cpShowingBack);
@@ -1379,6 +1507,7 @@
         wrap.classList.add('cp-hand-card');
         board.field.appendChild(wrap);
         wireCardInteractions(wrap, parts.rotLayer, parts.flipInner, board);
+        applyOpponentHandPrivacy(wrap, board);
         relayoutHandCardsBoard(board);
         return wrap;
     }
@@ -1405,12 +1534,7 @@
             return;
         }
         var card = commanderCard;
-        var p = window.renderCardMakerProjectToDataUrl(card.state);
-        if (!p || typeof p.then !== 'function') {
-            scheduleMultiplayerPush();
-            return;
-        }
-        p.then(function (url) {
+        getOrRenderCardPlayFaceUrl(card).then(function (url) {
             if (!url) {
                 scheduleMultiplayerPush();
                 return;
@@ -1448,15 +1572,7 @@
         var card = board.deck.pop();
         updateStats();
         setStatus('Drawing to hand…');
-        var p = window.renderCardMakerProjectToDataUrl(card.state);
-        if (!p || typeof p.then !== 'function') {
-            board.deck.push(card);
-            updateStats();
-            setStatus('Renderer not available.');
-            scheduleMultiplayerPush();
-            return;
-        }
-        p.then(function (url) {
+        getOrRenderCardPlayFaceUrl(card).then(function (url) {
             if (!url) {
                 board.deck.push(card);
                 updateStats();
@@ -1482,15 +1598,7 @@
         var card = pile.pop();
         updateStats();
         setStatus('Rendering card…');
-        var p = window.renderCardMakerProjectToDataUrl(card.state);
-        if (!p || typeof p.then !== 'function') {
-            pile.push(card);
-            updateStats();
-            setStatus('Renderer not available.');
-            scheduleMultiplayerPush();
-            return;
-        }
-        p.then(function (url) {
+        getOrRenderCardPlayFaceUrl(card).then(function (url) {
             if (!url) {
                 pile.push(card);
                 updateStats();
@@ -1615,9 +1723,7 @@
         if (!c) return Promise.resolve();
         var board = entry.b === 'p2' ? boardP2 : boardP1;
         var fromDeck = !!entry.fromDeck;
-        var p = window.renderCardMakerProjectToDataUrl(c.state);
-        if (!p || typeof p.then !== 'function') return Promise.resolve();
-        return p.then(function (url) {
+        return getOrRenderCardPlayFaceUrl(c).then(function (url) {
             if (!url) return;
             var wrap = placeCardOnField(url, fromDeck ? c : null, entry.l, entry.t, board);
             if (!wrap) return;
@@ -1633,6 +1739,7 @@
             if (rotLayer) rotLayer.style.transform = 'rotate(' + wrap._cpRotationDeg + 'deg)';
             wrap._cpShowingBack = !!entry.back;
             if (flipInner) flipInner.classList.toggle('cp-flip-inner--back', wrap._cpShowingBack);
+            applyOpponentHandPrivacy(wrap, board);
         });
     }
 
@@ -1648,13 +1755,10 @@
             el.remove();
         });
         var entries = slice.cards || [];
-        var chain = Promise.resolve();
-        entries.forEach(function (entry) {
-            chain = chain.then(function () {
-                return restoreOneCardFromFirestoreEntry(entry);
-            });
-        });
-        return chain;
+        if (entries.length === 0) return Promise.resolve();
+        return Promise.all(entries.map(function (entry) {
+            return restoreOneCardFromFirestoreEntry(entry);
+        }));
     }
 
     function applyPlayStateFromFirestorePayload(d) {
@@ -1666,19 +1770,47 @@
             var hasP1Key = Object.prototype.hasOwnProperty.call(d, 'p1');
             var hasP2Key = Object.prototype.hasOwnProperty.call(d, 'p2');
             if (d.v === 2 && (hasP1Key || hasP2Key)) {
-                var cmdId = (d.shared && d.shared.commanderId) || '';
-                commanderCard = cmdId ? cardById(cmdId) : null;
-                persistCommanderId();
-                updateCommanderUi();
                 var p1 = hasP1Key ? d.p1 : { deckIds: [], cards: [] };
                 var p2 = hasP2Key ? d.p2 : { deckIds: [], cards: [] };
                 if (!p1 || typeof p1 !== 'object') p1 = { deckIds: [], cards: [] };
                 if (!p2 || typeof p2 !== 'object') p2 = { deckIds: [], cards: [] };
-                var chain = applyOnePlayerSliceFromFirestore(p1, boardP1, deck)
-                    .then(function () {
-                        return applyOnePlayerSliceFromFirestore(p2, boardP2, deckP2);
-                    });
-                chain.then(function () {
+                var fpS = firestoreSliceFingerprint(d.shared || {});
+                var needShared = fpS !== lastSyncedFirestoreSlices.shared;
+                var needP1 = hasP1Key && firestoreSliceFingerprint(p1) !== lastSyncedFirestoreSlices.p1;
+                var needP2 = hasP2Key && firestoreSliceFingerprint(p2) !== lastSyncedFirestoreSlices.p2;
+                /* Firestore round-trip almost never matches JSON.stringify of our payload (key order, numbers).
+                   When we were the last writer, trust local UI: do not re-apply our slice or shared from echo. */
+                var authUid = (window.firebase && firebase.auth().currentUser) ? firebase.auth().currentUser.uid : '';
+                var iWroteLast = !!(authUid && d.updatedBy === authUid);
+                if (iWroteLast) {
+                    needShared = false;
+                    if (localMultiplayerSeat === 1) needP1 = false;
+                    if (localMultiplayerSeat === 2) needP2 = false;
+                }
+                if (!needShared && !needP1 && !needP2) {
+                    resolve();
+                    return;
+                }
+                if (needShared) {
+                    var cmdId = (d.shared && d.shared.commanderId) || '';
+                    commanderCard = cmdId ? cardById(cmdId) : null;
+                    persistCommanderId();
+                    updateCommanderUi();
+                    syncCommanderToPlayingField();
+                    lastSyncedFirestoreSlices.shared = fpS;
+                }
+                var tasks = [];
+                if (needP1) {
+                    tasks.push(applyOnePlayerSliceFromFirestore(p1, boardP1, deck).then(function () {
+                        lastSyncedFirestoreSlices.p1 = firestoreSliceFingerprint(p1);
+                    }));
+                }
+                if (needP2) {
+                    tasks.push(applyOnePlayerSliceFromFirestore(p2, boardP2, deckP2).then(function () {
+                        lastSyncedFirestoreSlices.p2 = firestoreSliceFingerprint(p2);
+                    }));
+                }
+                Promise.all(tasks).then(function () {
                     updateStats();
                     relayoutHandCards();
                     relayoutDiscardPile();
@@ -1693,6 +1825,7 @@
                 resolve();
                 return;
             }
+            resetFirestoreSliceCache();
             var cmdIdLegacy = (d.shared && d.shared.commanderId) || d.commanderId || '';
             commanderCard = cmdIdLegacy ? cardById(cmdIdLegacy) : null;
             persistCommanderId();
@@ -1714,13 +1847,12 @@
                 });
             });
             var entries = d.cards || [];
-            var chain = Promise.resolve();
-            entries.forEach(function (entry) {
-                chain = chain.then(function () {
+            var leg = entries.length === 0
+                ? Promise.resolve()
+                : Promise.all(entries.map(function (entry) {
                     return restoreOneCardFromFirestoreEntry(entry);
-                });
-            });
-            chain.then(function () {
+                }));
+            leg.then(function () {
                 relayoutHandCards();
                 relayoutDiscardPile();
                 relayoutCommanderZone();
@@ -1753,11 +1885,14 @@
                     payload.p1 = serializeP1FirestoreSlice();
                     payload.p2 = serializeP2FirestoreSlice();
                 }
+                lastSyncedFirestoreSlices.shared = firestoreSliceFingerprint(payload.shared);
+                if (payload.p1) lastSyncedFirestoreSlices.p1 = firestoreSliceFingerprint(payload.p1);
+                if (payload.p2) lastSyncedFirestoreSlices.p2 = firestoreSliceFingerprint(payload.p2);
                 firebaseMultiplayerDbRef.set(payload, { merge: true });
             } catch (e) {
                 console.error(e);
             }
-        }, 480);
+        }, 200);
     }
 
     function sanitizeFirebaseRoomId(raw) {
@@ -1799,6 +1934,7 @@
         if (btnD) btnD.disabled = true;
         if (roomInp) roomInp.disabled = false;
         if (st) st.textContent = 'Ready — enter a room name and Connect';
+        resetFirestoreSliceCache();
         updateStats();
     }
 
@@ -1881,6 +2017,7 @@
                     localMultiplayerSeat = chosenSeat;
                     applyMultiplayerSeatUi();
                     setSeatRadiosDisabled(true);
+                    resetFirestoreSliceCache();
                     firebaseMultiplayerDbRef = ref;
                     if (firebaseMultiplayerUnsub) {
                         firebaseMultiplayerUnsub();
@@ -1932,12 +2069,15 @@
         setStatus('Loading cached saves…');
         idbReadAllStates()
             .then(function (rows) {
+                clearCardFaceUrlCache();
                 library = rows;
                 renderLibraryList();
                 restoreCommanderFromLibrary();
                 setStatus('Library: ' + library.length + ' from cache + ' + imported.length + ' imported.');
+                warmCardFaceUrlCacheIdle();
             })
             .catch(function () {
+                clearCardFaceUrlCache();
                 setStatus('Could not read card cache.');
                 library = [];
                 renderLibraryList();
@@ -2352,9 +2492,11 @@
                 }
             });
             cpImportFile.value = '';
+            clearCardFaceUrlCache();
             renderLibraryList();
             restoreCommanderFromLibrary();
             setStatus('Imported ' + added + ' file(s). Total library: ' + allCards().length + '.');
+            if (added > 0) warmCardFaceUrlCacheIdle();
             scheduleMultiplayerPush();
         });
     });
