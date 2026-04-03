@@ -716,13 +716,32 @@
         return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
     }
 
+    /** Top-left of el relative to field, in field local px (correct when field is inside a rotated wrapper). */
+    function offsetWithinField(field, el) {
+        if (!field || !el) return null;
+        var l = 0, t = 0, n = el;
+        while (n && n !== field) {
+            l += n.offsetLeft;
+            t += n.offsetTop;
+            n = n.offsetParent;
+        }
+        return n === field ? { l: l, t: t } : null;
+    }
+
     function relayoutDiscardPileBoard(board) {
         if (!board || !board.field || !board.discardZone) return;
         var cards = Array.from(board.field.querySelectorAll('.cp-card-on-field[data-cp-discard="1"]'));
-        var zone = board.discardZone.getBoundingClientRect();
-        var fieldR = board.field.getBoundingClientRect();
-        var baseL = zone.left - fieldR.left + 12;
-        var baseT = zone.top - fieldR.top + 36;
+        var off = offsetWithinField(board.field, board.discardZone);
+        var baseL, baseT;
+        if (off) {
+            baseL = off.l + 12;
+            baseT = off.t + 36;
+        } else {
+            var zone = board.discardZone.getBoundingClientRect();
+            var fieldR = board.field.getBoundingClientRect();
+            baseL = zone.left - fieldR.left + 12;
+            baseT = zone.top - fieldR.top + 36;
+        }
         cards.forEach(function (w, i) {
             w.style.left = Math.max(0, baseL + i * 5) + 'px';
             w.style.top = Math.max(0, baseT + i * 4) + 'px';
@@ -741,10 +760,17 @@
         )).filter(function (w) {
             return w.getAttribute('data-cp-discard') !== '1';
         });
-        var zone = board.commanderZone.getBoundingClientRect();
-        var fieldR = board.field.getBoundingClientRect();
-        var baseL = zone.left - fieldR.left + 10;
-        var baseT = zone.top - fieldR.top + 36;
+        var cmdOff = offsetWithinField(board.field, board.commanderZone);
+        var baseL, baseT;
+        if (cmdOff) {
+            baseL = cmdOff.l + 10;
+            baseT = cmdOff.t + 36;
+        } else {
+            var zone = board.commanderZone.getBoundingClientRect();
+            var fieldR = board.field.getBoundingClientRect();
+            baseL = zone.left - fieldR.left + 10;
+            baseT = zone.top - fieldR.top + 36;
+        }
         cards.forEach(function (w, i) {
             w.style.left = Math.max(0, baseL + i * 5) + 'px';
             w.style.top = Math.max(0, baseT + i * 4) + 'px';
@@ -1298,12 +1324,20 @@
     function relayoutHandCardsBoard(board) {
         if (!board || !board.handZone || !board.field) return;
         var list = Array.prototype.slice.call(board.field.querySelectorAll('.cp-card-on-field.cp-hand-card'));
-        var zr = board.handZone.getBoundingClientRect();
-        var fr = board.field.getBoundingClientRect();
-        var baseLeft = zr.left - fr.left + 8;
-        var baseTop = zr.top - fr.top + 26;
+        var hOff = offsetWithinField(board.field, board.handZone);
+        var baseLeft, baseTop, maxW;
+        if (hOff) {
+            baseLeft = hOff.l + 8;
+            baseTop = hOff.t + 26;
+            maxW = Math.max(40, board.handZone.offsetWidth - 20);
+        } else {
+            var zr = board.handZone.getBoundingClientRect();
+            var fr = board.field.getBoundingClientRect();
+            baseLeft = zr.left - fr.left + 8;
+            baseTop = zr.top - fr.top + 26;
+            maxW = Math.max(40, zr.width - 20);
+        }
         var step = 40;
-        var maxW = Math.max(40, zr.width - 20);
         if (list.length > 1) {
             step = Math.min(48, Math.max(28, (maxW - 56) / (list.length - 1)));
         }
