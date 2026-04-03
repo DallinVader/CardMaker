@@ -258,6 +258,26 @@
             cursor: grab; user-select: none; touch-action: none; color: #e2e8f0;
         }
         .cp-draw-zone:active { cursor: grabbing; }
+        .cp-treasure-zone {
+            position: absolute;
+            left: 14px;
+            bottom: calc(14px + min(165px, 29vw) + 10px);
+            width: min(118px, 22vw);
+            height: min(120px, 22vw);
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.9);
+            border-radius: 12px;
+            z-index: 5;
+            pointer-events: none;
+        }
+        .cp-treasure-zone .cp-zone-label {
+            position: absolute; top: 6px; left: 0; right: 0; text-align: center; pointer-events: none;
+            color: rgba(255, 255, 255, 0.95);
+            letter-spacing: 0.08em;
+            font-size: 8px;
+            line-height: 1.2;
+            text-shadow: 0 0 6px rgba(0, 0, 0, 0.95), 0 1px 2px rgba(0, 0, 0, 0.9);
+        }
         .cp-hand-zone {
             position: absolute;
             left: clamp(132px, 26vw, 200px);
@@ -487,7 +507,98 @@
         .cp-file-input { display: none; }
         #cpDeckModal .drive-modal-panel { max-width: min(920px, 96vw); max-height: min(92vh, 900px); display: flex; flex-direction: column; }
         #cpDeckModal .cp-deck-modal-scroll { flex: 1; min-height: 0; overflow-y: auto; }
-        #cpDeckSearchModal .cp-deck-search-scroll .cp-list { max-height: min(50vh, 420px); }
+        #cpDeckSearchModal .cp-deck-search-scroll .cp-list,
+        #cpDiscardSearchModal .cp-deck-search-scroll .cp-list { max-height: min(50vh, 420px); }
+        #cpTreasureModal .cp-treasure-modal-scroll {
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 12px 8px;
+            max-width: 100%;
+            -webkit-overflow-scrolling: touch;
+        }
+        #cpTreasureModal .cp-treasure-modal-row {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            gap: 14px;
+            align-items: flex-end;
+            min-height: 132px;
+            padding-bottom: 4px;
+        }
+        #cpTreasureModal .cp-treasure-modal-cell {
+            flex: 0 0 auto;
+            width: 76px;
+            text-align: center;
+        }
+        #cpTreasureModal .cp-treasure-modal-thumb-wrap {
+            width: 76px;
+            height: 106px;
+            margin: 0 auto 6px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            background: rgba(15, 23, 42, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #cpTreasureModal .cp-treasure-modal-thumb-inner {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform-origin: center center;
+        }
+        #cpTreasureModal .cp-treasure-modal-thumb-inner img {
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            pointer-events: none;
+        }
+        #cpTreasureModal .cp-treasure-modal-caption {
+            font-size: 10px;
+            line-height: 1.25;
+            color: rgba(203, 213, 225, 0.92);
+            max-width: 76px;
+            margin: 0 auto;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        #cpTreasureModal .cp-treasure-modal-ready-pill {
+            display: inline-block;
+            margin-top: 4px;
+            font-size: 9px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 2px 6px;
+            border-radius: 6px;
+            background: rgba(34, 197, 94, 0.2);
+            color: #86efac;
+        }
+        #cpTreasureModal .cp-treasure-modal-ready-pill.is-exhausted {
+            background: rgba(148, 163, 184, 0.15);
+            color: rgba(148, 163, 184, 0.95);
+        }
+        .cp-treasure-zone .cp-treasure-ready-count {
+            position: absolute;
+            bottom: 4px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 15px;
+            font-weight: 900;
+            font-variant-numeric: tabular-nums;
+            color: rgba(255, 255, 255, 0.96);
+            text-shadow: 0 0 8px rgba(0, 0, 0, 0.95), 0 1px 2px rgba(0, 0, 0, 0.9);
+            pointer-events: none;
+            line-height: 1;
+        }
         #cpDeckDriveList { max-height: min(200px, 28vh); }
     </style>
 </head>
@@ -557,7 +668,7 @@
             <div class="cp-panel cp-panel-play">
                 <div class="cp-play-stacks">
                     <div class="cp-field-wrap cp-field-wrap--p2">
-                        <span class="cp-field-label">Player 2 · same size as P1, flipped 180° (opponent view)</span>
+                        <span class="cp-field-label">Player 2 · same layout as P1, flipped 180° (opponent view)</span>
                         <div class="cp-field-rot-p2">
                             <div class="cp-field" id="cpPlayingFieldP2" aria-label="Player 2 playing field">
                                 <div class="cp-commander-zone" id="cpCommanderZoneP2" title="Commander zone">
@@ -566,11 +677,15 @@
                                 <div class="cp-hand-zone" id="cpHandZoneP2" title="Hand">
                                     <span class="cp-zone-label">Hand</span>
                                 </div>
+                                <div class="cp-treasure-zone" id="cpTreasureZoneP2" title="Treasure — right-click for manager. Shift+right-click a card to rotate on the mat. Number = ready (unexhausted).">
+                                    <span class="cp-zone-label">Treasure</span>
+                                    <span class="cp-treasure-ready-count" id="cpTreasureCountZoneP2" aria-label="Unexhausted treasures">0</span>
+                                </div>
                                 <div class="cp-draw-zone" id="cpDrawZoneP2" title="Deck — click / drag. Right-click to search.">
                                     <span class="cp-zone-label">Deck</span>
                                     <span class="cp-zone-count" id="cpDeckCountZoneP2">0</span>
                                 </div>
-                                <div class="cp-discard-zone" id="cpDiscardZoneP2" title="Discard">
+                                <div class="cp-discard-zone" id="cpDiscardZoneP2" title="Discard — drop cards here. Right-click a discard card or this zone to search. Shift+right-click a card to rotate.">
                                     <span class="cp-zone-label">Discard</span>
                                 </div>
                             </div>
@@ -578,7 +693,7 @@
                         <div class="cp-deck-drag-ghost" id="cpDeckDragGhostP2" aria-hidden="true"></div>
                     </div>
                     <div class="cp-field-wrap cp-field-wrap--p1">
-                        <span class="cp-field-label">Player 1 · commander top right · click deck → hand · drag → field</span>
+                        <span class="cp-field-label">Player 1 · commander top right · treasure above deck · click deck → hand</span>
                         <div class="cp-field-rot-p1">
                             <div class="cp-field" id="cpPlayingField" aria-label="Playing field">
                                 <div class="cp-commander-zone" id="cpCommanderZone" title="Commander — set from the sidebar; drag your commander here to dock">
@@ -587,11 +702,15 @@
                                 <div class="cp-hand-zone" id="cpHandZone" title="Hand — cards drawn by clicking the deck">
                                     <span class="cp-zone-label">Hand</span>
                                 </div>
+                                <div class="cp-treasure-zone" id="cpTreasureZone" title="Treasure — right-click for manager. Shift+right-click a card to rotate on the mat. Number = ready (unexhausted).">
+                                    <span class="cp-zone-label">Treasure</span>
+                                    <span class="cp-treasure-ready-count" id="cpTreasureCountZone" aria-label="Unexhausted treasures">0</span>
+                                </div>
                                 <div class="cp-draw-zone" id="cpDrawZone" title="Click to draw to hand. Right-click to search deck. Drag out to place on the field. Drop a card here to return to the deck.">
                                     <span class="cp-zone-label">Deck</span>
                                     <span class="cp-zone-count" id="cpDeckCountZone">0</span>
                                 </div>
-                                <div class="cp-discard-zone" id="cpDiscardZone" title="Discard — drop cards here face up">
+                                <div class="cp-discard-zone" id="cpDiscardZone" title="Discard — drop cards here face up. Right-click a discard card or this zone to search. Shift+right-click a card to rotate.">
                                     <span class="cp-zone-label">Discard</span>
                                 </div>
                             </div>
@@ -689,6 +808,42 @@
         </div>
     </div>
 
+    <div id="cpDiscardSearchModal" class="drive-modal" aria-hidden="true">
+        <div class="drive-modal-backdrop" id="cpDiscardSearchModalBackdrop" aria-hidden="true"></div>
+        <div class="drive-modal-panel" role="dialog" aria-modal="true" aria-labelledby="cpDiscardSearchModalTitle" style="max-width:min(520px,94vw);">
+            <button type="button" class="drive-modal-close" id="cpDiscardSearchModalClose" aria-label="Close">&times;</button>
+            <h2 id="cpDiscardSearchModalTitle" class="drive-modal-title">Search discard</h2>
+            <p class="drive-modal-hint">Filter by name or type. Each row is one card in the pile; “To hand” moves that copy to your hand.</p>
+            <div class="drive-modal-section">
+                <label class="drive-modal-label" for="cpDiscardSearchInput">Filter</label>
+                <input type="search" id="cpDiscardSearchInput" class="drive-modal-input" placeholder="Type to filter…" autocomplete="off" style="width:100%;max-width:none;">
+            </div>
+            <div class="drive-modal-section cp-deck-search-scroll">
+                <div class="cp-list" id="cpDiscardSearchList" role="listbox" aria-label="Cards in discard pile"></div>
+            </div>
+            <div class="drive-modal-section" style="display:flex;flex-wrap:wrap;gap:10px;">
+                <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="cpDiscardSearchModalDone">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="cpTreasureModal" class="drive-modal" aria-hidden="true">
+        <div class="drive-modal-backdrop" id="cpTreasureModalBackdrop" aria-hidden="true"></div>
+        <div class="drive-modal-panel" role="dialog" aria-modal="true" aria-labelledby="cpTreasureModalTitle" style="max-width:min(640px,96vw);">
+            <button type="button" class="drive-modal-close" id="cpTreasureModalClose" aria-label="Close">&times;</button>
+            <h2 id="cpTreasureModalTitle" class="drive-modal-title">Treasure</h2>
+            <p id="cpTreasureModalStats" class="drive-modal-hint" role="status">0 of 0</p>
+            <p class="drive-modal-hint" style="margin-top:-6px;">Right-click a card in the row below to rotate 90° (exhaust). Use <strong>Unexhaust all</strong> to set every treasure upright.</p>
+            <div class="drive-modal-section" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="cpTreasureUnexhaustAll">Unexhaust all</button>
+                <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="cpTreasureModalDone">Close</button>
+            </div>
+            <div class="drive-modal-section cp-treasure-modal-scroll">
+                <div class="cp-treasure-modal-row" id="cpTreasureModalRow" role="list" aria-label="Treasure cards"></div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -721,6 +876,8 @@
     var cpPlayingField = document.getElementById('cpPlayingField');
     var cpDrawZone = document.getElementById('cpDrawZone');
     var cpDiscardZone = document.getElementById('cpDiscardZone');
+    var cpTreasureZone = document.getElementById('cpTreasureZone');
+    var cpTreasureCountZone = document.getElementById('cpTreasureCountZone');
     var cpCommanderZone = document.getElementById('cpCommanderZone');
     var cpHandZone = document.getElementById('cpHandZone');
     var cpDeckCountZone = document.getElementById('cpDeckCountZone');
@@ -728,6 +885,8 @@
     var cpPlayingFieldP2 = document.getElementById('cpPlayingFieldP2');
     var cpDrawZoneP2 = document.getElementById('cpDrawZoneP2');
     var cpDiscardZoneP2 = document.getElementById('cpDiscardZoneP2');
+    var cpTreasureZoneP2 = document.getElementById('cpTreasureZoneP2');
+    var cpTreasureCountZoneP2 = document.getElementById('cpTreasureCountZoneP2');
     var cpCommanderZoneP2 = document.getElementById('cpCommanderZoneP2');
     var cpHandZoneP2 = document.getElementById('cpHandZoneP2');
     var cpDeckCountZoneP2 = document.getElementById('cpDeckCountZoneP2');
@@ -765,12 +924,15 @@
         drawZone: cpDrawZone,
         handZone: cpHandZone,
         discardZone: cpDiscardZone,
+        treasureZone: cpTreasureZone,
+        treasureReadyCountEl: cpTreasureCountZone,
         commanderZone: cpCommanderZone,
         deckCountEl: cpDeckCountZone,
         ghost: cpDeckDragGhost,
         deck: null,
         /** Monotonic stack index for discard pile (higher = newer / on top). */
         discardSeq: 0,
+        treasureSeq: 0,
         deckDrag: { active: false, moved: false, startX: 0, startY: 0 }
     };
     var boardP2 = {
@@ -779,11 +941,14 @@
         drawZone: cpDrawZoneP2,
         handZone: cpHandZoneP2,
         discardZone: cpDiscardZoneP2,
+        treasureZone: cpTreasureZoneP2,
+        treasureReadyCountEl: cpTreasureCountZoneP2,
         commanderZone: cpCommanderZoneP2,
         deckCountEl: cpDeckCountZoneP2,
         ghost: cpDeckDragGhostP2,
         deck: null,
         discardSeq: 0,
+        treasureSeq: 0,
         deckDrag: { active: false, moved: false, startX: 0, startY: 0 }
     };
     boardP1.deck = deck;
@@ -1137,13 +1302,14 @@
     }
 
     function firestoreEntryIsFreeFieldPlacement(entry) {
-        return entry && !entry.h && !entry.d && !entry.czIn;
+        return entry && !entry.h && !entry.d && !entry.tr && !entry.czIn;
     }
 
     function cardVisualIsFreeFieldLayout(wrap) {
         if (!wrap) return false;
         if (wrap.classList.contains('cp-hand-card')) return false;
         if (wrap.getAttribute('data-cp-discard') === '1') return false;
+        if (wrap.getAttribute('data-cp-treasure') === '1') return false;
         if (wrap.getAttribute('data-cp-commander-in-zone') === '1') return false;
         return true;
     }
@@ -1223,6 +1389,8 @@
         wrap.classList.remove('cp-hand-card');
         wrap.removeAttribute('data-cp-discard');
         wrap.removeAttribute('data-cp-discard-order');
+        wrap.removeAttribute('data-cp-treasure');
+        wrap.removeAttribute('data-cp-treasure-order');
         wrap.removeAttribute('data-cp-commander');
         wrap.removeAttribute('data-cp-commander-in-zone');
     }
@@ -1280,12 +1448,57 @@
         });
     }
 
+    function treasurePileLayoutItems(board) {
+        if (!board || !board.field || !board.treasureZone) return [];
+        var cards = Array.from(board.field.querySelectorAll('.cp-card-on-field[data-cp-treasure="1"]'));
+        var maxO = 0;
+        cards.forEach(function (w) {
+            var o = parseInt(w.getAttribute('data-cp-treasure-order'), 10);
+            if (!isNaN(o)) maxO = Math.max(maxO, o);
+        });
+        cards.filter(function (w) { return !w.hasAttribute('data-cp-treasure-order'); }).forEach(function (w) {
+            maxO += 1;
+            w.setAttribute('data-cp-treasure-order', String(maxO));
+        });
+        board.treasureSeq = Math.max(board.treasureSeq || 0, maxO);
+        cards.sort(function (a, b) {
+            var oa = parseInt(a.getAttribute('data-cp-treasure-order'), 10) || 0;
+            var ob = parseInt(b.getAttribute('data-cp-treasure-order'), 10) || 0;
+            if (oa !== ob) return oa - ob;
+            if (a === b) return 0;
+            var bit = a.compareDocumentPosition(b);
+            if (bit & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+            if (bit & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+            return 0;
+        });
+        var off = offsetWithinField(board.field, board.treasureZone);
+        var baseL;
+        var baseT;
+        if (off) {
+            baseL = off.l + 12;
+            baseT = off.t + 32;
+        } else {
+            var zone = board.treasureZone.getBoundingClientRect();
+            var fieldR = board.field.getBoundingClientRect();
+            baseL = zone.left - fieldR.left + 12;
+            baseT = zone.top - fieldR.top + 32;
+        }
+        return cards.map(function (w, i) {
+            return {
+                w: w,
+                l: Math.max(0, baseL + i * 5),
+                t: Math.max(0, baseT + i * 4),
+                z: 34 + i
+            };
+        });
+    }
+
     function commanderZoneLayoutItems(board) {
         if (!board || !board.field || !board.commanderZone) return [];
         var cards = Array.from(board.field.querySelectorAll(
             '.cp-card-on-field[data-cp-commander="1"][data-cp-commander-in-zone="1"]'
         )).filter(function (w) {
-            return w.getAttribute('data-cp-discard') !== '1';
+            return w.getAttribute('data-cp-discard') !== '1' && w.getAttribute('data-cp-treasure') !== '1';
         });
         var cmdOff = offsetWithinField(board.field, board.commanderZone);
         var baseL;
@@ -1349,12 +1562,12 @@
         });
     }
 
-    /** After remote merge: tween hand / discard / commander to computed slots on this mat. */
+    /** After remote merge: tween hand / treasure / discard / commander to computed slots on this mat. */
     function finalizeBoardZoneLayoutsRemote(board, animateRemote) {
         if (!board || !board.field) return Promise.resolve();
         if (!animateRemote || cpPrefersReducedMotion()) {
             relayoutHandCardsBoard(board);
-            relayoutDiscardPileBoard(board);
+            relayoutZonePilesBoard(board);
             relayoutCommanderZoneBoard(board);
             return Promise.resolve();
         }
@@ -1363,7 +1576,8 @@
             var id = w.getAttribute('data-cp-instance-id');
             if (id) saved[id] = { l: w.offsetLeft, t: w.offsetTop };
         });
-        var items = discardPileLayoutItems(board)
+        var items = treasurePileLayoutItems(board)
+            .concat(discardPileLayoutItems(board))
             .concat(handLayoutItems(board))
             .concat(commanderZoneLayoutItems(board));
         var promises = [];
@@ -1450,6 +1664,123 @@
         });
     }
 
+    /** Write one card project into the same IndexedDB store as Saved projects (by Drive file id). */
+    function idbWriteSpmSave(fileId, fileMeta, state) {
+        return openSpmIdb().then(function (db) {
+            if (!db || !state || typeof state !== 'object') {
+                return Promise.reject(new Error('IndexedDB unavailable'));
+            }
+            var meta = fileMeta || {};
+            var rec = {
+                modifiedTime: meta.modifiedTime != null ? meta.modifiedTime : null,
+                size: meta.size != null ? meta.size : null,
+                state: state
+            };
+            return new Promise(function (resolve, reject) {
+                try {
+                    var tx = db.transaction(SPM_IDB_STORE, 'readwrite');
+                    tx.oncomplete = function () { resolve(); };
+                    tx.onerror = function () { reject(tx.error); };
+                    tx.objectStore(SPM_IDB_STORE).put(rec, String(fileId));
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        });
+    }
+
+    function isValidCardmakerProjectState(o) {
+        if (!o || typeof o !== 'object') return false;
+        if (o.kind === 'cardmaker-deck') return false;
+        if (!o.fields || typeof o.fields !== 'object') return false;
+        return true;
+    }
+
+    /** Run async tasks on items with at most `limit` concurrent workers. */
+    function mapLimit(items, limit, fn) {
+        return new Promise(function (resolve, reject) {
+            if (!items || !items.length) {
+                resolve([]);
+                return;
+            }
+            var out = new Array(items.length);
+            var nextIndex = 0;
+            var active = 0;
+            var settled = false;
+
+            function drain() {
+                if (settled) return;
+                if (nextIndex >= items.length && active === 0) {
+                    resolve(out);
+                    return;
+                }
+                while (active < limit && nextIndex < items.length) {
+                    var i = nextIndex++;
+                    active++;
+                    (function (idx) {
+                        Promise.resolve(fn(items[idx], idx)).then(function (v) {
+                            out[idx] = v;
+                            active--;
+                            drain();
+                        }, function (err) {
+                            if (settled) return;
+                            settled = true;
+                            reject(err);
+                        });
+                    })(i);
+                }
+            }
+            drain();
+        });
+    }
+
+    var CP_DECK_HYDRATE_CONCURRENCY = 8;
+
+    /**
+     * Fetch card projects from Drive and persist to SPM IndexedDB. Calls onProgress(doneCount, total) after each card.
+     * @returns {Promise<{ ok: string[], failed: { id: string, message: string }[] }>}
+     */
+    function hydrateDeckCardIdsFromDrive(fileIds, onProgress) {
+        var total = fileIds.length;
+        var done = 0;
+        var ok = [];
+        var failed = [];
+        return mapLimit(fileIds, CP_DECK_HYDRATE_CONCURRENCY, function (fileId) {
+            var fid = String(fileId);
+            return Promise.all([
+                CPDrive.fetchDriveFileMetadata(fid).catch(function () {
+                    return { modifiedTime: null, size: null };
+                }),
+                CPDrive.fetchDriveFileMedia(fid)
+            ]).then(function (pair) {
+                var meta = pair[0];
+                var text = pair[1];
+                var state;
+                try {
+                    state = JSON.parse(text);
+                } catch (e) {
+                    throw new Error('Invalid JSON');
+                }
+                if (!isValidCardmakerProjectState(state)) {
+                    throw new Error('Not a card project file');
+                }
+                return idbWriteSpmSave(fid, meta, state).then(function () {
+                    ok.push(fid);
+                    done++;
+                    if (typeof onProgress === 'function') onProgress(done, total);
+                    return null;
+                });
+            }).catch(function (err) {
+                failed.push({ id: fid, message: err && err.message ? err.message : String(err) });
+                done++;
+                if (typeof onProgress === 'function') onProgress(done, total);
+                return null;
+            });
+        }).then(function () {
+            return { ok: ok, failed: failed };
+        });
+    }
+
     function shuffleInPlace(arr) {
         var i = arr.length;
         while (i > 1) {
@@ -1514,12 +1845,68 @@
         board.discardSeq = maxO;
     }
 
+    function nextTreasureStackSeq(board) {
+        board.treasureSeq = (board.treasureSeq || 0) + 1;
+        return board.treasureSeq;
+    }
+
+    function syncBoardTreasureSeqFromDom(board) {
+        if (!board || !board.field) return;
+        var maxO = board.treasureSeq || 0;
+        board.field.querySelectorAll('.cp-card-on-field[data-cp-treasure-order]').forEach(function (w) {
+            var o = parseInt(w.getAttribute('data-cp-treasure-order'), 10);
+            if (!isNaN(o)) maxO = Math.max(maxO, o);
+        });
+        board.treasureSeq = maxO;
+    }
+
     function relayoutDiscardPileBoard(board) {
         applyLayoutItemPositions(discardPileLayoutItems(board));
     }
 
+    function relayoutTreasurePileBoard(board) {
+        applyLayoutItemPositions(treasurePileLayoutItems(board));
+    }
+
+    function relayoutZonePilesBoard(board) {
+        relayoutTreasurePileBoard(board);
+        relayoutDiscardPileBoard(board);
+        updateTreasureZoneBadgesBoard(board);
+    }
+
+    function normalizeRotationDeg(deg) {
+        var n = Number(deg) || 0;
+        return ((n % 360) + 360) % 360;
+    }
+
+    function isTreasureCardUnexhausted(wrap) {
+        return normalizeRotationDeg(wrap && wrap._cpRotationDeg) === 0;
+    }
+
+    function countTreasureCardsOnBoard(board) {
+        if (!board || !board.field) return { total: 0, ready: 0 };
+        var nodes = board.field.querySelectorAll('.cp-card-on-field[data-cp-treasure="1"]');
+        var total = nodes.length;
+        var ready = 0;
+        for (var i = 0; i < nodes.length; i++) {
+            if (isTreasureCardUnexhausted(nodes[i])) ready++;
+        }
+        return { total: total, ready: ready };
+    }
+
+    function updateTreasureZoneBadgesBoard(board) {
+        if (!board || !board.treasureReadyCountEl) return;
+        var c = countTreasureCardsOnBoard(board);
+        board.treasureReadyCountEl.textContent = String(c.ready);
+        board.treasureReadyCountEl.title = c.total ? c.ready + ' ready of ' + c.total + ' treasures' : 'No treasures';
+    }
+
+    function updateAllTreasureZoneBadges() {
+        boards.forEach(updateTreasureZoneBadgesBoard);
+    }
+
     function relayoutDiscardPile() {
-        boards.forEach(relayoutDiscardPileBoard);
+        boards.forEach(relayoutZonePilesBoard);
     }
 
     function relayoutCommanderZoneBoard(board) {
@@ -1530,6 +1917,27 @@
         boards.forEach(relayoutCommanderZoneBoard);
     }
 
+    function snapCardToTreasureIfInside(wrap, board) {
+        board = board || wrap._cpBoard || boardP1;
+        if (!board || !board.treasureZone) return false;
+        var r = wrap.getBoundingClientRect();
+        var cx = (r.left + r.right) / 2;
+        var cy = (r.top + r.bottom) / 2;
+        if (pointInEl(cx, cy, board.treasureZone)) {
+            wrap.removeAttribute('data-cp-discard');
+            wrap.removeAttribute('data-cp-discard-order');
+            var wasTr = wrap.getAttribute('data-cp-treasure') === '1';
+            wrap.setAttribute('data-cp-treasure', '1');
+            if (!wasTr) {
+                wrap.setAttribute('data-cp-treasure-order', String(nextTreasureStackSeq(board)));
+                cpPlaySfx();
+            }
+            relayoutZonePilesBoard(board);
+            return true;
+        }
+        return false;
+    }
+
     function snapCardToDiscardIfInside(wrap, board) {
         board = board || wrap._cpBoard || boardP1;
         if (!board || !board.discardZone) return false;
@@ -1537,13 +1945,15 @@
         var cx = (r.left + r.right) / 2;
         var cy = (r.top + r.bottom) / 2;
         if (pointInEl(cx, cy, board.discardZone)) {
+            wrap.removeAttribute('data-cp-treasure');
+            wrap.removeAttribute('data-cp-treasure-order');
             var wasDisc = wrap.getAttribute('data-cp-discard') === '1';
             wrap.setAttribute('data-cp-discard', '1');
             if (!wasDisc) {
                 wrap.setAttribute('data-cp-discard-order', String(nextDiscardStackSeq(board)));
                 cpPlayDiscardSfx();
             }
-            relayoutDiscardPileBoard(board);
+            relayoutZonePilesBoard(board);
             return true;
         }
         return false;
@@ -1709,7 +2119,9 @@
         modal.setAttribute('aria-hidden', 'true');
         var deckM = document.getElementById('cpDeckModal');
         var searchM = document.getElementById('cpDeckSearchModal');
-        if ((!deckM || !deckM.classList.contains('is-open')) && (!searchM || !searchM.classList.contains('is-open'))) {
+        var discM = document.getElementById('cpDiscardSearchModal');
+        var trM = document.getElementById('cpTreasureModal');
+        if ((!deckM || !deckM.classList.contains('is-open')) && (!searchM || !searchM.classList.contains('is-open')) && (!discM || !discM.classList.contains('is-open')) && (!trM || !trM.classList.contains('is-open'))) {
             document.body.style.overflow = '';
         }
     }
@@ -1829,7 +2241,7 @@
                     stripCardFromPlayZones(el);
                     el.classList.remove('cp-hand-card');
                     relayoutHandCardsBoard(board);
-                    relayoutDiscardPileBoard(board);
+                    relayoutZonePilesBoard(board);
                     relayoutCommanderZoneBoard(board);
                     finishDeckReturn();
                     return;
@@ -1837,7 +2249,7 @@
                 stripCardFromPlayZones(el);
                 el.classList.remove('cp-hand-card');
                 relayoutHandCardsBoard(board);
-                relayoutDiscardPileBoard(board);
+                relayoutZonePilesBoard(board);
                 relayoutCommanderZoneBoard(board);
                 var deckPos = deckDrawStartPosition(board);
                 el.style.zIndex = '6400';
@@ -1846,9 +2258,59 @@
                 });
                 return;
             }
+            if (board.treasureZone && pointInEl(cx, cy, board.treasureZone)) {
+                el.classList.remove('cp-hand-card');
+                relayoutHandCardsBoard(board);
+                el.removeAttribute('data-cp-discard');
+                el.removeAttribute('data-cp-discard-order');
+                var wasTrEl = el.getAttribute('data-cp-treasure') === '1';
+                el.setAttribute('data-cp-treasure', '1');
+                if (!wasTrEl) {
+                    el.setAttribute('data-cp-treasure-order', String(nextTreasureStackSeq(board)));
+                }
+                handledSfx = true;
+                if (cpPrefersReducedMotion()) {
+                    cpPlaySfx();
+                    relayoutZonePilesBoard(board);
+                    relayoutCommanderZoneBoard(board);
+                    scheduleMultiplayerPush();
+                    return;
+                }
+                var trItems = treasurePileLayoutItems(board);
+                var trTarget = null;
+                for (var ti = 0; ti < trItems.length; ti++) {
+                    if (trItems[ti].w === el) {
+                        trTarget = trItems[ti];
+                        break;
+                    }
+                }
+                if (!trTarget) {
+                    cpPlaySfx();
+                    relayoutZonePilesBoard(board);
+                    relayoutCommanderZoneBoard(board);
+                    scheduleMultiplayerPush();
+                    return;
+                }
+                trItems.forEach(function (it) {
+                    if (it.w !== el) {
+                        it.w.style.left = it.l + 'px';
+                        it.w.style.top = it.t + 'px';
+                        it.w.style.zIndex = String(it.z);
+                    }
+                });
+                el.style.zIndex = '6400';
+                animateOpponentCardLayout(el, trTarget.l, trTarget.t, trTarget.z).then(function () {
+                    cpPlaySfx();
+                    relayoutCommanderZoneBoard(board);
+                    scheduleMultiplayerPush();
+                });
+                return;
+            }
             if (pointInEl(cx, cy, board.discardZone)) {
                 el.classList.remove('cp-hand-card');
                 relayoutHandCardsBoard(board);
+                el.removeAttribute('data-cp-treasure');
+                el.removeAttribute('data-cp-treasure-order');
                 var wasDiscEl = el.getAttribute('data-cp-discard') === '1';
                 el.setAttribute('data-cp-discard', '1');
                 if (!wasDiscEl) {
@@ -1857,7 +2319,7 @@
                 handledSfx = true;
                 if (cpPrefersReducedMotion()) {
                     cpPlayDiscardSfx();
-                    relayoutDiscardPileBoard(board);
+                    relayoutZonePilesBoard(board);
                     relayoutCommanderZoneBoard(board);
                     scheduleMultiplayerPush();
                     return;
@@ -1872,7 +2334,7 @@
                 }
                 if (!dTarget) {
                     cpPlayDiscardSfx();
-                    relayoutDiscardPileBoard(board);
+                    relayoutZonePilesBoard(board);
                     relayoutCommanderZoneBoard(board);
                     scheduleMultiplayerPush();
                     return;
@@ -1904,14 +2366,17 @@
             } else if (!wasHand && inHand) {
                 el.classList.add('cp-hand-card');
                 var leftDiscard = el.getAttribute('data-cp-discard') === '1';
+                var leftTreasure = el.getAttribute('data-cp-treasure') === '1';
                 el.removeAttribute('data-cp-discard');
                 el.removeAttribute('data-cp-discard-order');
-                if (leftDiscard) relayoutDiscardPileBoard(board);
+                el.removeAttribute('data-cp-treasure');
+                el.removeAttribute('data-cp-treasure-order');
+                if (leftDiscard || leftTreasure) relayoutZonePilesBoard(board);
                 handledSfx = true;
                 if (cpPrefersReducedMotion()) {
                     cpPlaySfx();
                     relayoutHandCardsBoard(board);
-                    relayoutDiscardPileBoard(board);
+                    relayoutZonePilesBoard(board);
                     relayoutCommanderZoneBoard(board);
                     scheduleMultiplayerPush();
                     return;
@@ -1927,7 +2392,7 @@
                 if (!hTarget) {
                     cpPlaySfx();
                     relayoutHandCardsBoard(board);
-                    relayoutDiscardPileBoard(board);
+                    relayoutZonePilesBoard(board);
                     relayoutCommanderZoneBoard(board);
                     scheduleMultiplayerPush();
                     return;
@@ -1942,7 +2407,7 @@
                 el.style.zIndex = '6400';
                 animateOpponentCardLayout(el, hTarget.l, hTarget.t, hTarget.z).then(function () {
                     cpPlaySfx();
-                    relayoutDiscardPileBoard(board);
+                    relayoutZonePilesBoard(board);
                     relayoutCommanderZoneBoard(board);
                     scheduleMultiplayerPush();
                 });
@@ -1951,10 +2416,16 @@
             if (el.getAttribute('data-cp-discard') === '1' && !pointInEl(cx, cy, board.discardZone)) {
                 el.removeAttribute('data-cp-discard');
                 el.removeAttribute('data-cp-discard-order');
-                relayoutDiscardPileBoard(board);
+                relayoutZonePilesBoard(board);
                 relayoutCommanderZoneBoard(board);
             }
-            if (el.getAttribute('data-cp-commander') === '1' && el.getAttribute('data-cp-discard') !== '1') {
+            if (board.treasureZone && el.getAttribute('data-cp-treasure') === '1' && !pointInEl(cx, cy, board.treasureZone)) {
+                el.removeAttribute('data-cp-treasure');
+                el.removeAttribute('data-cp-treasure-order');
+                relayoutZonePilesBoard(board);
+                relayoutCommanderZoneBoard(board);
+            }
+            if (el.getAttribute('data-cp-commander') === '1' && el.getAttribute('data-cp-discard') !== '1' && el.getAttribute('data-cp-treasure') !== '1') {
                 if (board.commanderZone && pointInEl(cx, cy, board.commanderZone)) {
                     el.setAttribute('data-cp-commander-in-zone', '1');
                     el.classList.remove('cp-hand-card');
@@ -2063,6 +2534,72 @@
         });
     }
 
+    function attachDiscardZoneSearch(board) {
+        if (!board || !board.discardZone) return;
+        board.discardZone.addEventListener('contextmenu', function (ev) {
+            ev.preventDefault();
+            if (!canEditBoard(board)) {
+                setStatus('You can only search your own discard pile.');
+                return;
+            }
+            openDiscardSearchModal(board);
+        });
+    }
+
+    /**
+     * Discard cards sit above the zone in the stacking order, so contextmenu on the pile hits the card
+     * (which would otherwise only rotate). Capture on the field: right-click discard stack → search;
+     * Shift+right-click still reaches the card and rotates.
+     */
+    function attachDiscardPileFieldContextMenu(board) {
+        if (!board || !board.field) return;
+        board.field.addEventListener('contextmenu', function (ev) {
+            if (ev.shiftKey) return;
+            var w = ev.target.closest('.cp-card-on-field');
+            if (!w || w.getAttribute('data-cp-discard') !== '1') return;
+            if (w._cpBoard !== board) return;
+            ev.preventDefault();
+            ev.stopImmediatePropagation();
+            if (!canEditBoard(board)) {
+                setStatus('You can only search your own discard pile.');
+                return;
+            }
+            openDiscardSearchModal(board);
+        }, true);
+    }
+
+    function attachTreasureZoneContextMenu(board) {
+        if (!board || !board.treasureZone) return;
+        board.treasureZone.addEventListener('contextmenu', function (ev) {
+            ev.preventDefault();
+            if (!canEditBoard(board)) {
+                setStatus('You can only manage treasures on your own mat.');
+                return;
+            }
+            openTreasureModal(board);
+        });
+    }
+
+    /**
+     * Treasure cards stack above the zone; capture opens the manager unless Shift+right-click (rotate on mat).
+     */
+    function attachTreasurePileFieldContextMenu(board) {
+        if (!board || !board.field) return;
+        board.field.addEventListener('contextmenu', function (ev) {
+            if (ev.shiftKey) return;
+            var w = ev.target.closest('.cp-card-on-field');
+            if (!w || w.getAttribute('data-cp-treasure') !== '1') return;
+            if (w._cpBoard !== board) return;
+            ev.preventDefault();
+            ev.stopImmediatePropagation();
+            if (!canEditBoard(board)) {
+                setStatus('You can only manage treasures on your own mat.');
+                return;
+            }
+            openTreasureModal(board);
+        }, true);
+    }
+
     function attachRotateOnRightClick(wrap, rotLayer) {
         wrap._cpRotationDeg = 0;
         wrap.addEventListener('contextmenu', function (ev) {
@@ -2070,6 +2607,9 @@
             if (!canEditBoard(wrap._cpBoard)) return;
             wrap._cpRotationDeg = (wrap._cpRotationDeg + 90) % 360;
             rotLayer.style.transform = 'rotate(' + wrap._cpRotationDeg + 'deg)';
+            if (wrap.getAttribute('data-cp-treasure') === '1' && wrap._cpBoard) {
+                updateTreasureZoneBadgesBoard(wrap._cpBoard);
+            }
             scheduleMultiplayerPush();
         });
     }
@@ -2540,11 +3080,11 @@
             wrap.style.left = Math.max(0, destL) + 'px';
             wrap.style.top = Math.max(0, destT) + 'px';
             wrap.style.removeProperty('z-index');
-            if (!snapCardToDiscardIfInside(wrap, board)) cpPlaySfx();
+            if (!snapCardToTreasureIfInside(wrap, board) && !snapCardToDiscardIfInside(wrap, board)) cpPlaySfx();
             return Promise.resolve(wrap);
         }
         return animateOpponentCardLayout(wrap, destL, destT).then(function () {
-            if (!snapCardToDiscardIfInside(wrap, board)) cpPlaySfx();
+            if (!snapCardToTreasureIfInside(wrap, board) && !snapCardToDiscardIfInside(wrap, board)) cpPlaySfx();
             return wrap;
         });
     }
@@ -2604,7 +3144,7 @@
         if (!list.length) return;
         list.forEach(function (el) { el.remove(); });
         relayoutHandCardsBoard(board);
-        relayoutDiscardPileBoard(board);
+        relayoutZonePilesBoard(board);
         relayoutCommanderZoneBoard(board);
     }
 
@@ -2689,9 +3229,369 @@
         modal.setAttribute('aria-hidden', 'true');
         var deckM = document.getElementById('cpDeckModal');
         var cmdM = document.getElementById('cpCommanderModal');
-        if ((!deckM || !deckM.classList.contains('is-open')) && (!cmdM || !cmdM.classList.contains('is-open'))) {
+        var discM = document.getElementById('cpDiscardSearchModal');
+        var trM = document.getElementById('cpTreasureModal');
+        if ((!deckM || !deckM.classList.contains('is-open')) && (!cmdM || !cmdM.classList.contains('is-open')) && (!discM || !discM.classList.contains('is-open')) && (!trM || !trM.classList.contains('is-open'))) {
             document.body.style.overflow = '';
         }
+    }
+
+    /** Board whose discard pile is shown in the search modal (null when closed). */
+    var discardSearchBoard = null;
+
+    function findDiscardWrapByInstanceId(board, instanceId) {
+        if (!board || !board.field || !instanceId) return null;
+        var all = board.field.querySelectorAll('.cp-card-on-field[data-cp-discard="1"]');
+        var sid = String(instanceId);
+        for (var i = 0; i < all.length; i++) {
+            if (all[i].getAttribute('data-cp-instance-id') === sid) return all[i];
+        }
+        return null;
+    }
+
+    function closeDiscardSearchModal() {
+        var modal = document.getElementById('cpDiscardSearchModal');
+        if (!modal) return;
+        discardSearchBoard = null;
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        var deckM = document.getElementById('cpDeckModal');
+        var cmdM = document.getElementById('cpCommanderModal');
+        var deckSearchM = document.getElementById('cpDeckSearchModal');
+        var trM = document.getElementById('cpTreasureModal');
+        if ((!deckM || !deckM.classList.contains('is-open')) && (!cmdM || !cmdM.classList.contains('is-open')) && (!deckSearchM || !deckSearchM.classList.contains('is-open')) && (!trM || !trM.classList.contains('is-open'))) {
+            document.body.style.overflow = '';
+        }
+    }
+
+    /** Board shown in the treasure manager modal (null when closed). */
+    var treasureModalBoard = null;
+
+    function findTreasureWrapByInstanceId(board, instanceId) {
+        if (!board || !board.field || !instanceId) return null;
+        var all = board.field.querySelectorAll('.cp-card-on-field[data-cp-treasure="1"]');
+        var sid = String(instanceId);
+        for (var i = 0; i < all.length; i++) {
+            if (all[i].getAttribute('data-cp-instance-id') === sid) return all[i];
+        }
+        return null;
+    }
+
+    function getTreasureCardFaceSrcFromWrap(wrap) {
+        if (!wrap) return '';
+        var img = wrap.querySelector('.cp-flip-face-front img');
+        return img && img.getAttribute('src') ? img.src : '';
+    }
+
+    function closeTreasureModal() {
+        var modal = document.getElementById('cpTreasureModal');
+        if (!modal) return;
+        treasureModalBoard = null;
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        var deckM = document.getElementById('cpDeckModal');
+        var cmdM = document.getElementById('cpCommanderModal');
+        var deckSearchM = document.getElementById('cpDeckSearchModal');
+        var discM = document.getElementById('cpDiscardSearchModal');
+        if ((!deckM || !deckM.classList.contains('is-open')) && (!cmdM || !cmdM.classList.contains('is-open')) && (!deckSearchM || !deckSearchM.classList.contains('is-open')) && (!discM || !discM.classList.contains('is-open'))) {
+            document.body.style.overflow = '';
+        }
+    }
+
+    function rotateTreasureInstance90(board, instanceId) {
+        if (!board || !instanceId) return;
+        var w = findTreasureWrapByInstanceId(board, instanceId);
+        if (!w) return;
+        var rotLayer = w.querySelector('.cp-card-rot');
+        w._cpRotationDeg = ((w._cpRotationDeg || 0) + 90) % 360;
+        if (rotLayer) rotLayer.style.transform = 'rotate(' + w._cpRotationDeg + 'deg)';
+        cpPlayFlipSfx();
+        updateTreasureZoneBadgesBoard(board);
+        scheduleMultiplayerPush();
+    }
+
+    function unexhaustAllTreasuresOnBoard(board) {
+        if (!board || !board.field) return;
+        board.field.querySelectorAll('.cp-card-on-field[data-cp-treasure="1"]').forEach(function (w) {
+            w._cpRotationDeg = 0;
+            var rotLayer = w.querySelector('.cp-card-rot');
+            if (rotLayer) rotLayer.style.transform = 'rotate(0deg)';
+        });
+        updateTreasureZoneBadgesBoard(board);
+        scheduleMultiplayerPush();
+    }
+
+    function rebuildTreasureModalContent() {
+        var stats = document.getElementById('cpTreasureModalStats');
+        var row = document.getElementById('cpTreasureModalRow');
+        if (!stats || !row || !treasureModalBoard) return;
+        var board = treasureModalBoard;
+        var cts = countTreasureCardsOnBoard(board);
+        stats.textContent = 'Ready (rotation 0°): ' + cts.ready + ' of ' + cts.total;
+        var items = treasurePileLayoutItems(board);
+        if (!items.length) {
+            row.innerHTML = '';
+            closeTreasureModal();
+            return;
+        }
+        row.innerHTML = '';
+        items.forEach(function (it) {
+            var w = it.w;
+            var instanceId = w.getAttribute('data-cp-instance-id') || '';
+            var libId = w.getAttribute('data-cp-card-lib-id') || '';
+            var entry = w._cpDeckEntry;
+            var card = entry || (libId ? cardById(libId) : null);
+            var title = card && card.state ? cardTitleFromState(card.state) : '(card)';
+            var face = getTreasureCardFaceSrcFromWrap(w);
+            var cell = document.createElement('div');
+            cell.className = 'cp-treasure-modal-cell';
+            cell.setAttribute('role', 'listitem');
+            cell.title = 'Right-click to rotate 90° (exhaust)';
+            var thumbWrap = document.createElement('div');
+            thumbWrap.className = 'cp-treasure-modal-thumb-wrap';
+            var inner = document.createElement('div');
+            inner.className = 'cp-treasure-modal-thumb-inner';
+            inner.style.transform = 'rotate(' + (w._cpRotationDeg || 0) + 'deg)';
+            if (face) {
+                var im = document.createElement('img');
+                im.alt = '';
+                im.src = face;
+                inner.appendChild(im);
+            } else {
+                inner.textContent = '?';
+                inner.style.color = '#94a3b8';
+                inner.style.fontSize = '22px';
+                inner.style.fontWeight = '800';
+            }
+            thumbWrap.appendChild(inner);
+            var cap = document.createElement('div');
+            cap.className = 'cp-treasure-modal-caption';
+            cap.textContent = title;
+            cap.title = title;
+            var pill = document.createElement('div');
+            var ready = isTreasureCardUnexhausted(w);
+            pill.className = 'cp-treasure-modal-ready-pill' + (ready ? '' : ' is-exhausted');
+            pill.textContent = ready ? 'Ready' : 'Used';
+            cell.appendChild(thumbWrap);
+            cell.appendChild(cap);
+            cell.appendChild(pill);
+            cell.addEventListener('contextmenu', function (ev) {
+                ev.preventDefault();
+                if (!treasureModalBoard || treasureModalBoard !== board) return;
+                if (!canEditBoard(board)) return;
+                rotateTreasureInstance90(board, instanceId);
+                rebuildTreasureModalContent();
+            });
+            row.appendChild(cell);
+        });
+    }
+
+    function openTreasureModal(board) {
+        board = board || boardP1;
+        if (!canEditBoard(board)) {
+            setStatus('You can only manage treasures on your own mat.');
+            return;
+        }
+        var items = treasurePileLayoutItems(board);
+        if (!items.length) {
+            setStatus(board.id === 'p2' ? 'Player 2 has no treasure cards.' : 'No treasure cards in the pile.');
+            return;
+        }
+        var modal = document.getElementById('cpTreasureModal');
+        if (!modal) return;
+        treasureModalBoard = board;
+        rebuildTreasureModalContent();
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function openDiscardSearchModal(board) {
+        board = board || boardP1;
+        if (!canEditBoard(board)) {
+            setStatus('You can only search your own discard pile.');
+            return;
+        }
+        var items = discardPileLayoutItems(board);
+        if (!items.length) {
+            setStatus(board.id === 'p2' ? 'Player 2 discard is empty.' : 'Discard pile is empty.');
+            return;
+        }
+        var modal = document.getElementById('cpDiscardSearchModal');
+        var inp = document.getElementById('cpDiscardSearchInput');
+        if (!modal || !inp) return;
+        discardSearchBoard = board;
+        inp.value = '';
+        rebuildDiscardSearchList('');
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        setTimeout(function () {
+            inp.focus();
+            inp.select();
+        }, 0);
+    }
+
+    function rebuildDiscardSearchList(filterText) {
+        var listEl = document.getElementById('cpDiscardSearchList');
+        if (!listEl || !discardSearchBoard) return;
+        var board = discardSearchBoard;
+        var layoutItems = discardPileLayoutItems(board);
+        var q = (filterText || '').trim().toLowerCase();
+
+        var rows = layoutItems.map(function (it, idx) {
+            var w = it.w;
+            var libId = w.getAttribute('data-cp-card-lib-id') || '';
+            var entry = w._cpDeckEntry;
+            var c = entry || (libId ? cardById(libId) : null);
+            var title;
+            var sub;
+            if (c && c.state) {
+                title = cardTitleFromState(c.state);
+                sub = cardSubtitle(c.state, String(c.id != null ? c.id : libId || ''));
+            } else {
+                title = '(unknown card)';
+                sub = libId || '—';
+            }
+            var instanceId = w.getAttribute('data-cp-instance-id') || '';
+            return {
+                instanceId: instanceId,
+                title: title,
+                sub: sub,
+                sort: title.toLowerCase(),
+                pileIdx: idx
+            };
+        });
+        rows.sort(function (a, b) {
+            if (a.sort < b.sort) return -1;
+            if (a.sort > b.sort) return 1;
+            return a.pileIdx - b.pileIdx;
+        });
+
+        if (q) {
+            rows = rows.filter(function (r) {
+                return r.title.toLowerCase().indexOf(q) !== -1 || r.sub.toLowerCase().indexOf(q) !== -1;
+            });
+        }
+
+        listEl.innerHTML = '';
+        if (!rows.length) {
+            var empty = document.createElement('div');
+            empty.className = 'drive-modal-empty';
+            empty.textContent = layoutItems.length === 0 ? 'Discard pile is empty.' : 'No cards match your filter.';
+            listEl.appendChild(empty);
+            return;
+        }
+
+        rows.forEach(function (r) {
+            var row = document.createElement('div');
+            row.className = 'cp-lib-row';
+            row.setAttribute('role', 'option');
+
+            var meta = document.createElement('div');
+            meta.className = 'cp-lib-meta';
+            var t = document.createElement('span');
+            t.className = 'cp-card-title';
+            t.textContent = r.title;
+            var s = document.createElement('span');
+            s.className = 'cp-card-sub';
+            s.textContent = r.sub;
+            meta.appendChild(t);
+            meta.appendChild(s);
+
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'drive-modal-btn drive-modal-btn-primary';
+            btn.style.flexShrink = '0';
+            btn.textContent = 'To hand';
+            btn.addEventListener('click', function () {
+                moveDiscardWrapToHandByInstanceId(board, r.instanceId);
+            });
+
+            row.appendChild(meta);
+            row.appendChild(btn);
+            listEl.appendChild(row);
+        });
+    }
+
+    function moveDiscardWrapToHandByInstanceId(board, instanceId) {
+        board = board || boardP1;
+        if (!canEditBoard(board)) return;
+        if (!discardSearchBoard || discardSearchBoard !== board) return;
+        var wrap = findDiscardWrapByInstanceId(board, instanceId);
+        if (!wrap) {
+            var inp = document.getElementById('cpDiscardSearchInput');
+            rebuildDiscardSearchList(inp ? inp.value : '');
+            setStatus('That card is no longer in the discard pile.');
+            return;
+        }
+
+        var statusTitle = '(card)';
+        var entry = wrap._cpDeckEntry;
+        var libId = wrap.getAttribute('data-cp-card-lib-id') || '';
+        var c = entry || (libId ? cardById(libId) : null);
+        if (c && c.state) statusTitle = cardTitleFromState(c.state);
+
+        wrap.classList.add('cp-hand-card');
+        wrap.removeAttribute('data-cp-discard');
+        wrap.removeAttribute('data-cp-discard-order');
+        wrap.removeAttribute('data-cp-treasure');
+        wrap.removeAttribute('data-cp-treasure-order');
+        relayoutZonePilesBoard(board);
+        applyOpponentHandPrivacy(wrap, board);
+
+        function finishRebuild() {
+            var inp2 = document.getElementById('cpDiscardSearchInput');
+            rebuildDiscardSearchList(inp2 ? inp2.value : '');
+            var still = discardPileLayoutItems(board).length;
+            if (still === 0) closeDiscardSearchModal();
+        }
+
+        if (cpPrefersReducedMotion()) {
+            relayoutHandCardsBoard(board);
+            relayoutZonePilesBoard(board);
+            relayoutCommanderZoneBoard(board);
+            cpPlaySfx();
+            setStatus('From discard to hand (P' + (board.id === 'p2' ? '2' : '1') + '): ' + statusTitle + '.');
+            scheduleMultiplayerPush();
+            finishRebuild();
+            return;
+        }
+
+        var hItems = handLayoutItems(board);
+        var hTarget = null;
+        var hi;
+        for (hi = 0; hi < hItems.length; hi++) {
+            if (hItems[hi].w === wrap) {
+                hTarget = hItems[hi];
+                break;
+            }
+        }
+        if (!hTarget) {
+            relayoutHandCardsBoard(board);
+            cpPlaySfx();
+            setStatus('From discard to hand (P' + (board.id === 'p2' ? '2' : '1') + '): ' + statusTitle + '.');
+            scheduleMultiplayerPush();
+            finishRebuild();
+            return;
+        }
+
+        hItems.forEach(function (it) {
+            if (it.w !== wrap) {
+                it.w.style.left = it.l + 'px';
+                it.w.style.top = it.t + 'px';
+                it.w.style.zIndex = String(it.z);
+            }
+        });
+        wrap.style.zIndex = '6400';
+        animateOpponentCardLayout(wrap, hTarget.l, hTarget.t, hTarget.z).then(function () {
+            cpPlaySfx();
+            relayoutZonePilesBoard(board);
+            relayoutCommanderZoneBoard(board);
+            setStatus('From discard to hand (P' + (board.id === 'p2' ? '2' : '1') + '): ' + statusTitle + '.');
+            scheduleMultiplayerPush();
+            finishRebuild();
+        });
     }
 
     function openDeckSearchModal(board) {
@@ -2894,6 +3794,7 @@
                 libId = commanderCard.id;
             }
             var disc = w.getAttribute('data-cp-discard') === '1';
+            var treasure = w.getAttribute('data-cp-treasure') === '1';
             var row = {
                 i: w.getAttribute('data-cp-instance-id') || '',
                 lib: libId,
@@ -2902,6 +3803,7 @@
                 t: parseFloat(w.style.top) || 0,
                 h: w.classList.contains('cp-hand-card') ? 1 : 0,
                 d: disc ? 1 : 0,
+                tr: treasure ? 1 : 0,
                 cz: w.getAttribute('data-cp-commander') === '1' ? 1 : 0,
                 czIn: w.getAttribute('data-cp-commander-in-zone') === '1' ? 1 : 0,
                 rot: w._cpRotationDeg || 0,
@@ -2910,6 +3812,9 @@
             };
             if (disc) {
                 row.do = parseInt(w.getAttribute('data-cp-discard-order'), 10) || 0;
+            }
+            if (treasure) {
+                row.tro = parseInt(w.getAttribute('data-cp-treasure-order'), 10) || 0;
             }
             cards.push(row);
         });
@@ -2973,6 +3878,7 @@
     function updateExistingCardFromFirestoreEntry(wrap, entry, board, animateMoves, playOpponentSfx) {
         playOpponentSfx = !!playOpponentSfx;
         var wasDisc = wrap.getAttribute('data-cp-discard') === '1';
+        var wasTr = wrap.getAttribute('data-cp-treasure') === '1';
         var wasHand = wrap.classList.contains('cp-hand-card');
         var wasCzIn = wrap.getAttribute('data-cp-commander-in-zone') === '1';
         var prevBack = !!wrap._cpShowingBack;
@@ -2993,15 +3899,22 @@
         wrap._cpDeckEntry = entry.fromDeck && c ? c : null;
 
         if (entry.h) wrap.classList.add('cp-hand-card'); else wrap.classList.remove('cp-hand-card');
+        wrap.removeAttribute('data-cp-discard');
+        wrap.removeAttribute('data-cp-discard-order');
+        wrap.removeAttribute('data-cp-treasure');
+        wrap.removeAttribute('data-cp-treasure-order');
         if (entry.d) {
             wrap.setAttribute('data-cp-discard', '1');
             var dOrder = entry.do;
             if (dOrder != null && dOrder !== '' && !isNaN(parseInt(dOrder, 10))) {
                 wrap.setAttribute('data-cp-discard-order', String(parseInt(dOrder, 10)));
             }
-        } else {
-            wrap.removeAttribute('data-cp-discard');
-            wrap.removeAttribute('data-cp-discard-order');
+        } else if (entry.tr) {
+            wrap.setAttribute('data-cp-treasure', '1');
+            var trOrder = entry.tro;
+            if (trOrder != null && trOrder !== '' && !isNaN(parseInt(trOrder, 10))) {
+                wrap.setAttribute('data-cp-treasure-order', String(parseInt(trOrder, 10)));
+            }
         }
         if (entry.cz) wrap.setAttribute('data-cp-commander', '1'); else wrap.removeAttribute('data-cp-commander');
         if (entry.czIn) wrap.setAttribute('data-cp-commander-in-zone', '1'); else wrap.removeAttribute('data-cp-commander-in-zone');
@@ -3018,19 +3931,25 @@
             if (!!entry.d && !wasDisc) {
                 cpPlayDiscardSfx();
                 playedZone = true;
+            } else if (!!entry.tr && !wasTr) {
+                cpPlaySfx();
+                playedZone = true;
             } else if (!!entry.h && !wasHand) {
                 cpPlaySfx();
                 playedZone = true;
             } else if (!entry.h && wasHand) {
                 cpPlaySfx();
                 playedZone = true;
-            } else if (!entry.d && wasDisc && !entry.h) {
+            } else if (!entry.d && wasDisc && !entry.h && !entry.tr) {
                 cpPlayFlipSfx();
                 playedZone = true;
-            } else if (!!entry.czIn && !wasCzIn && !entry.d) {
+            } else if (!entry.tr && wasTr && !entry.h && !entry.d) {
+                cpPlayFlipSfx();
+                playedZone = true;
+            } else if (!!entry.czIn && !wasCzIn && !entry.d && !entry.tr) {
                 cpPlaySfx();
                 playedZone = true;
-            } else if (!entry.czIn && wasCzIn && !entry.d) {
+            } else if (!entry.czIn && wasCzIn && !entry.d && !entry.tr) {
                 cpPlayFlipSfx();
                 playedZone = true;
             } else if (!!entry.back !== prevBack) {
@@ -3051,7 +3970,7 @@
             }
             return p;
         }
-        if (entry.h || entry.d || entry.czIn) {
+        if (entry.h || entry.d || entry.tr || entry.czIn) {
             return Promise.resolve();
         }
         wrap.style.left = Math.max(0, l) + 'px';
@@ -3088,15 +4007,22 @@
             if (entry.i) wrap.setAttribute('data-cp-instance-id', entry.i);
             wrap.setAttribute('data-cp-card-lib-id', entry.lib);
             if (entry.h) wrap.classList.add('cp-hand-card'); else wrap.classList.remove('cp-hand-card');
+            wrap.removeAttribute('data-cp-discard');
+            wrap.removeAttribute('data-cp-discard-order');
+            wrap.removeAttribute('data-cp-treasure');
+            wrap.removeAttribute('data-cp-treasure-order');
             if (entry.d) {
                 wrap.setAttribute('data-cp-discard', '1');
                 var dOrder = entry.do;
                 if (dOrder != null && dOrder !== '' && !isNaN(parseInt(dOrder, 10))) {
                     wrap.setAttribute('data-cp-discard-order', String(parseInt(dOrder, 10)));
                 }
-            } else {
-                wrap.removeAttribute('data-cp-discard');
-                wrap.removeAttribute('data-cp-discard-order');
+            } else if (entry.tr) {
+                wrap.setAttribute('data-cp-treasure', '1');
+                var trOrderRestore = entry.tro;
+                if (trOrderRestore != null && trOrderRestore !== '' && !isNaN(parseInt(trOrderRestore, 10))) {
+                    wrap.setAttribute('data-cp-treasure-order', String(parseInt(trOrderRestore, 10)));
+                }
             }
             if (entry.cz) wrap.setAttribute('data-cp-commander', '1'); else wrap.removeAttribute('data-cp-commander');
             if (entry.czIn) wrap.setAttribute('data-cp-commander-in-zone', '1'); else wrap.removeAttribute('data-cp-commander-in-zone');
@@ -3109,6 +4035,7 @@
             applyOpponentHandPrivacy(wrap, board);
             if (playOpponentSfx && !skipRestoreSfx && !cpPrefersReducedMotion()) {
                 if (entry.d) cpPlayDiscardSfx();
+                else if (entry.tr) cpPlaySfx();
                 else if (entry.h) cpPlaySfx();
                 else cpPlaySfx();
             }
@@ -3142,6 +4069,7 @@
                 return restoreOneCardFromFirestoreEntry(entry, playOpponentSfx, skipBulkLegacy);
             })).then(function () {
                 syncBoardDiscardSeqFromDom(board);
+                syncBoardTreasureSeqFromDom(board);
             });
         }
 
@@ -3181,6 +4109,7 @@
             return restoreOneCardFromFirestoreEntry(entry, playOpponentSfx, bulkInitialRestore);
         })).then(function () {
             syncBoardDiscardSeqFromDom(board);
+            syncBoardTreasureSeqFromDom(board);
             if (!pendingDeckFly.length) return Promise.resolve();
             return Promise.all(pendingDeckFly.map(function (w) {
                 return animateCardFlyToDrawZoneThenRemove(w, board).then(function () {
@@ -3509,7 +4438,7 @@
 
     function refreshLibrary() {
         setStatus('Loading cached saves…');
-        idbReadAllStates()
+        return idbReadAllStates()
             .then(function (rows) {
                 clearCardFaceUrlCache();
                 library = rows;
@@ -3517,6 +4446,7 @@
                 restoreCommanderFromLibrary();
                 setStatus('Library: ' + library.length + ' from cache + ' + imported.length + ' imported.');
                 warmCardFaceUrlCacheIdle();
+                updateAllTreasureZoneBadges();
             })
             .catch(function () {
                 clearCardFaceUrlCache();
@@ -3524,6 +4454,7 @@
                 library = [];
                 renderLibraryList();
                 restoreCommanderFromLibrary();
+                updateAllTreasureZoneBadges();
             });
     }
 
@@ -3725,7 +4656,9 @@
         cpDeckModal.setAttribute('aria-hidden', 'true');
         var cmdM = document.getElementById('cpCommanderModal');
         var searchM = document.getElementById('cpDeckSearchModal');
-        if ((!cmdM || !cmdM.classList.contains('is-open')) && (!searchM || !searchM.classList.contains('is-open'))) {
+        var discM = document.getElementById('cpDiscardSearchModal');
+        var trM = document.getElementById('cpTreasureModal');
+        if ((!cmdM || !cmdM.classList.contains('is-open')) && (!searchM || !searchM.classList.contains('is-open')) && (!discM || !discM.classList.contains('is-open')) && (!trM || !trM.classList.contains('is-open'))) {
             document.body.style.overflow = '';
         }
     }
@@ -3845,21 +4778,54 @@
             var loadId = t.getAttribute('data-cp-deck-load');
             var delId = t.getAttribute('data-cp-deck-delete');
             if (loadId) {
-                setDeckModalMessage('Loading…');
+                setDeckModalMessage('Loading deck file…');
                 CPDrive.ensureDriveTokenBeforeDriveOp().then(function (ok) {
                     if (!ok) throw new Error('Not signed in.');
                     return CPDrive.fetchDriveFileMedia(loadId);
                 }).then(function (text) {
                     var doc = parseDeckDocument(text);
-                    applyDeckDocumentToInputs(doc);
-                    var missing = [];
+                    var seen = {};
+                    var missingUnique = [];
                     (doc.entries || []).forEach(function (e) {
-                        if (e && e.id && !cardById(e.id)) missing.push(e.id);
+                        if (!e || e.id == null) return;
+                        var sid = String(e.id);
+                        if (seen[sid]) return;
+                        seen[sid] = true;
+                        if (!cardById(sid)) missingUnique.push(sid);
                     });
-                    buildDeckFromSelection();
-                    var msg = 'Loaded deck (“' + (doc.name || 'untitled') + '”) — applied ' + deck.length + ' cards to play deck.';
-                    if (missing.length) msg += ' ' + missing.length + ' entr' + (missing.length === 1 ? 'y' : 'ies') + ' not in this library (skipped).';
-                    setDeckModalMessage(msg, missing.length > 0);
+
+                    function finishDeckLoad() {
+                        applyDeckDocumentToInputs(doc);
+                        buildDeckFromSelection();
+                        var stillMissing = [];
+                        (doc.entries || []).forEach(function (e) {
+                            if (e && e.id && !cardById(e.id)) stillMissing.push(String(e.id));
+                        });
+                        var msg = 'Loaded deck (“' + (doc.name || 'untitled') + '”) — applied ' + deck.length + ' cards to play deck.';
+                        if (stillMissing.length) {
+                            msg += ' ' + stillMissing.length + ' entr' + (stillMissing.length === 1 ? 'y' : 'ies') + ' not in library (skipped).';
+                        }
+                        setDeckModalMessage(msg, stillMissing.length > 0);
+                    }
+
+                    if (!missingUnique.length) {
+                        finishDeckLoad();
+                        return null;
+                    }
+
+                    setDeckModalMessage('Fetching cards 0/' + missingUnique.length + ' from Drive…', false);
+                    return hydrateDeckCardIdsFromDrive(missingUnique, function (done, total) {
+                        setDeckModalMessage('Fetching cards ' + done + '/' + total + ' from Drive…', false);
+                    }).then(function (result) {
+                        return refreshLibrary().then(function () {
+                            finishDeckLoad();
+                            if (result.failed.length) {
+                                var prev = cpDeckModalMessage ? cpDeckModalMessage.textContent : '';
+                                var extra = ' Could not load ' + result.failed.length + ' card file' + (result.failed.length === 1 ? '' : 's') + ' from Drive.';
+                                setDeckModalMessage((prev || '') + extra, true);
+                            }
+                        });
+                    });
                 }).catch(function (err) {
                     setDeckModalMessage(err.message || String(err), true);
                 });
@@ -3889,6 +4855,16 @@
         var deckSearchM = document.getElementById('cpDeckSearchModal');
         if (deckSearchM && deckSearchM.classList.contains('is-open')) {
             closeDeckSearchModal();
+            return;
+        }
+        var discardSearchM = document.getElementById('cpDiscardSearchModal');
+        if (discardSearchM && discardSearchM.classList.contains('is-open')) {
+            closeDiscardSearchModal();
+            return;
+        }
+        var treasureM = document.getElementById('cpTreasureModal');
+        if (treasureM && treasureM.classList.contains('is-open')) {
+            closeTreasureModal();
             return;
         }
         if (cpDeckModal && cpDeckModal.classList.contains('is-open')) closeDeckModal();
@@ -3972,6 +4948,28 @@
     document.getElementById('cpDeckSearchModalClose').addEventListener('click', closeDeckSearchModal);
     document.getElementById('cpDeckSearchModalBackdrop').addEventListener('click', closeDeckSearchModal);
     document.getElementById('cpDeckSearchModalDone').addEventListener('click', closeDeckSearchModal);
+
+    (function () {
+        var inpD = document.getElementById('cpDiscardSearchInput');
+        if (inpD) {
+            inpD.addEventListener('input', function () {
+                rebuildDiscardSearchList(inpD.value);
+            });
+        }
+    })();
+    document.getElementById('cpDiscardSearchModalClose').addEventListener('click', closeDiscardSearchModal);
+    document.getElementById('cpDiscardSearchModalBackdrop').addEventListener('click', closeDiscardSearchModal);
+    document.getElementById('cpDiscardSearchModalDone').addEventListener('click', closeDiscardSearchModal);
+
+    document.getElementById('cpTreasureModalClose').addEventListener('click', closeTreasureModal);
+    document.getElementById('cpTreasureModalBackdrop').addEventListener('click', closeTreasureModal);
+    document.getElementById('cpTreasureModalDone').addEventListener('click', closeTreasureModal);
+    document.getElementById('cpTreasureUnexhaustAll').addEventListener('click', function () {
+        if (!treasureModalBoard) return;
+        unexhaustAllTreasuresOnBoard(treasureModalBoard);
+        rebuildTreasureModalContent();
+    });
+
     document.getElementById('cpCommanderApply').addEventListener('click', function () {
         var sel = document.getElementById('cpCommanderSelect');
         if (!sel) return;
@@ -4001,6 +4999,14 @@
 
     attachDrawZoneDrag(boardP1);
     attachDrawZoneDrag(boardP2);
+    attachDiscardZoneSearch(boardP1);
+    attachDiscardZoneSearch(boardP2);
+    attachDiscardPileFieldContextMenu(boardP1);
+    attachDiscardPileFieldContextMenu(boardP2);
+    attachTreasureZoneContextMenu(boardP1);
+    attachTreasureZoneContextMenu(boardP2);
+    attachTreasurePileFieldContextMenu(boardP1);
+    attachTreasurePileFieldContextMenu(boardP2);
     refreshLibrary();
     initCardPlayerFirebaseMultiplayer();
 })();

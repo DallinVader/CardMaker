@@ -307,6 +307,21 @@
             });
     }
 
+    /** modifiedTime + size for IndexedDB cache rows (same semantics as Saved projects list files). */
+    function fetchDriveFileMetadata(fileId) {
+        var u = DRIVE_FILES_API + '/' + encodeURIComponent(fileId) + '?fields=modifiedTime,size';
+        return fetch(u, { headers: driveAuthHeaders() })
+            .then(function (res) { return res.text().then(function (text) { return { res: res, text: text }; }); })
+            .then(function (o) {
+                if (!o.res.ok) throw new Error(parseDriveError(o.text, o.res.status));
+                var j = JSON.parse(o.text);
+                return {
+                    modifiedTime: j.modifiedTime != null ? String(j.modifiedTime) : null,
+                    size: j.size != null ? String(j.size) : null
+                };
+            });
+    }
+
     function deleteDriveFile(fileId) {
         var u = DRIVE_FILES_API + '/' + encodeURIComponent(fileId);
         return fetch(u, { method: 'DELETE', headers: driveAuthHeaders() })
@@ -379,6 +394,7 @@
         listDeckFiles: listDeckFiles,
         saveDeckToDrive: saveDeckToDrive,
         fetchDriveFileMedia: fetchDriveFileMedia,
+        fetchDriveFileMetadata: fetchDriveFileMetadata,
         deleteDriveFile: deleteDriveFile,
         applyDriveAccessToken: applyDriveAccessToken
     };
