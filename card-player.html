@@ -509,7 +509,6 @@
                 <div class="cp-sidebar-inner" id="cpSidebarPanel">
             <div class="cp-panel">
                 <h2>Saved cards</h2>
-                <p class="cp-muted">Loads cards from the same cache as <strong>Saved projects</strong> (open that page once while signed in so downloads are cached). Import <code style="color:#93c5fd">.cardmaker.json</code> files here. Open <strong>Deck builder</strong> to set how many of each card are in your deck and save decks to Google Drive.</p>
                 <div class="cp-stats">
                     <span id="cpStatLibrary">Library: —</span>
                     <span id="cpStatDeck">Deck: 0</span>
@@ -533,8 +532,6 @@
                     <button type="button" class="cp-btn cp-btn-primary" id="cpDraw" disabled>Draw to field</button>
                     <button type="button" class="cp-btn" id="cpClearField">Clear field</button>
                 </div>
-                <h2 style="margin-top:16px;">Play online</h2>
-                <p class="cp-muted" style="font-size:12px;margin-bottom:10px;">Realtime sync via <strong>Firebase</strong>. Choose <strong>Player 1</strong> or <strong>Player 2</strong> before Connect — each seat controls only that side; as P2 your board is shown upright at the bottom. Same library for both players. Keys in <code style="color:#93c5fd">firebase-config.js</code>; Anonymous auth + <code style="color:#93c5fd">firestore.rules.example</code> rules.</p>
                 <div class="cp-actions" style="align-items:center;">
                     <input type="text" class="cp-firebase-room" id="cpRoomId" placeholder="Room name (e.g. friday-game)" maxlength="48" autocomplete="off" aria-label="Room name" />
                 </div>
@@ -2953,10 +2950,18 @@
         };
     }
 
-    function updateExistingCardFromFirestoreEntry(wrap, entry, board, animateMoves) {
+    function updateExistingCardFromFirestoreEntry(wrap, entry, board, animateMoves, playOpponentSfx) {
+        playOpponentSfx = !!playOpponentSfx;
+        var wasDisc = wrap.getAttribute('data-cp-discard') === '1';
+        var wasHand = wrap.classList.contains('cp-hand-card');
+        var wasCzIn = wrap.getAttribute('data-cp-commander-in-zone') === '1';
+        var prevBack = !!wrap._cpShowingBack;
+        var prevL = wrap.offsetLeft;
+        var prevT = wrap.offsetTop;
+
         if (String(wrap.getAttribute('data-cp-card-lib-id') || '') !== String(entry.lib)) {
             wrap.remove();
-            return restoreOneCardFromFirestoreEntry(entry);
+            return restoreOneCardFromFirestoreEntry(entry, playOpponentSfx, false);
         }
         var wAnim = shouldAnimateRemoteFieldCardMove(entry, wrap, animateMoves);
         var l = parseFloat(entry.l);
@@ -2988,21 +2993,65 @@
         if (flipInner) flipInner.classList.toggle('cp-flip-inner--back', wrap._cpShowingBack);
         applyOpponentHandPrivacy(wrap, board);
 
+        var playedZone = false;
+        if (playOpponentSfx && !cpPrefersReducedMotion()) {
+            if (!!entry.d && !wasDisc) {
+                cpPlayDiscardSfx();
+                playedZone = true;
+            } else if (!!entry.h && !wasHand) {
+                cpPlaySfx();
+                playedZone = true;
+            } else if (!entry.h && wasHand) {
+                cpPlaySfx();
+                playedZone = true;
+            } else if (!entry.d && wasDisc && !entry.h) {
+                cpPlayFlipSfx();
+                playedZone = true;
+            } else if (!!entry.czIn && !wasCzIn && !entry.d) {
+                cpPlaySfx();
+                playedZone = true;
+            } else if (!entry.czIn && wasCzIn && !entry.d) {
+                cpPlayFlipSfx();
+                playedZone = true;
+            } else if (!!entry.back !== prevBack) {
+                cpPlayFlipSfx();
+                playedZone = true;
+            }
+        }
+
+        var freeAfter = firestoreEntryIsFreeFieldPlacement(entry);
+        var posCh = Math.abs(l - prevL) + Math.abs(t - prevT) > 2;
+
         if (wAnim) {
-            return animateOpponentCardLayout(wrap, l, t);
+            var p = animateOpponentCardLayout(wrap, l, t);
+            if (playOpponentSfx && !cpPrefersReducedMotion() && !playedZone && freeAfter && posCh) {
+                return p.then(function () {
+                    cpPlayFlipSfx();
+                });
+            }
+            return p;
         }
         if (entry.h || entry.d || entry.czIn) {
             return Promise.resolve();
         }
         wrap.style.left = Math.max(0, l) + 'px';
         wrap.style.top = Math.max(0, t) + 'px';
+        if (playOpponentSfx && !cpPrefersReducedMotion() && !playedZone && freeAfter && posCh) {
+            cpPlayFlipSfx();
+        }
         return Promise.resolve();
     }
 
-    function restoreOneCardFromFirestoreEntry(entry) {
+    /**
+     * @param {boolean} playOpponentSfx — local-only feedback when applying the opponent’s mat (never sent to Firestore).
+     * @param {boolean} skipRestoreSfx — skip when bulk-rebuilding many cards (e.g. first sync).
+     */
+    function restoreOneCardFromFirestoreEntry(entry, playOpponentSfx, skipRestoreSfx) {
         if (!entry || !entry.lib) return Promise.resolve();
         var c = cardById(entry.lib);
         if (!c) return Promise.resolve();
+        playOpponentSfx = !!playOpponentSfx;
+        skipRestoreSfx = !!skipRestoreSfx;
         var board = entry.b === 'p2' ? boardP2 : boardP1;
         var fromDeck = !!entry.fromDeck;
         return getOrRenderCardPlayFaceUrl(c).then(function (url) {
@@ -3038,12 +3087,18 @@
             wrap._cpShowingBack = !!entry.back;
             if (flipInner) flipInner.classList.toggle('cp-flip-inner--back', wrap._cpShowingBack);
             applyOpponentHandPrivacy(wrap, board);
+            if (playOpponentSfx && !skipRestoreSfx && !cpPrefersReducedMotion()) {
+                if (entry.d) cpPlayDiscardSfx();
+                else if (entry.h) cpPlaySfx();
+                else cpPlaySfx();
+            }
         });
     }
 
     function applyOnePlayerSliceFromFirestore(slice, board, deckArr, opts) {
         opts = opts || {};
         var animateRemoteMoves = !!opts.animateRemoteMoves;
+        var playOpponentSfx = !!opts.playOpponentSfx;
         if (!slice || typeof slice !== 'object') return Promise.resolve();
         deckArr.length = 0;
         (slice.deckIds || []).forEach(function (id) {
@@ -3062,8 +3117,9 @@
             board.field.querySelectorAll('.cp-card-on-field').forEach(function (el) {
                 el.remove();
             });
+            var skipBulkLegacy = playOpponentSfx && entries.length > 1;
             return Promise.all(entries.map(function (entry) {
-                return restoreOneCardFromFirestoreEntry(entry);
+                return restoreOneCardFromFirestoreEntry(entry, playOpponentSfx, skipBulkLegacy);
             })).then(function () {
                 syncBoardDiscardSeqFromDom(board);
             });
@@ -3079,6 +3135,8 @@
             if (e && e.i) incoming[e.i] = true;
         });
         var pendingDeckFly = [];
+        var hadCardsBefore = Object.keys(existing).length > 0;
+        var bulkInitialRestore = playOpponentSfx && !hadCardsBefore && entries.length > 1;
         var removeIds = Object.keys(existing).filter(function (id) { return !incoming[id]; });
         removeIds.forEach(function (id) {
             var w = existing[id];
@@ -3098,14 +3156,16 @@
             if (!entry || !entry.lib) return Promise.resolve();
             var w = entry.i ? existing[entry.i] : null;
             if (w && w.parentNode === board.field) {
-                return updateExistingCardFromFirestoreEntry(w, entry, board, animateRemoteMoves);
+                return updateExistingCardFromFirestoreEntry(w, entry, board, animateRemoteMoves, playOpponentSfx);
             }
-            return restoreOneCardFromFirestoreEntry(entry);
+            return restoreOneCardFromFirestoreEntry(entry, playOpponentSfx, bulkInitialRestore);
         })).then(function () {
             syncBoardDiscardSeqFromDom(board);
             if (!pendingDeckFly.length) return Promise.resolve();
             return Promise.all(pendingDeckFly.map(function (w) {
-                return animateCardFlyToDrawZoneThenRemove(w, board);
+                return animateCardFlyToDrawZoneThenRemove(w, board).then(function () {
+                    if (playOpponentSfx && !cpPrefersReducedMotion()) cpPlaySfx();
+                });
             }));
         });
     }
@@ -3151,14 +3211,16 @@
                 var tasks = [];
                 if (needP1) {
                     tasks.push(applyOnePlayerSliceFromFirestore(p1, boardP1, deck, {
-                        animateRemoteMoves: localMultiplayerSeat !== 1
+                        animateRemoteMoves: localMultiplayerSeat !== 1,
+                        playOpponentSfx: localMultiplayerSeat !== null && localMultiplayerSeat !== 1
                     }).then(function () {
                         lastSyncedFirestoreSlices.p1 = firestoreSliceFingerprint(p1);
                     }));
                 }
                 if (needP2) {
                     tasks.push(applyOnePlayerSliceFromFirestore(p2, boardP2, deckP2, {
-                        animateRemoteMoves: localMultiplayerSeat !== 2
+                        animateRemoteMoves: localMultiplayerSeat !== 2,
+                        playOpponentSfx: localMultiplayerSeat !== null && localMultiplayerSeat !== 2
                     }).then(function () {
                         lastSyncedFirestoreSlices.p2 = firestoreSliceFingerprint(p2);
                     }));
@@ -3205,7 +3267,10 @@
             var leg = entries.length === 0
                 ? Promise.resolve()
                 : Promise.all(entries.map(function (entry) {
-                    return restoreOneCardFromFirestoreEntry(entry);
+                    var onP2 = entry && entry.b === 'p2';
+                    var playOpp = localMultiplayerSeat !== null &&
+                        ((onP2 && localMultiplayerSeat !== 2) || (!onP2 && localMultiplayerSeat !== 1));
+                    return restoreOneCardFromFirestoreEntry(entry, playOpp, playOpp && entries.length > 1);
                 }));
             leg.then(function () {
                 syncBoardDiscardSeqFromDom(boardP1);
