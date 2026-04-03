@@ -1,9 +1,13 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Card player rooms: any signed-in user (use Anonymous auth) can read/write a room doc.
+    // Card player: signed-in users (Anonymous auth) only, room id length 4–64.
     match /cardPlayerRooms/{roomId} {
       allow read, write: if request.auth != null && roomId.size() >= 4 && roomId.size() <= 64;
+    }
+    // Deny everything else (safe default for a public client API key).
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
