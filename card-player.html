@@ -920,6 +920,14 @@
             (localMultiplayerSeat === 2 && board.id === 'p1');
     }
 
+    /** True for opponent’s hand in Firebase seat mode — no hover preview of real faces. */
+    function opponentHandPreviewBlocked(wrap) {
+        if (!wrap || !wrap.classList.contains('cp-hand-card')) return false;
+        var b = wrap._cpBoard;
+        if (!b) return false;
+        return shouldHideOpponentHandFromLocal(b);
+    }
+
     function applyOpponentHandPrivacy(wrap, board) {
         if (!wrap || !board) return;
         wrap.removeAttribute('data-cp-opponent-hand');
@@ -2183,6 +2191,7 @@
 
     function showOpponentFloatingPreviewFrom(wrap) {
         if (!wrap || !document.body.contains(wrap)) return;
+        if (opponentHandPreviewBlocked(wrap)) return;
         var el = ensureOpponentPreviewPopEl();
         var img = el.querySelector('img');
         img.src = opponentPreviewFaceSrc(wrap);
@@ -2213,6 +2222,13 @@
             return wrap.classList.contains('cp-hand-card') ? 320 : 520;
         }
         function arm() {
+            if (opponentHandPreviewBlocked(wrap)) {
+                if (hoverTimer != null) {
+                    clearTimeout(hoverTimer);
+                    hoverTimer = null;
+                }
+                return;
+            }
             if (hoverTimer != null) {
                 clearTimeout(hoverTimer);
                 hoverTimer = null;
@@ -2249,6 +2265,7 @@
                 hoverTimer = null;
             }
             hideOpponentFloatingPreview();
+            if (opponentHandPreviewBlocked(wrap)) return;
             arm();
         });
         wrap.addEventListener('pointermove', function () {
@@ -2333,6 +2350,9 @@
 
     function attachHoverEnlarge(wrap) {
         if (cardIsOnOpponentReadonlyMat(wrap)) {
+            if (opponentHandPreviewBlocked(wrap)) {
+                return;
+            }
             attachOpponentHoverPreview(wrap);
             return;
         }
