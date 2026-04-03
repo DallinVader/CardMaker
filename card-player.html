@@ -71,6 +71,15 @@
             flex-direction: column;
             gap: 18px;
         }
+        /* Local player 2: own board at bottom, upright; opponent (P1) rotated like across the table. */
+        .cp-panel-play.cp-local-seat-p2 .cp-play-stacks {
+            flex-direction: column-reverse;
+        }
+        .cp-board-readonly {
+            pointer-events: none;
+            opacity: 0.88;
+            filter: saturate(0.92);
+        }
         /* Same footprint as P1’s field; inner layer is rotated 180° like sitting across the table. */
         .cp-field-wrap--p2 {
             position: relative;
@@ -105,6 +114,23 @@
             width: 100%;
             height: 100%;
             box-sizing: border-box;
+        }
+        .cp-field-rot-p1 {
+            width: 100%;
+            height: min(86vh, 920px);
+            transform: none;
+            transform-origin: center center;
+        }
+        .cp-field-rot-p1 .cp-field {
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+        }
+        .cp-panel-play.cp-local-seat-p2 .cp-field-rot-p2 {
+            transform: none;
+        }
+        .cp-panel-play.cp-local-seat-p2 .cp-field-rot-p1 {
+            transform: rotate(180deg);
         }
         .cp-field-label {
             position: absolute; top: 12px; left: 16px; font-size: 11px; text-transform: uppercase;
@@ -331,9 +357,18 @@
                     <button type="button" class="cp-btn" id="cpClearField">Clear field</button>
                 </div>
                 <h2 style="margin-top:16px;">Play online</h2>
-                <p class="cp-muted" style="font-size:12px;margin-bottom:10px;">Realtime sync via <strong>Firebase</strong> (static site + Firestore). Put your web app keys in <code style="color:#93c5fd">firebase-config.js</code>, enable <strong>Anonymous</strong> sign-in and deploy <code style="color:#93c5fd">firestore.rules.example</code> rules. Both players need the <strong>same card library</strong> (same Saved projects cache / imports).</p>
+                <p class="cp-muted" style="font-size:12px;margin-bottom:10px;">Realtime sync via <strong>Firebase</strong>. Choose <strong>Player 1</strong> or <strong>Player 2</strong> before Connect — each seat controls only that side; as P2 your board is shown upright at the bottom. Same library for both players. Keys in <code style="color:#93c5fd">firebase-config.js</code>; Anonymous auth + <code style="color:#93c5fd">firestore.rules.example</code> rules.</p>
                 <div class="cp-actions" style="align-items:center;">
                     <input type="text" class="cp-firebase-room" id="cpRoomId" placeholder="Room name (e.g. friday-game)" maxlength="48" autocomplete="off" aria-label="Room name" />
+                </div>
+                <p class="cp-muted" style="font-size:12px;margin-bottom:6px;">Seat (before Connect)</p>
+                <div class="cp-actions" style="align-items:center;gap:14px;margin-bottom:4px;" role="group" aria-label="Player seat">
+                    <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+                        <input type="radio" name="cpMultiplayerSeat" id="cpSeatP1" value="1" checked /> Player 1
+                    </label>
+                    <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+                        <input type="radio" name="cpMultiplayerSeat" id="cpSeatP2" value="2" /> Player 2
+                    </label>
                 </div>
                 <div class="cp-actions">
                     <button type="button" class="cp-btn cp-btn-primary" id="cpFirebaseConnect">Connect</button>
@@ -368,19 +403,21 @@
                     </div>
                     <div class="cp-field-wrap cp-field-wrap--p1">
                         <span class="cp-field-label">Player 1 · commander top right · click deck → hand · drag → field</span>
-                        <div class="cp-field" id="cpPlayingField" aria-label="Playing field">
-                            <div class="cp-commander-zone" id="cpCommanderZone" title="Commander — set from the sidebar; drag your commander here to dock">
-                                <span class="cp-zone-label">Commander</span>
-                            </div>
-                            <div class="cp-hand-zone" id="cpHandZone" title="Hand — cards drawn by clicking the deck">
-                                <span class="cp-zone-label">Hand</span>
-                            </div>
-                            <div class="cp-draw-zone" id="cpDrawZone" title="Click to draw to hand. Drag out to place on the field. Drop a card here to return to the deck.">
-                                <span class="cp-zone-label">Deck</span>
-                                <span class="cp-zone-count" id="cpDeckCountZone">0</span>
-                            </div>
-                            <div class="cp-discard-zone" id="cpDiscardZone" title="Discard — drop cards here face up">
-                                <span class="cp-zone-label">Discard</span>
+                        <div class="cp-field-rot-p1">
+                            <div class="cp-field" id="cpPlayingField" aria-label="Playing field">
+                                <div class="cp-commander-zone" id="cpCommanderZone" title="Commander — set from the sidebar; drag your commander here to dock">
+                                    <span class="cp-zone-label">Commander</span>
+                                </div>
+                                <div class="cp-hand-zone" id="cpHandZone" title="Hand — cards drawn by clicking the deck">
+                                    <span class="cp-zone-label">Hand</span>
+                                </div>
+                                <div class="cp-draw-zone" id="cpDrawZone" title="Click to draw to hand. Drag out to place on the field. Drop a card here to return to the deck.">
+                                    <span class="cp-zone-label">Deck</span>
+                                    <span class="cp-zone-count" id="cpDeckCountZone">0</span>
+                                </div>
+                                <div class="cp-discard-zone" id="cpDiscardZone" title="Discard — drop cards here face up">
+                                    <span class="cp-zone-label">Discard</span>
+                                </div>
                             </div>
                         </div>
                         <div class="cp-deck-drag-ghost" id="cpDeckDragGhost" aria-hidden="true"></div>
@@ -533,6 +570,43 @@
     var firebaseMultiplayerUnsub = null;
     var firebaseMultiplayerDbRef = null;
     var firebaseMultiplayerPushTimer = null;
+    /** 1, 2, or null when not in a Firebase seat */
+    var localMultiplayerSeat = null;
+
+    function getSelectedMultiplayerSeat() {
+        var r = document.querySelector('input[name="cpMultiplayerSeat"]:checked');
+        if (!r) return 1;
+        var n = parseInt(String(r.value), 10);
+        return n === 2 ? 2 : 1;
+    }
+
+    function isFirebaseSeatLocked() {
+        return !!(firebaseMultiplayerDbRef && localMultiplayerSeat);
+    }
+
+    function canEditBoard(board) {
+        if (!board) return true;
+        if (!isFirebaseSeatLocked()) return true;
+        if (localMultiplayerSeat === 1) return board.id === 'p1';
+        if (localMultiplayerSeat === 2) return board.id === 'p2';
+        return true;
+    }
+
+    function applyMultiplayerSeatUi() {
+        var panel = document.querySelector('.cp-panel-play');
+        if (panel) panel.classList.toggle('cp-local-seat-p2', localMultiplayerSeat === 2);
+        var wrapP1 = document.querySelector('.cp-field-wrap--p1');
+        var wrapP2 = document.querySelector('.cp-field-wrap--p2');
+        if (wrapP1) wrapP1.classList.toggle('cp-board-readonly', localMultiplayerSeat === 2);
+        if (wrapP2) wrapP2.classList.toggle('cp-board-readonly', localMultiplayerSeat === 1);
+    }
+
+    function setSeatRadiosDisabled(disabled) {
+        var a = document.getElementById('cpSeatP1');
+        var b = document.getElementById('cpSeatP2');
+        if (a) a.disabled = !!disabled;
+        if (b) b.disabled = !!disabled;
+    }
 
     function newCpInstanceId() {
         return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 11);
@@ -627,7 +701,11 @@
         var n = allCards().length;
         cpStatLibrary.textContent = 'Library: ' + n + (n ? '' : ' (open Saved projects to cache cards)');
         cpStatDeck.textContent = 'Deck P1: ' + deck.length + ' · P2: ' + deckP2.length;
-        cpDraw.disabled = deck.length === 0;
+        if (localMultiplayerSeat === 2) {
+            cpDraw.disabled = deckP2.length === 0;
+        } else {
+            cpDraw.disabled = deck.length === 0;
+        }
         if (cpDeckCountZone) cpDeckCountZone.textContent = String(deck.length);
         if (cpDeckCountZoneP2) cpDeckCountZoneP2.textContent = String(deckP2.length);
     }
@@ -694,6 +772,7 @@
 
     function drawCardToFieldAt(clientX, clientY, board) {
         board = board || boardP1;
+        if (!canEditBoard(board)) return;
         if (board.deck.length === 0) return;
         var card = board.deck.pop();
         updateStats();
@@ -875,29 +954,61 @@
             var k;
             for (k = 0; k < n; k++) next.push(c);
         });
-        deck = next;
-        deckP2 = deck.slice();
-        setStatus('Deck: ' + deck.length + ' cards (from builder quantities). P2 deck copied.');
+        if (localMultiplayerSeat === 2) {
+            deckP2 = next;
+            setStatus('Deck (P2): ' + deckP2.length + ' cards from builder quantities.');
+        } else if (localMultiplayerSeat === 1) {
+            deck = next;
+            setStatus('Deck (P1): ' + deck.length + ' cards from builder quantities.');
+        } else {
+            deck = next;
+            deckP2 = deck.slice();
+            setStatus('Deck: ' + deck.length + ' cards (from builder quantities). P2 deck copied.');
+        }
         updateStats();
         scheduleMultiplayerPush();
     }
 
     function useAllAsDeck() {
-        deck = allCards().slice();
-        deckP2 = deck.slice();
-        setStatus('Deck: all ' + deck.length + ' cards (both players).');
+        if (localMultiplayerSeat === 2) {
+            deckP2 = allCards().slice();
+            setStatus('Deck (P2): all ' + deckP2.length + ' cards from library.');
+        } else if (localMultiplayerSeat === 1) {
+            deck = allCards().slice();
+            setStatus('Deck (P1): all ' + deck.length + ' cards from library.');
+        } else {
+            deck = allCards().slice();
+            deckP2 = deck.slice();
+            setStatus('Deck: all ' + deck.length + ' cards (both players).');
+        }
         updateStats();
         scheduleMultiplayerPush();
     }
 
     function shuffleDeck() {
-        if (deck.length === 0) {
-            setStatus('Deck is empty. Build a deck first.');
-            return;
+        if (localMultiplayerSeat === 2) {
+            if (deckP2.length === 0) {
+                setStatus('Player 2 deck is empty. Build a deck first.');
+                return;
+            }
+            shuffleInPlace(deckP2);
+            setStatus('Shuffled P2 deck (' + deckP2.length + ').');
+        } else if (localMultiplayerSeat === 1) {
+            if (deck.length === 0) {
+                setStatus('Player 1 deck is empty. Build a deck first.');
+                return;
+            }
+            shuffleInPlace(deck);
+            setStatus('Shuffled P1 deck (' + deck.length + ').');
+        } else {
+            if (deck.length === 0) {
+                setStatus('Deck is empty. Build a deck first.');
+                return;
+            }
+            shuffleInPlace(deck);
+            if (deckP2.length > 0) shuffleInPlace(deckP2);
+            setStatus('Shuffled P1 (' + deck.length + '). P2: ' + deckP2.length + ' cards.');
         }
-        shuffleInPlace(deck);
-        if (deckP2.length > 0) shuffleInPlace(deckP2);
-        setStatus('Shuffled P1 (' + deck.length + '). P2: ' + deckP2.length + ' cards.');
         scheduleMultiplayerPush();
     }
 
@@ -907,6 +1018,7 @@
         var startX = 0, startY = 0, origLeft = 0, origTop = 0;
         function down(ev) {
             if (ev.button !== 0) return;
+            if (!canEditBoard(board)) return;
             dragging = true;
             startX = ev.clientX;
             startY = ev.clientY;
@@ -1019,6 +1131,7 @@
         }
         board.drawZone.addEventListener('pointerdown', function (ev) {
             if (ev.button !== 0) return;
+            if (!canEditBoard(board)) return;
             if (board.deck.length === 0) {
                 setStatus(board.id === 'p2' ? 'Player 2 deck is empty — build a deck in the sidebar.' : 'Deck is empty — build a deck in the sidebar.');
                 return;
@@ -1039,6 +1152,7 @@
         wrap._cpRotationDeg = 0;
         wrap.addEventListener('contextmenu', function (ev) {
             ev.preventDefault();
+            if (!canEditBoard(wrap._cpBoard)) return;
             wrap._cpRotationDeg = (wrap._cpRotationDeg + 90) % 360;
             rotLayer.style.transform = 'rotate(' + wrap._cpRotationDeg + 'deg)';
             scheduleMultiplayerPush();
@@ -1058,6 +1172,7 @@
         wrap.addEventListener('auxclick', function (ev) {
             if (ev.button !== 1) return;
             ev.preventDefault();
+            if (!canEditBoard(wrap._cpBoard)) return;
             wrap._cpShowingBack = !wrap._cpShowingBack;
             flipInner.classList.toggle('cp-flip-inner--back', wrap._cpShowingBack);
             scheduleMultiplayerPush();
@@ -1291,6 +1406,7 @@
 
     function drawCardToHand(board) {
         board = board || boardP1;
+        if (!canEditBoard(board)) return;
         if (board.deck.length === 0) {
             setStatus(board.id === 'p2' ? 'Player 2 deck is empty — build a deck first.' : 'Deck is empty — build a deck first.');
             return;
@@ -1326,13 +1442,15 @@
     }
 
     function drawOne() {
-        if (deck.length === 0) return;
-        var card = deck.pop();
+        var board = localMultiplayerSeat === 2 ? boardP2 : boardP1;
+        var pile = board === boardP2 ? deckP2 : deck;
+        if (pile.length === 0) return;
+        var card = pile.pop();
         updateStats();
         setStatus('Rendering card…');
         var p = window.renderCardMakerProjectToDataUrl(card.state);
         if (!p || typeof p.then !== 'function') {
-            deck.push(card);
+            pile.push(card);
             updateStats();
             setStatus('Renderer not available.');
             scheduleMultiplayerPush();
@@ -1340,18 +1458,18 @@
         }
         p.then(function (url) {
             if (!url) {
-                deck.push(card);
+                pile.push(card);
                 updateStats();
                 setStatus('Could not render card (check images / CORS).');
                 scheduleMultiplayerPush();
                 return;
             }
-            var wrap = placeCardOnField(url, card, undefined, undefined, boardP1);
-            if (wrap) snapCardToDiscardIfInside(wrap, boardP1);
-            setStatus('Drew: ' + cardTitleFromState(card.state) + ' · ' + deck.length + ' left in deck.');
+            var wrap = placeCardOnField(url, card, undefined, undefined, board);
+            if (wrap) snapCardToDiscardIfInside(wrap, board);
+            setStatus('Drew: ' + cardTitleFromState(card.state) + ' · P' + (board.id === 'p2' ? '2' : '1') + ' · ' + pile.length + ' left in deck.');
             scheduleMultiplayerPush();
         }).catch(function () {
-            deck.push(card);
+            pile.push(card);
             updateStats();
             setStatus('Render failed.');
             scheduleMultiplayerPush();
@@ -1359,46 +1477,101 @@
     }
 
     function clearField() {
-        boards.forEach(function (b) {
+        if (isFirebaseSeatLocked()) {
+            var b = localMultiplayerSeat === 2 ? boardP2 : boardP1;
             b.field.querySelectorAll('.cp-card-on-field').forEach(function (el) {
                 el.remove();
             });
-        });
-        setStatus('Both fields cleared.');
+            setStatus('Your field cleared (P' + localMultiplayerSeat + ').');
+        } else {
+            boards.forEach(function (b) {
+                b.field.querySelectorAll('.cp-card-on-field').forEach(function (el) {
+                    el.remove();
+                });
+            });
+            setStatus('Both fields cleared.');
+        }
         syncCommanderToPlayingField();
         scheduleMultiplayerPush();
     }
 
-    function serializePlayStateForFirestore() {
+    function serializeBoardCardsForFirestore(board) {
         var cards = [];
-        boards.forEach(function (board) {
-            board.field.querySelectorAll('.cp-card-on-field').forEach(function (w) {
-                var libId = w.getAttribute('data-cp-card-lib-id') || '';
-                if (!libId && w.getAttribute('data-cp-commander') === '1' && commanderCard) {
-                    libId = commanderCard.id;
-                }
-                cards.push({
-                    i: w.getAttribute('data-cp-instance-id') || '',
-                    lib: libId,
-                    b: board.id,
-                    l: parseFloat(w.style.left) || 0,
-                    t: parseFloat(w.style.top) || 0,
-                    h: w.classList.contains('cp-hand-card') ? 1 : 0,
-                    d: w.getAttribute('data-cp-discard') === '1' ? 1 : 0,
-                    cz: w.getAttribute('data-cp-commander') === '1' ? 1 : 0,
-                    czIn: w.getAttribute('data-cp-commander-in-zone') === '1' ? 1 : 0,
-                    rot: w._cpRotationDeg || 0,
-                    back: w._cpShowingBack ? 1 : 0,
-                    fromDeck: w._cpDeckEntry ? 1 : 0
-                });
+        if (!board || !board.field) return cards;
+        board.field.querySelectorAll('.cp-card-on-field').forEach(function (w) {
+            var libId = w.getAttribute('data-cp-card-lib-id') || '';
+            if (!libId && w.getAttribute('data-cp-commander') === '1' && commanderCard) {
+                libId = commanderCard.id;
+            }
+            cards.push({
+                i: w.getAttribute('data-cp-instance-id') || '',
+                lib: libId,
+                b: board.id,
+                l: parseFloat(w.style.left) || 0,
+                t: parseFloat(w.style.top) || 0,
+                h: w.classList.contains('cp-hand-card') ? 1 : 0,
+                d: w.getAttribute('data-cp-discard') === '1' ? 1 : 0,
+                cz: w.getAttribute('data-cp-commander') === '1' ? 1 : 0,
+                czIn: w.getAttribute('data-cp-commander-in-zone') === '1' ? 1 : 0,
+                rot: w._cpRotationDeg || 0,
+                back: w._cpShowingBack ? 1 : 0,
+                fromDeck: w._cpDeckEntry ? 1 : 0
             });
         });
+        return cards;
+    }
+
+    function serializeSharedFirestorePayload() {
         return {
-            v: 1,
-            commanderId: commanderCard && commanderCard.id ? commanderCard.id : '',
+            commanderId: commanderCard && commanderCard.id ? commanderCard.id : ''
+        };
+    }
+
+    function serializeP1FirestoreSlice() {
+        return {
             deckIds: deck.map(function (x) { return x.id; }),
-            deckP2Ids: deckP2.map(function (x) { return x.id; }),
-            cards: cards
+            cards: serializeBoardCardsForFirestore(boardP1)
+        };
+    }
+
+    function serializeP2FirestoreSlice() {
+        return {
+            deckIds: deckP2.map(function (x) { return x.id; }),
+            cards: serializeBoardCardsForFirestore(boardP2)
+        };
+    }
+
+    /** Full v2 document for first write in a transaction (both seats + both boards). */
+    function buildFreshV2RoomDoc(seat, uid) {
+        var doc = {
+            v: 2,
+            shared: serializeSharedFirestorePayload(),
+            p1: serializeP1FirestoreSlice(),
+            p2: serializeP2FirestoreSlice(),
+            seat1Uid: '',
+            seat2Uid: ''
+        };
+        if (seat === 1) doc.seat1Uid = uid;
+        else doc.seat2Uid = uid;
+        return doc;
+    }
+
+    function v1RoomDataToV2MergePayload(data) {
+        data = data || {};
+        var cards = data.cards || [];
+        var p1Cards = [];
+        var p2Cards = [];
+        cards.forEach(function (e) {
+            if (e && e.b === 'p2') p2Cards.push(e);
+            else p1Cards.push(e);
+        });
+        return {
+            v: 2,
+            shared: { commanderId: data.commanderId || '' },
+            p1: { deckIds: data.deckIds || [], cards: p1Cards },
+            p2: { deckIds: data.deckP2Ids || [], cards: p2Cards },
+            seat1Uid: data.seat1Uid || '',
+            seat2Uid: data.seat2Uid || ''
         };
     }
 
@@ -1429,14 +1602,65 @@
         });
     }
 
+    function applyOnePlayerSliceFromFirestore(slice, board, deckArr) {
+        if (!slice || typeof slice !== 'object') return Promise.resolve();
+        deckArr.length = 0;
+        (slice.deckIds || []).forEach(function (id) {
+            var c = cardById(id);
+            if (c) deckArr.push(c);
+        });
+        if (!board || !board.field) return Promise.resolve();
+        board.field.querySelectorAll('.cp-card-on-field').forEach(function (el) {
+            el.remove();
+        });
+        var entries = slice.cards || [];
+        var chain = Promise.resolve();
+        entries.forEach(function (entry) {
+            chain = chain.then(function () {
+                return restoreOneCardFromFirestoreEntry(entry);
+            });
+        });
+        return chain;
+    }
+
     function applyPlayStateFromFirestorePayload(d) {
         return new Promise(function (resolve) {
-            if (!d || d.v !== 1) {
+            if (!d) {
                 resolve();
                 return;
             }
-            var cmdId = d.commanderId || '';
-            commanderCard = cmdId ? cardById(cmdId) : null;
+            var hasP1Key = Object.prototype.hasOwnProperty.call(d, 'p1');
+            var hasP2Key = Object.prototype.hasOwnProperty.call(d, 'p2');
+            if (d.v === 2 && (hasP1Key || hasP2Key)) {
+                var cmdId = (d.shared && d.shared.commanderId) || '';
+                commanderCard = cmdId ? cardById(cmdId) : null;
+                persistCommanderId();
+                updateCommanderUi();
+                var p1 = hasP1Key ? d.p1 : { deckIds: [], cards: [] };
+                var p2 = hasP2Key ? d.p2 : { deckIds: [], cards: [] };
+                if (!p1 || typeof p1 !== 'object') p1 = { deckIds: [], cards: [] };
+                if (!p2 || typeof p2 !== 'object') p2 = { deckIds: [], cards: [] };
+                var chain = applyOnePlayerSliceFromFirestore(p1, boardP1, deck)
+                    .then(function () {
+                        return applyOnePlayerSliceFromFirestore(p2, boardP2, deckP2);
+                    });
+                chain.then(function () {
+                    updateStats();
+                    relayoutHandCards();
+                    relayoutDiscardPile();
+                    relayoutCommanderZone();
+                    resolve();
+                }).catch(function () {
+                    resolve();
+                });
+                return;
+            }
+            if (d.v !== 1 && !(d.v === 2 && (d.deckIds || d.cards))) {
+                resolve();
+                return;
+            }
+            var cmdIdLegacy = (d.shared && d.shared.commanderId) || d.commanderId || '';
+            commanderCard = cmdIdLegacy ? cardById(cmdIdLegacy) : null;
             persistCommanderId();
             updateCommanderUi();
             deck.length = 0;
@@ -1481,9 +1705,20 @@
             if (applyingRemoteFirestoreSync || !firebaseMultiplayerDbRef) return;
             try {
                 var auth = firebase.auth();
-                var payload = serializePlayStateForFirestore();
+                var uid = auth.currentUser ? auth.currentUser.uid : '';
+                var payload = { v: 2, shared: serializeSharedFirestorePayload() };
                 payload.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
-                payload.updatedBy = auth.currentUser ? auth.currentUser.uid : '';
+                payload.updatedBy = uid;
+                if (localMultiplayerSeat === 1) {
+                    payload.p1 = serializeP1FirestoreSlice();
+                    payload.seat1Uid = uid;
+                } else if (localMultiplayerSeat === 2) {
+                    payload.p2 = serializeP2FirestoreSlice();
+                    payload.seat2Uid = uid;
+                } else {
+                    payload.p1 = serializeP1FirestoreSlice();
+                    payload.p2 = serializeP2FirestoreSlice();
+                }
                 firebaseMultiplayerDbRef.set(payload, { merge: true });
             } catch (e) {
                 console.error(e);
@@ -1496,14 +1731,31 @@
     }
 
     function disconnectFirebaseMultiplayer() {
+        var ref = firebaseMultiplayerDbRef;
+        var seat = localMultiplayerSeat;
         if (firebaseMultiplayerUnsub) {
             firebaseMultiplayerUnsub();
             firebaseMultiplayerUnsub = null;
         }
         firebaseMultiplayerDbRef = null;
+        localMultiplayerSeat = null;
+        applyMultiplayerSeatUi();
+        setSeatRadiosDisabled(false);
         if (firebaseMultiplayerPushTimer) {
             clearTimeout(firebaseMultiplayerPushTimer);
             firebaseMultiplayerPushTimer = null;
+        }
+        if (ref && seat && window.firebase) {
+            try {
+                var auth = firebase.auth();
+                var uid = auth.currentUser ? auth.currentUser.uid : '';
+                var upd = {};
+                if (uid) {
+                    if (seat === 1) upd.seat1Uid = firebase.firestore.FieldValue.delete();
+                    if (seat === 2) upd.seat2Uid = firebase.firestore.FieldValue.delete();
+                }
+                if (Object.keys(upd).length) ref.update(upd).catch(function () {});
+            } catch (e) {}
         }
         var btnC = document.getElementById('cpFirebaseConnect');
         var btnD = document.getElementById('cpFirebaseDisconnect');
@@ -1512,7 +1764,8 @@
         if (btnC) btnC.disabled = false;
         if (btnD) btnD.disabled = true;
         if (roomInp) roomInp.disabled = false;
-        if (st) st.textContent = 'Offline';
+        if (st) st.textContent = 'Ready — enter a room name and Connect';
+        updateStats();
     }
 
     function initCardPlayerFirebaseMultiplayer() {
@@ -1561,41 +1814,81 @@
                 return;
             }
             if (statusEl) statusEl.textContent = 'Connecting…';
+            var chosenSeat = getSelectedMultiplayerSeat();
             auth.signInAnonymously().then(function () {
                 var ref = db.collection('cardPlayerRooms').doc(rid);
-                firebaseMultiplayerDbRef = ref;
-                if (firebaseMultiplayerUnsub) {
-                    firebaseMultiplayerUnsub();
-                    firebaseMultiplayerUnsub = null;
-                }
-                firebaseMultiplayerUnsub = ref.onSnapshot(function (snap) {
-                    if (!snap.exists) {
+                var uid = auth.currentUser.uid;
+                var seatKey = chosenSeat === 1 ? 'seat1Uid' : 'seat2Uid';
+                return db.runTransaction(function (transaction) {
+                    return transaction.get(ref).then(function (doc) {
+                        if (!doc.exists) {
+                            transaction.set(ref, buildFreshV2RoomDoc(chosenSeat, uid));
+                            return;
+                        }
+                        var data = doc.data() || {};
+                        var taken = data[seatKey];
+                        if (taken && taken !== uid) {
+                            throw { code: 'SEAT_TAKEN', message: 'That seat is taken. Pick the other player or another room.' };
+                        }
+                        var hasP1 = Object.prototype.hasOwnProperty.call(data, 'p1');
+                        var hasP2 = Object.prototype.hasOwnProperty.call(data, 'p2');
+                        var isLegacy = data.v === 1 || (data.cards != null && !hasP1 && !hasP2);
+                        if (isLegacy) {
+                            var migrated = v1RoomDataToV2MergePayload(data);
+                            migrated[seatKey] = uid;
+                            transaction.set(ref, migrated, { merge: true });
+                            return;
+                        }
+                        var claim = { v: 2 };
+                        claim[seatKey] = uid;
+                        transaction.set(ref, claim, { merge: true });
+                    });
+                }).then(function () {
+                    localMultiplayerSeat = chosenSeat;
+                    applyMultiplayerSeatUi();
+                    setSeatRadiosDisabled(true);
+                    firebaseMultiplayerDbRef = ref;
+                    if (firebaseMultiplayerUnsub) {
+                        firebaseMultiplayerUnsub();
+                        firebaseMultiplayerUnsub = null;
+                    }
+                    firebaseMultiplayerUnsub = ref.onSnapshot(function (snap) {
+                        if (!snap.exists) {
+                            applyingRemoteFirestoreSync = true;
+                            ref.set(buildFreshV2RoomDoc(localMultiplayerSeat, uid), { merge: true }).then(function () {
+                                applyingRemoteFirestoreSync = false;
+                            }).catch(function () {
+                                applyingRemoteFirestoreSync = false;
+                            });
+                            return;
+                        }
+                        if (snap.metadata.hasPendingWrites) return;
+                        var dat = snap.data();
+                        if (!dat || (dat.v !== 1 && dat.v !== 2)) return;
                         applyingRemoteFirestoreSync = true;
-                        var initial = serializePlayStateForFirestore();
-                        initial.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
-                        initial.updatedBy = auth.currentUser ? auth.currentUser.uid : '';
-                        ref.set(initial, { merge: true }).then(function () {
+                        applyPlayStateFromFirestorePayload(dat).then(function () {
                             applyingRemoteFirestoreSync = false;
                         }).catch(function () {
                             applyingRemoteFirestoreSync = false;
                         });
+                    });
+                    setConnUi(true);
+                    if (statusEl) statusEl.textContent = 'Room “' + rid + '” — you are P' + chosenSeat + ' · live sync';
+                    scheduleMultiplayerPush();
+                }).catch(function (err) {
+                    firebaseMultiplayerDbRef = null;
+                    localMultiplayerSeat = null;
+                    applyMultiplayerSeatUi();
+                    setSeatRadiosDisabled(false);
+                    if (err && err.code === 'SEAT_TAKEN') {
+                        var sm = err.message || 'That seat is taken. Pick the other player or another room.';
+                        if (statusEl) statusEl.textContent = sm;
+                        setStatus(sm);
                         return;
                     }
-                    if (snap.metadata.hasPendingWrites) return;
-                    var dat = snap.data();
-                    if (!dat || dat.v !== 1) return;
-                    applyingRemoteFirestoreSync = true;
-                    applyPlayStateFromFirestorePayload(dat).then(function () {
-                        applyingRemoteFirestoreSync = false;
-                    }).catch(function () {
-                        applyingRemoteFirestoreSync = false;
-                    });
+                    if (statusEl) statusEl.textContent = 'Firebase: ' + (err && err.message ? err.message : String(err));
                 });
-                setConnUi(true);
-                if (statusEl) statusEl.textContent = 'Room “' + rid + '” — live sync';
-                scheduleMultiplayerPush();
             }).catch(function (err) {
-                firebaseMultiplayerDbRef = null;
                 if (statusEl) statusEl.textContent = 'Firebase: ' + (err.message || String(err));
             });
         });
