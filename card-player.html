@@ -178,12 +178,7 @@
         .cp-card-on-field.cp-card-enlarged[data-cp-opponent-hand="1"] .cp-flip-inner.cp-flip-inner--back {
             transform: rotateY(0deg);
         }
-        /* Opponent playmat lives in a 180°-rotated wrapper — un-rotate hover preview so text reads normally */
-        .cp-board-readonly .cp-card-on-field.cp-card-enlarged {
-            transform: translate(var(--cp-enlarge-dx, 0px), calc(var(--cp-enlarge-dy, 0px) + var(--cp-enlarge-shift, 0px))) rotate(180deg);
-            transform-origin: center center;
-            transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1), filter 0.28s ease;
-        }
+        /* Opponent mat: hover preview is a fixed overlay (#cpOpponentPreviewPop), not in-place enlarge. */
         /* Same footprint as P1’s field; inner layer is rotated 180° like sitting across the table. */
         .cp-field-wrap--p2 {
             position: relative;
@@ -369,10 +364,6 @@
             transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1), filter 0.28s ease,
                 left 0.42s cubic-bezier(0.25, 0.85, 0.22, 1), top 0.42s cubic-bezier(0.25, 0.85, 0.22, 1);
         }
-        .cp-board-readonly .cp-card-on-field.cp-card-enlarged.cp-card-sync-move {
-            transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1), filter 0.28s ease,
-                left 0.42s cubic-bezier(0.25, 0.85, 0.22, 1), top 0.42s cubic-bezier(0.25, 0.85, 0.22, 1);
-        }
         .cp-card-on-field.cp-hand-card.cp-card-enlarged {
             width: min(375px, 78vw) !important;
         }
@@ -445,8 +436,45 @@
             .cp-card-on-field.cp-hand-card.cp-card-enlarged {
                 width: min(76px, 10.5vw) !important;
             }
-            .cp-board-readonly .cp-card-on-field.cp-card-enlarged {
-                transform: none;
+        }
+        /* Fixed full-viewport layer: opponent card preview (pointer-events none — card underneath keeps hover). */
+        #cpOpponentPreviewPop {
+            position: fixed;
+            z-index: 200000;
+            left: 0;
+            top: 0;
+            max-width: min(300px, 68vw);
+            width: min(300px, 68vw);
+            pointer-events: none;
+            border-radius: 12px;
+            box-shadow: 0 24px 56px rgba(0, 0, 0, 0.6);
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.94);
+            transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.25, 0.85, 0.22, 1);
+            will-change: opacity, transform;
+        }
+        #cpOpponentPreviewPop.cp-opponent-preview-pop--visible {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        #cpOpponentPreviewPop img {
+            display: block;
+            width: 100%;
+            height: auto;
+            max-height: min(calc(100vh - 40px), 82vh);
+            border-radius: 12px;
+            object-fit: contain;
+        }
+        @media (max-width: 640px) {
+            #cpOpponentPreviewPop {
+                max-width: min(248px, 78vw);
+                width: min(248px, 78vw);
+            }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            #cpOpponentPreviewPop {
+                transition: none;
+                transform: translate(-50%, -50%) scale(1);
             }
         }
         .cp-status { margin-top: 10px; font-size: 12px; color: #93c5fd; min-height: 1.25em; }
@@ -934,6 +962,170 @@
         }
     }
 
+    var cpAudioCtx = null;
+    /** Cached mono noise buffer for flip SFX (sample-rate specific). */
+    var cpFlipNoiseBuffer = null;
+
+    function cpEnsureAudioCtx() {
+        if (cpAudioCtx) return cpAudioCtx;
+        try {
+            var AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return null;
+            cpAudioCtx = new AC();
+        } catch (e) {
+            return null;
+        }
+        return cpAudioCtx;
+    }
+
+    /** Field-style placement thump (all card SFX use this). Muted when reduced motion is preferred. */
+    function cpPlaySfx() {
+        if (cpPrefersReducedMotion()) return;
+        var ctx = cpEnsureAudioCtx();
+        if (!ctx) return;
+        if (ctx.state === 'suspended') {
+            ctx.resume().catch(function () {});
+        }
+
+        var now = ctx.currentTime;
+        var master = ctx.createGain();
+        master.connect(ctx.destination);
+
+        function env(g, peak, attack, decay, peakT) {
+            g.gain.setValueAtTime(0.0001, now);
+            g.gain.linearRampToValueAtTime(peak, now + attack);
+            g.gain.exponentialRampToValueAtTime(0.0001, now + peakT + decay);
+        }
+
+        var th = ctx.createOscillator();
+        th.type = 'triangle';
+        th.frequency.setValueAtTime(175, now);
+        th.frequency.exponentialRampToValueAtTime(88, now + 0.07);
+        env(master, 0.32, 0.006, 0.1, 0.02);
+        th.connect(master);
+        th.start(now);
+        th.stop(now + 0.14);
+        var hi = ctx.createOscillator();
+        hi.type = 'sine';
+        hi.frequency.setValueAtTime(420, now);
+        var gHi = ctx.createGain();
+        env(gHi, 0.09, 0.004, 0.06, 0.01);
+        hi.connect(gHi);
+        gHi.connect(ctx.destination);
+        hi.start(now);
+        hi.stop(now + 0.11);
+    }
+
+    function cpGetFlipNoiseBuffer(ctx) {
+        if (cpFlipNoiseBuffer && cpFlipNoiseBuffer.sampleRate === ctx.sampleRate) return cpFlipNoiseBuffer;
+        var dur = 0.26;
+        var len = Math.ceil(ctx.sampleRate * dur);
+        var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        var ch = buf.getChannelData(0);
+        for (var i = 0; i < len; i++) {
+            ch[i] = (Math.random() * 2 - 1) * (1 - (i / len) * 0.25);
+        }
+        cpFlipNoiseBuffer = buf;
+        return buf;
+    }
+
+    /** Paper-like flip: filtered noise whoosh + short edge “catch”. */
+    function cpPlayFlipSfx() {
+        if (cpPrefersReducedMotion()) return;
+        var ctx = cpEnsureAudioCtx();
+        if (!ctx) return;
+        if (ctx.state === 'suspended') {
+            ctx.resume().catch(function () {});
+        }
+
+        var now = ctx.currentTime;
+        var nSrc = ctx.createBufferSource();
+        nSrc.buffer = cpGetFlipNoiseBuffer(ctx);
+        var bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.Q.setValueAtTime(6, now);
+        bp.frequency.setValueAtTime(320, now);
+        bp.frequency.exponentialRampToValueAtTime(3200, now + 0.09);
+        bp.frequency.exponentialRampToValueAtTime(480, now + 0.2);
+        var gN = ctx.createGain();
+        gN.gain.setValueAtTime(0.0001, now);
+        gN.gain.linearRampToValueAtTime(0.16, now + 0.014);
+        gN.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+        nSrc.connect(bp);
+        bp.connect(gN);
+        gN.connect(ctx.destination);
+        nSrc.start(now);
+        nSrc.stop(now + 0.24);
+
+        var edge = ctx.createOscillator();
+        edge.type = 'sine';
+        edge.frequency.setValueAtTime(2100, now + 0.068);
+        edge.frequency.exponentialRampToValueAtTime(420, now + 0.1);
+        var gE = ctx.createGain();
+        gE.gain.setValueAtTime(0.0001, now + 0.065);
+        gE.gain.linearRampToValueAtTime(0.045, now + 0.072);
+        gE.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+        edge.connect(gE);
+        gE.connect(ctx.destination);
+        edge.start(now + 0.065);
+        edge.stop(now + 0.13);
+    }
+
+    /** Exhale / last-breath feel for the discard pile. */
+    function cpPlayDiscardSfx() {
+        if (cpPrefersReducedMotion()) return;
+        var ctx = cpEnsureAudioCtx();
+        if (!ctx) return;
+        if (ctx.state === 'suspended') {
+            ctx.resume().catch(function () {});
+        }
+
+        var now = ctx.currentTime;
+        var breath = ctx.createBufferSource();
+        breath.buffer = cpGetFlipNoiseBuffer(ctx);
+        breath.playbackRate.setValueAtTime(0.5, now);
+        var lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.Q.setValueAtTime(1.5, now);
+        lp.frequency.setValueAtTime(580, now);
+        lp.frequency.exponentialRampToValueAtTime(120, now + 0.4);
+        var gN = ctx.createGain();
+        gN.gain.setValueAtTime(0.0001, now);
+        gN.gain.linearRampToValueAtTime(0.4, now + 0.09);
+        gN.gain.exponentialRampToValueAtTime(0.0001, now + 0.48);
+        breath.connect(lp);
+        lp.connect(gN);
+        gN.connect(ctx.destination);
+        breath.start(now);
+        breath.stop(now + 0.52);
+
+        var moan = ctx.createOscillator();
+        moan.type = 'sine';
+        moan.frequency.setValueAtTime(198, now);
+        moan.frequency.exponentialRampToValueAtTime(68, now + 0.44);
+        var gM = ctx.createGain();
+        gM.gain.setValueAtTime(0.0001, now);
+        gM.gain.linearRampToValueAtTime(0.22, now + 0.07);
+        gM.gain.exponentialRampToValueAtTime(0.0001, now + 0.46);
+        moan.connect(gM);
+        gM.connect(ctx.destination);
+        moan.start(now);
+        moan.stop(now + 0.5);
+
+        var rasp = ctx.createOscillator();
+        rasp.type = 'triangle';
+        rasp.frequency.setValueAtTime(312, now);
+        rasp.frequency.exponentialRampToValueAtTime(95, now + 0.36);
+        var gR = ctx.createGain();
+        gR.gain.setValueAtTime(0.0001, now);
+        gR.gain.linearRampToValueAtTime(0.093, now + 0.05);
+        gR.gain.exponentialRampToValueAtTime(0.0001, now + 0.38);
+        rasp.connect(gR);
+        gR.connect(ctx.destination);
+        rasp.start(now + 0.02);
+        rasp.stop(now + 0.42);
+    }
+
     function firestoreEntriesAllHaveInstanceIds(entries) {
         if (!entries || entries.length === 0) return true;
         return entries.every(function (e) { return e && e.i; });
@@ -1344,6 +1536,7 @@
             wrap.setAttribute('data-cp-discard', '1');
             if (!wasDisc) {
                 wrap.setAttribute('data-cp-discard-order', String(nextDiscardStackSeq(board)));
+                cpPlayDiscardSfx();
             }
             relayoutDiscardPileBoard(board);
             return true;
@@ -1373,8 +1566,7 @@
                 scheduleMultiplayerPush();
                 return;
             }
-            spawnFieldCardFromDeck(board, url, card, x, y).then(function (wrap) {
-                if (wrap) snapCardToDiscardIfInside(wrap, board);
+            spawnFieldCardFromDeck(board, url, card, x, y).then(function () {
                 setStatus('Drew: ' + cardTitleFromState(card.state) + ' · P' + (board.id === 'p2' ? '2' : '1') + ' deck: ' + board.deck.length + ' left.');
                 scheduleMultiplayerPush();
             });
@@ -1612,171 +1804,190 @@
         function up(ev) {
             if (!dragging) return;
             dragging = false;
-            if (ev) {
-                var r = el.getBoundingClientRect();
-                var cx = (r.left + r.right) / 2;
-                var cy = (r.top + r.bottom) / 2;
-                if (pointInEl(cx, cy, board.drawZone) && el._cpDeckEntry) {
-                    var deckEntry = el._cpDeckEntry;
-                    function finishDeckReturn() {
-                        board.deck.push(deckEntry);
-                        el.remove();
-                        updateStats();
-                        scheduleMultiplayerPush();
-                    }
-                    if (cpPrefersReducedMotion()) {
-                        stripCardFromPlayZones(el);
-                        el.classList.remove('cp-hand-card');
-                        relayoutHandCardsBoard(board);
-                        relayoutDiscardPileBoard(board);
-                        relayoutCommanderZoneBoard(board);
-                        finishDeckReturn();
-                        return;
-                    }
+            if (!ev) return;
+            var handledSfx = false;
+            var posChanged = Math.abs(el.offsetLeft - origLeft) + Math.abs(el.offsetTop - origTop) > 2;
+            var r = el.getBoundingClientRect();
+            var cx = (r.left + r.right) / 2;
+            var cy = (r.top + r.bottom) / 2;
+            if (pointInEl(cx, cy, board.drawZone) && el._cpDeckEntry) {
+                var deckEntry = el._cpDeckEntry;
+                function finishDeckReturn() {
+                    board.deck.push(deckEntry);
+                    el.remove();
+                    updateStats();
+                    scheduleMultiplayerPush();
+                }
+                handledSfx = true;
+                cpPlaySfx();
+                if (cpPrefersReducedMotion()) {
                     stripCardFromPlayZones(el);
                     el.classList.remove('cp-hand-card');
                     relayoutHandCardsBoard(board);
                     relayoutDiscardPileBoard(board);
                     relayoutCommanderZoneBoard(board);
-                    var deckPos = deckDrawStartPosition(board);
-                    el.style.zIndex = '6400';
-                    animateOpponentCardLayout(el, deckPos.l, deckPos.t).then(function () {
-                        finishDeckReturn();
-                    });
+                    finishDeckReturn();
                     return;
                 }
-                if (pointInEl(cx, cy, board.discardZone)) {
-                    el.classList.remove('cp-hand-card');
-                    relayoutHandCardsBoard(board);
-                    var wasDiscEl = el.getAttribute('data-cp-discard') === '1';
-                    el.setAttribute('data-cp-discard', '1');
-                    if (!wasDiscEl) {
-                        el.setAttribute('data-cp-discard-order', String(nextDiscardStackSeq(board)));
-                    }
-                    if (cpPrefersReducedMotion()) {
-                        relayoutDiscardPileBoard(board);
-                        relayoutCommanderZoneBoard(board);
-                        scheduleMultiplayerPush();
-                        return;
-                    }
-                    var dItems = discardPileLayoutItems(board);
-                    var dTarget = null;
-                    for (var di = 0; di < dItems.length; di++) {
-                        if (dItems[di].w === el) {
-                            dTarget = dItems[di];
-                            break;
-                        }
-                    }
-                    if (!dTarget) {
-                        relayoutDiscardPileBoard(board);
-                        relayoutCommanderZoneBoard(board);
-                        scheduleMultiplayerPush();
-                        return;
-                    }
-                    dItems.forEach(function (it) {
-                        if (it.w !== el) {
-                            it.w.style.left = it.l + 'px';
-                            it.w.style.top = it.t + 'px';
-                            it.w.style.zIndex = String(it.z);
-                        }
-                    });
-                    el.style.zIndex = '6400';
-                    animateOpponentCardLayout(el, dTarget.l, dTarget.t, dTarget.z).then(function () {
-                        relayoutCommanderZoneBoard(board);
-                        scheduleMultiplayerPush();
-                    });
-                    return;
+                stripCardFromPlayZones(el);
+                el.classList.remove('cp-hand-card');
+                relayoutHandCardsBoard(board);
+                relayoutDiscardPileBoard(board);
+                relayoutCommanderZoneBoard(board);
+                var deckPos = deckDrawStartPosition(board);
+                el.style.zIndex = '6400';
+                animateOpponentCardLayout(el, deckPos.l, deckPos.t).then(function () {
+                    finishDeckReturn();
+                });
+                return;
+            }
+            if (pointInEl(cx, cy, board.discardZone)) {
+                el.classList.remove('cp-hand-card');
+                relayoutHandCardsBoard(board);
+                var wasDiscEl = el.getAttribute('data-cp-discard') === '1';
+                el.setAttribute('data-cp-discard', '1');
+                if (!wasDiscEl) {
+                    el.setAttribute('data-cp-discard-order', String(nextDiscardStackSeq(board)));
                 }
-                var wasHand = el.classList.contains('cp-hand-card');
-                var inHand = board.handZone && pointInEl(cx, cy, board.handZone);
-                if (wasHand && !inHand) {
-                    el.classList.remove('cp-hand-card');
-                    relayoutHandCardsBoard(board);
-                } else if (!wasHand && inHand) {
-                    el.classList.add('cp-hand-card');
-                    var leftDiscard = el.getAttribute('data-cp-discard') === '1';
-                    el.removeAttribute('data-cp-discard');
-                    el.removeAttribute('data-cp-discard-order');
-                    if (leftDiscard) relayoutDiscardPileBoard(board);
-                    if (cpPrefersReducedMotion()) {
-                        relayoutHandCardsBoard(board);
-                        relayoutDiscardPileBoard(board);
-                        relayoutCommanderZoneBoard(board);
-                        scheduleMultiplayerPush();
-                        return;
-                    }
-                    var hItems = handLayoutItems(board);
-                    var hTarget = null;
-                    for (var hi = 0; hi < hItems.length; hi++) {
-                        if (hItems[hi].w === el) {
-                            hTarget = hItems[hi];
-                            break;
-                        }
-                    }
-                    if (!hTarget) {
-                        relayoutHandCardsBoard(board);
-                        relayoutDiscardPileBoard(board);
-                        relayoutCommanderZoneBoard(board);
-                        scheduleMultiplayerPush();
-                        return;
-                    }
-                    hItems.forEach(function (it) {
-                        if (it.w !== el) {
-                            it.w.style.left = it.l + 'px';
-                            it.w.style.top = it.t + 'px';
-                            it.w.style.zIndex = String(it.z);
-                        }
-                    });
-                    el.style.zIndex = '6400';
-                    animateOpponentCardLayout(el, hTarget.l, hTarget.t, hTarget.z).then(function () {
-                        relayoutDiscardPileBoard(board);
-                        relayoutCommanderZoneBoard(board);
-                        scheduleMultiplayerPush();
-                    });
-                    return;
-                }
-                if (el.getAttribute('data-cp-discard') === '1' && !pointInEl(cx, cy, board.discardZone)) {
-                    el.removeAttribute('data-cp-discard');
-                    el.removeAttribute('data-cp-discard-order');
+                handledSfx = true;
+                if (cpPrefersReducedMotion()) {
+                    cpPlayDiscardSfx();
                     relayoutDiscardPileBoard(board);
                     relayoutCommanderZoneBoard(board);
+                    scheduleMultiplayerPush();
+                    return;
                 }
-                if (el.getAttribute('data-cp-commander') === '1' && el.getAttribute('data-cp-discard') !== '1') {
-                    if (board.commanderZone && pointInEl(cx, cy, board.commanderZone)) {
-                        el.setAttribute('data-cp-commander-in-zone', '1');
-                        el.classList.remove('cp-hand-card');
-                        relayoutHandCardsBoard(board);
-                        if (!cpPrefersReducedMotion()) {
-                            var cItems = commanderZoneLayoutItems(board);
-                            var cTarget = null;
-                            for (var cj = 0; cj < cItems.length; cj++) {
-                                if (cItems[cj].w === el) {
-                                    cTarget = cItems[cj];
-                                    break;
-                                }
-                            }
-                            if (cTarget) {
-                                cItems.forEach(function (it) {
-                                    if (it.w !== el) {
-                                        it.w.style.left = it.l + 'px';
-                                        it.w.style.top = it.t + 'px';
-                                        it.w.style.zIndex = String(it.z);
-                                    }
-                                });
-                                el.style.zIndex = '6400';
-                                animateOpponentCardLayout(el, cTarget.l, cTarget.t, cTarget.z).then(function () {
-                                    scheduleMultiplayerPush();
-                                });
-                                return;
+                var dItems = discardPileLayoutItems(board);
+                var dTarget = null;
+                for (var di = 0; di < dItems.length; di++) {
+                    if (dItems[di].w === el) {
+                        dTarget = dItems[di];
+                        break;
+                    }
+                }
+                if (!dTarget) {
+                    cpPlayDiscardSfx();
+                    relayoutDiscardPileBoard(board);
+                    relayoutCommanderZoneBoard(board);
+                    scheduleMultiplayerPush();
+                    return;
+                }
+                dItems.forEach(function (it) {
+                    if (it.w !== el) {
+                        it.w.style.left = it.l + 'px';
+                        it.w.style.top = it.t + 'px';
+                        it.w.style.zIndex = String(it.z);
+                    }
+                });
+                el.style.zIndex = '6400';
+                animateOpponentCardLayout(el, dTarget.l, dTarget.t, dTarget.z).then(function () {
+                    cpPlayDiscardSfx();
+                    relayoutCommanderZoneBoard(board);
+                    scheduleMultiplayerPush();
+                });
+                return;
+            }
+            var wasHand = el.classList.contains('cp-hand-card');
+            var inHand = board.handZone && pointInEl(cx, cy, board.handZone);
+            var droppedFromHandToField = false;
+            if (wasHand && !inHand) {
+                el.classList.remove('cp-hand-card');
+                relayoutHandCardsBoard(board);
+                handledSfx = true;
+                droppedFromHandToField = true;
+                cpPlaySfx();
+            } else if (!wasHand && inHand) {
+                el.classList.add('cp-hand-card');
+                var leftDiscard = el.getAttribute('data-cp-discard') === '1';
+                el.removeAttribute('data-cp-discard');
+                el.removeAttribute('data-cp-discard-order');
+                if (leftDiscard) relayoutDiscardPileBoard(board);
+                handledSfx = true;
+                if (cpPrefersReducedMotion()) {
+                    cpPlaySfx();
+                    relayoutHandCardsBoard(board);
+                    relayoutDiscardPileBoard(board);
+                    relayoutCommanderZoneBoard(board);
+                    scheduleMultiplayerPush();
+                    return;
+                }
+                var hItems = handLayoutItems(board);
+                var hTarget = null;
+                for (var hi = 0; hi < hItems.length; hi++) {
+                    if (hItems[hi].w === el) {
+                        hTarget = hItems[hi];
+                        break;
+                    }
+                }
+                if (!hTarget) {
+                    cpPlaySfx();
+                    relayoutHandCardsBoard(board);
+                    relayoutDiscardPileBoard(board);
+                    relayoutCommanderZoneBoard(board);
+                    scheduleMultiplayerPush();
+                    return;
+                }
+                hItems.forEach(function (it) {
+                    if (it.w !== el) {
+                        it.w.style.left = it.l + 'px';
+                        it.w.style.top = it.t + 'px';
+                        it.w.style.zIndex = String(it.z);
+                    }
+                });
+                el.style.zIndex = '6400';
+                animateOpponentCardLayout(el, hTarget.l, hTarget.t, hTarget.z).then(function () {
+                    cpPlaySfx();
+                    relayoutDiscardPileBoard(board);
+                    relayoutCommanderZoneBoard(board);
+                    scheduleMultiplayerPush();
+                });
+                return;
+            }
+            if (el.getAttribute('data-cp-discard') === '1' && !pointInEl(cx, cy, board.discardZone)) {
+                el.removeAttribute('data-cp-discard');
+                el.removeAttribute('data-cp-discard-order');
+                relayoutDiscardPileBoard(board);
+                relayoutCommanderZoneBoard(board);
+            }
+            if (el.getAttribute('data-cp-commander') === '1' && el.getAttribute('data-cp-discard') !== '1') {
+                if (board.commanderZone && pointInEl(cx, cy, board.commanderZone)) {
+                    el.setAttribute('data-cp-commander-in-zone', '1');
+                    el.classList.remove('cp-hand-card');
+                    relayoutHandCardsBoard(board);
+                    if (!cpPrefersReducedMotion()) {
+                        var cItems = commanderZoneLayoutItems(board);
+                        var cTarget = null;
+                        for (var cj = 0; cj < cItems.length; cj++) {
+                            if (cItems[cj].w === el) {
+                                cTarget = cItems[cj];
+                                break;
                             }
                         }
-                    } else {
-                        el.removeAttribute('data-cp-commander-in-zone');
+                        if (cTarget) {
+                            cItems.forEach(function (it) {
+                                if (it.w !== el) {
+                                    it.w.style.left = it.l + 'px';
+                                    it.w.style.top = it.t + 'px';
+                                    it.w.style.zIndex = String(it.z);
+                                }
+                            });
+                            el.style.zIndex = '6400';
+                            animateOpponentCardLayout(el, cTarget.l, cTarget.t, cTarget.z).then(function () {
+                                if (!droppedFromHandToField) cpPlaySfx();
+                                scheduleMultiplayerPush();
+                            });
+                            return;
+                        }
                     }
-                    relayoutCommanderZoneBoard(board);
+                    handledSfx = true;
+                    if (!droppedFromHandToField) cpPlaySfx();
+                } else {
+                    el.removeAttribute('data-cp-commander-in-zone');
                 }
-                scheduleMultiplayerPush();
+                relayoutCommanderZoneBoard(board);
             }
+            if (!handledSfx && posChanged) cpPlayFlipSfx();
+            scheduleMultiplayerPush();
         }
         el.addEventListener('pointerdown', down);
         window.addEventListener('pointermove', move);
@@ -1875,6 +2086,7 @@
             if (!canEditBoard(wrap._cpBoard)) return;
             wrap._cpShowingBack = !wrap._cpShowingBack;
             flipInner.classList.toggle('cp-flip-inner--back', wrap._cpShowingBack);
+            cpPlayFlipSfx();
             scheduleMultiplayerPush();
         });
         wrap.addEventListener('mousedown', function (ev) {
@@ -1902,9 +2114,161 @@
         wrap.style.setProperty('--cp-enlarge-shift', delta + 'px');
     }
 
+    /** True when this card sits on the opponent’s mat (multiplayer). */
+    function cardIsOnOpponentReadonlyMat(wrap) {
+        try {
+            return !!(wrap && wrap.closest('.cp-board-readonly'));
+        } catch (e) {
+            return false;
+        }
+    }
+
+    var cpOpponentPreviewSourceWrap = null;
+    var cpOppPvEpoch = 0;
+
+    function ensureOpponentPreviewPopEl() {
+        var el = document.getElementById('cpOpponentPreviewPop');
+        if (el) return el;
+        el = document.createElement('div');
+        el.id = 'cpOpponentPreviewPop';
+        el.setAttribute('aria-hidden', 'true');
+        var img = document.createElement('img');
+        img.alt = 'Card preview';
+        el.appendChild(img);
+        document.body.appendChild(el);
+        return el;
+    }
+
+    function opponentPreviewFaceSrc(wrap) {
+        var front = wrap.querySelector('.cp-flip-face-front img');
+        if (front && front.getAttribute('src')) return front.src;
+        return cardBackImageSrc();
+    }
+
+    function positionOpponentPreviewNearCard(el, anchorRect) {
+        var margin = 18;
+        var estHalfW = Math.min(152, Math.max(72, anchorRect.width * 2.2));
+        var estHalfH = Math.min(212, Math.max(100, anchorRect.height * 2.2));
+        var cx = anchorRect.left + anchorRect.width / 2;
+        var cy = anchorRect.top + anchorRect.height / 2;
+        var vw = window.innerWidth;
+        var vh = window.innerHeight;
+        cx = Math.max(margin + estHalfW, Math.min(vw - margin - estHalfW, cx));
+        cy = Math.max(margin + estHalfH, Math.min(vh - margin - estHalfH, cy));
+        el.style.left = cx + 'px';
+        el.style.top = cy + 'px';
+    }
+
+    function hideOpponentFloatingPreview() {
+        cpOppPvEpoch++;
+        var el = document.getElementById('cpOpponentPreviewPop');
+        if (el) el.classList.remove('cp-opponent-preview-pop--visible');
+        cpOpponentPreviewSourceWrap = null;
+    }
+
+    var cpOppPvGlobalDismissAttached = false;
+    function ensureOpponentPreviewGlobalDismiss() {
+        if (cpOppPvGlobalDismissAttached) return;
+        cpOppPvGlobalDismissAttached = true;
+        document.addEventListener(
+            'pointerdown',
+            function (ev) {
+                var pop = document.getElementById('cpOpponentPreviewPop');
+                if (!pop || !pop.classList.contains('cp-opponent-preview-pop--visible')) return;
+                var t = ev.target;
+                var w = cpOpponentPreviewSourceWrap;
+                if (w && (w === t || w.contains(t))) return;
+                hideOpponentFloatingPreview();
+            },
+            true
+        );
+    }
+
+    function showOpponentFloatingPreviewFrom(wrap) {
+        if (!wrap || !document.body.contains(wrap)) return;
+        var el = ensureOpponentPreviewPopEl();
+        var img = el.querySelector('img');
+        img.src = opponentPreviewFaceSrc(wrap);
+        var r = wrap.getBoundingClientRect();
+        positionOpponentPreviewNearCard(el, r);
+        el.classList.remove('cp-opponent-preview-pop--visible');
+        void el.offsetHeight;
+        var epochAtSchedule = cpOppPvEpoch;
+        requestAnimationFrame(function () {
+            if (epochAtSchedule !== cpOppPvEpoch) return;
+            if (!document.body.contains(wrap)) return;
+            positionOpponentPreviewNearCard(el, wrap.getBoundingClientRect());
+            cpOpponentPreviewSourceWrap = wrap;
+            el.classList.add('cp-opponent-preview-pop--visible');
+        });
+    }
+
+    /** Hover preview for opponent cards: fixed overlay, does not transform the card (avoids rotated-mat + pointer bugs). */
+    function attachOpponentHoverPreview(wrap) {
+        ensureOpponentPreviewGlobalDismiss();
+        var hoverTimer = null;
+        function hoverDelayMs() {
+            var reduced = false;
+            try {
+                reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            } catch (e) { /* ignore */ }
+            if (reduced) return 0;
+            return wrap.classList.contains('cp-hand-card') ? 320 : 520;
+        }
+        function arm() {
+            if (hoverTimer != null) {
+                clearTimeout(hoverTimer);
+                hoverTimer = null;
+            }
+            var d = hoverDelayMs();
+            var epochArm = cpOppPvEpoch;
+            if (d <= 0) {
+                requestAnimationFrame(function () {
+                    if (epochArm !== cpOppPvEpoch) return;
+                    if (!document.body.contains(wrap)) return;
+                    showOpponentFloatingPreviewFrom(wrap);
+                });
+                return;
+            }
+            hoverTimer = setTimeout(function () {
+                hoverTimer = null;
+                if (epochArm !== cpOppPvEpoch) return;
+                if (document.body.contains(wrap)) showOpponentFloatingPreviewFrom(wrap);
+            }, d);
+        }
+        function closeOpponentPreviewForCard() {
+            if (hoverTimer != null) {
+                clearTimeout(hoverTimer);
+                hoverTimer = null;
+            }
+            hideOpponentFloatingPreview();
+        }
+        function onLeaveOrOut() {
+            closeOpponentPreviewForCard();
+        }
+        wrap.addEventListener('pointerenter', function () {
+            if (hoverTimer != null) {
+                clearTimeout(hoverTimer);
+                hoverTimer = null;
+            }
+            hideOpponentFloatingPreview();
+            arm();
+        });
+        wrap.addEventListener('pointermove', function () {
+            if (cpOpponentPreviewSourceWrap === wrap) return;
+            arm();
+        });
+        wrap.addEventListener('pointerleave', onLeaveOrOut);
+        wrap.addEventListener('pointerout', onLeaveOrOut);
+        wrap.addEventListener('pointercancel', onLeaveOrOut);
+        wrap.addEventListener('pointerdown', function (ev) {
+            if (ev.button === 0) closeOpponentPreviewForCard();
+        });
+    }
+
     /**
      * Keep enlarged bbox centered on the saved pre-hover rect for the current (animating) width,
-     * then apply absolute viewport Y clamp. Re-entrant each animation frame; dx/dy carry over between frames.
+     * then apply absolute viewport Y clamp (own mat only — opponent uses floating preview).
      */
     function applyEnlargeLayoutFrame(wrap) {
         var r0 = wrap._cpEnlargeRect0;
@@ -1926,6 +2290,11 @@
             dx += ex;
             dy += ey;
         }
+        var cap = 420;
+        dx = Math.max(-cap, Math.min(cap, dx));
+        dy = Math.max(-cap, Math.min(cap, dy));
+        wrap.style.setProperty('--cp-enlarge-dx', dx + 'px');
+        wrap.style.setProperty('--cp-enlarge-dy', dy + 'px');
         fitEnlargedCardAbsolute(wrap);
     }
 
@@ -1936,6 +2305,8 @@
     }
 
     var CP_ENLARGE_TRACK_MS = 400;
+    /** Ignore pointerleave briefly after enlarging so a translating hit-target does not fire leave and clear the preview. */
+    var CP_ENLARGE_LEAVE_GRACE_MS = 650;
 
     function runEnlargeLayoutDuringWidthTransition(wrap) {
         teardownEnlargeLayoutSchedule(wrap);
@@ -1964,11 +2335,20 @@
     }
 
     function attachHoverEnlarge(wrap) {
+        if (cardIsOnOpponentReadonlyMat(wrap)) {
+            attachOpponentHoverPreview(wrap);
+            return;
+        }
         var hoverTimer = null;
+        var enlargeLeaveCheckTimer = null;
         function clearEnlarge() {
             if (hoverTimer != null) {
                 clearTimeout(hoverTimer);
                 hoverTimer = null;
+            }
+            if (enlargeLeaveCheckTimer != null) {
+                clearTimeout(enlargeLeaveCheckTimer);
+                enlargeLeaveCheckTimer = null;
             }
             teardownEnlargeLayoutSchedule(wrap);
             wrap.classList.remove('cp-card-enlarged');
@@ -1976,6 +2356,7 @@
             wrap.style.removeProperty('--cp-enlarge-dx');
             wrap.style.removeProperty('--cp-enlarge-dy');
             delete wrap._cpEnlargeRect0;
+            delete wrap._cpEnlargeLeaveGraceUntil;
         }
         function armIdleEnlarge() {
             if (hoverTimer != null) clearTimeout(hoverTimer);
@@ -1988,6 +2369,7 @@
                 var r = wrap.getBoundingClientRect();
                 wrap._cpEnlargeRect0 = { left: r.left, top: r.top, width: r.width, height: r.height };
                 wrap.classList.add('cp-card-enlarged');
+                wrap._cpEnlargeLeaveGraceUntil = performance.now() + CP_ENLARGE_LEAVE_GRACE_MS;
                 var instant = false;
                 try {
                     instant = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -2018,7 +2400,30 @@
             if (wrap.classList.contains('cp-card-enlarged')) return;
             armIdleEnlarge();
         });
-        wrap.addEventListener('pointerleave', clearEnlarge);
+        wrap.addEventListener('pointerleave', function () {
+            if (enlargeLeaveCheckTimer != null) {
+                clearTimeout(enlargeLeaveCheckTimer);
+                enlargeLeaveCheckTimer = null;
+            }
+            var until = wrap._cpEnlargeLeaveGraceUntil || 0;
+            var now = performance.now();
+            if (now < until) {
+                enlargeLeaveCheckTimer = setTimeout(function () {
+                    enlargeLeaveCheckTimer = null;
+                    if (!wrap.classList.contains('cp-card-enlarged')) return;
+                    try {
+                        if (!wrap.matches(':hover')) clearEnlarge();
+                    } catch (e) {
+                        clearEnlarge();
+                    }
+                }, Math.max(0, until - now) + 25);
+                return;
+            }
+            clearEnlarge();
+        });
+        wrap.addEventListener('pointercancel', function () {
+            clearEnlarge();
+        });
         wrap.addEventListener('pointerdown', function (ev) {
             if (ev.button === 0) clearEnlarge();
         });
@@ -2118,9 +2523,11 @@
             wrap.style.left = Math.max(0, destL) + 'px';
             wrap.style.top = Math.max(0, destT) + 'px';
             wrap.style.removeProperty('z-index');
+            if (!snapCardToDiscardIfInside(wrap, board)) cpPlaySfx();
             return Promise.resolve(wrap);
         }
         return animateOpponentCardLayout(wrap, destL, destT).then(function () {
+            if (!snapCardToDiscardIfInside(wrap, board)) cpPlaySfx();
             return wrap;
         });
     }
@@ -2137,6 +2544,7 @@
 
         if (cpPrefersReducedMotion() || opts.instant) {
             relayoutHandCardsBoard(board);
+            cpPlaySfx();
             return Promise.resolve(wrap);
         }
 
@@ -2168,6 +2576,7 @@
         });
 
         return animateOpponentCardLayout(wrap, target.l, target.t, target.z).then(function () {
+            cpPlaySfx();
             return wrap;
         });
     }
@@ -2428,8 +2837,7 @@
                 return;
             }
             var pos = randomFieldPositionForCard(board);
-            spawnFieldCardFromDeck(board, url, card, pos.l, pos.t).then(function (wrap) {
-                if (wrap) snapCardToDiscardIfInside(wrap, board);
+            spawnFieldCardFromDeck(board, url, card, pos.l, pos.t).then(function () {
                 setStatus('Drew: ' + cardTitleFromState(card.state) + ' · P' + (board.id === 'p2' ? '2' : '1') + ' · ' + pile.length + ' left in deck.');
                 scheduleMultiplayerPush();
             });
