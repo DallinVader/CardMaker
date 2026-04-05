@@ -59,6 +59,8 @@
                         <span class="drive-modal-label" style="margin:0;">Your saves</span>
                         <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="driveModalRefreshBtn">Refresh list</button>
                     </div>
+                    <label class="drive-modal-label drive-modal-search-label" for="driveModalSearchInput">Search</label>
+                    <input type="search" id="driveModalSearchInput" class="drive-modal-input drive-modal-search-input" placeholder="Filter by save file name…" autocomplete="off" enterkeyhint="search" />
                     <div class="drive-modal-saves-split">
                         <div id="driveModalList" class="drive-modal-list" role="list"></div>
                         <aside class="drive-modal-preview-aside" aria-label="Card preview">
@@ -357,6 +359,7 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="card-render.js"></script>
     <script src="cardmaker-sets.js"></script>
+    <script src="cardmaker-sets-drive.js"></script>
     <script>
         // Optional: not used for Drive save/load (OAuth only). Restricted API keys often break gapi if passed to init.
         const GOOGLE_API_KEY = '';
@@ -1127,6 +1130,7 @@
                 await trySilentRefreshDriveToken();
             }
             setDriveStatus('Signed in (saved on this device). Save/load works for up to 12 hours; use Sign out to clear sooner.');
+            await syncNamedSetsWithDriveIfPossible();
         }
 
         /** Re-attach token from localStorage if gapi was reset (e.g. first save after restore race). */
@@ -1173,6 +1177,7 @@
                         persistDriveToken(tokenResponse);
                         applyDriveAccessToken(tokenResponse.access_token);
                         setDriveStatus('Signed in. Session is saved on this device for up to 12 hours (or until you sign out).');
+                        syncNamedSetsWithDriveIfPossible().catch(function (e) { console.warn(e); });
                     } else {
                         console.error('Token response:', tokenResponse);
                         setDriveStatus('Sign-in failed. Check OAuth origin settings.');
@@ -1415,6 +1420,37 @@
             return text || ('HTTP ' + status);
         }
 
+        let cardMakerIndexNamedSetsDriveConfigured = false;
+        function configureCardMakerNamedSetsDriveIndex() {
+            if (cardMakerIndexNamedSetsDriveConfigured || typeof CardMakerSetsDrive === 'undefined' || typeof CardMakerSets === 'undefined') {
+                return;
+            }
+            cardMakerIndexNamedSetsDriveConfigured = true;
+            CardMakerSetsDrive.init({
+                getToken: function () { return driveAccessToken; },
+                authHeaders: function (extra) { return driveAuthHeaders(extra); },
+                parseDriveError: parseDriveError,
+                onAfterPull: function () { refreshCardMakerWorkingSetSelectAfterDriveSync(); }
+            });
+            CardMakerSets.setNamedSetsMutateListener(function () {
+                if (driveAccessToken) {
+                    CardMakerSetsDrive.schedulePush();
+                }
+            });
+        }
+
+        async function syncNamedSetsWithDriveIfPossible() {
+            configureCardMakerNamedSetsDriveIndex();
+            if (!driveAccessToken || typeof CardMakerSetsDrive === 'undefined') {
+                return;
+            }
+            try {
+                await CardMakerSetsDrive.pullMerge();
+            } catch (e) {
+                console.warn('Named sets Drive sync:', e);
+            }
+        }
+
         /** List appDataFolder files (same shape as official curl sample). */
         async function listAppDataFolderFiles() {
             const u = new URL(DRIVE_FILES_API);
@@ -1540,22 +1576,56 @@
             return n;
         }
 
-        function renderDriveModalList(files) {
+        function getDriveModalSearchQuery() {
+            var inp = document.getElementById('driveModalSearchInput');
+            return inp ? String(inp.value || '').trim().toLowerCase() : '';
+        }
+
+        function filterDriveModalFilesByQuery(files, q) {
+            if (!q) return (files || []).slice();
+            return (files || []).filter(function (f) {
+                if (!f || !f.name) return false;
+                var full = String(f.name).toLowerCase();
+                var short = displaySaveLabel(f.name).toLowerCase();
+                return full.indexOf(q) !== -1 || short.indexOf(q) !== -1;
+            });
+        }
+
+        function findDriveModalFileById(fileId) {
+            if (!fileId || !driveModalFilesCache || !driveModalFilesCache.length) return null;
+            var sid = String(fileId);
+            for (var i = 0; i < driveModalFilesCache.length; i++) {
+                if (driveModalFilesCache[i] && driveModalFilesCache[i].id === sid) {
+                    return driveModalFilesCache[i];
+                }
+            }
+            return null;
+        }
+
+        function renderDriveModalList() {
             const container = document.getElementById('driveModalList');
             if (!container) return;
-            if (!files || files.length === 0) {
+            const all = driveModalFilesCache || [];
+            if (!all.length) {
                 container.innerHTML = '<div class="drive-modal-empty">No saves yet. Enter a name above and click <strong>Save to Drive</strong>.</div>';
                 return;
             }
-            container.innerHTML = files.map(function (f, i) {
+            const q = getDriveModalSearchQuery();
+            const files = filterDriveModalFilesByQuery(all, q);
+            if (!files.length) {
+                container.innerHTML = '<div class="drive-modal-empty">No saves match your search. Try a different name or clear the filter.</div>';
+                return;
+            }
+            container.innerHTML = files.map(function (f) {
+                const fid = escapeHtml(f.id);
                 const nameFull = escapeHtml(f.name);
                 const nameShort = escapeHtml(displaySaveLabel(f.name));
                 const when = escapeHtml(formatDriveListDate(f.modifiedTime));
                 var sizeStr = formatFileSize(f.size);
                 var sizeSpan = sizeStr === '—' ? '' : ('<span class="drive-modal-item-size">' + escapeHtml(sizeStr) + '</span>');
                 var previewAria = escapeHtml('Preview ' + displaySaveLabel(f.name));
-                return '<div class="drive-modal-item" data-drive-row-idx="' + i + '">' +
-                    '<div class="drive-modal-item-info drive-modal-item-preview-hit" role="button" tabindex="0" data-drive-preview data-drive-idx="' + i + '" aria-label="' + previewAria + '">' +
+                return '<div class="drive-modal-item" data-drive-file-id="' + fid + '">' +
+                    '<div class="drive-modal-item-info drive-modal-item-preview-hit" role="button" tabindex="0" data-drive-preview data-drive-file-id="' + fid + '" aria-label="' + previewAria + '">' +
                         '<span class="drive-modal-item-name" title="' + nameFull + '">' + nameShort + '</span>' +
                         '<div class="drive-modal-item-meta">' +
                             '<span class="drive-modal-item-date">' + when + '</span>' +
@@ -1563,8 +1633,8 @@
                         '</div>' +
                     '</div>' +
                     '<div class="drive-modal-item-actions">' +
-                        '<button type="button" class="drive-modal-btn drive-modal-btn-small drive-modal-btn-load" data-drive-load data-drive-idx="' + i + '">Load</button>' +
-                        '<button type="button" class="drive-modal-btn drive-modal-btn-small drive-modal-btn-danger" data-drive-delete data-drive-idx="' + i + '">Delete</button>' +
+                        '<button type="button" class="drive-modal-btn drive-modal-btn-small drive-modal-btn-load" data-drive-load data-drive-file-id="' + fid + '">Load</button>' +
+                        '<button type="button" class="drive-modal-btn drive-modal-btn-small drive-modal-btn-danger" data-drive-delete data-drive-file-id="' + fid + '">Delete</button>' +
                     '</div>' +
                 '</div>';
             }).join('');
@@ -1578,7 +1648,7 @@
             try {
                 const files = await listDriveProjects();
                 driveModalFilesCache = files;
-                renderDriveModalList(files);
+                renderDriveModalList();
             } catch (err) {
                 console.error(err);
                 driveModalFilesCache = [];
@@ -1612,6 +1682,8 @@
                 var def = driveSaveNameDefaultFromCardTitle();
                 nameInput.value = def;
             }
+            const searchInp = document.getElementById('driveModalSearchInput');
+            if (searchInp) searchInp.value = '';
             modal.classList.add('is-open');
             modal.setAttribute('aria-hidden', 'false');
             document.body.style.overflow = 'hidden';
@@ -1709,16 +1781,18 @@
             });
         }
 
-        function setDriveModalPreviewRowSelected(idx) {
+        function setDriveModalPreviewRowSelected(fileId) {
+            if (!fileId) return;
+            var sid = String(fileId);
             document.querySelectorAll('.drive-modal-item').forEach(function (el) {
-                var rowIdx = el.getAttribute('data-drive-row-idx');
-                el.classList.toggle('is-preview-selected', rowIdx === String(idx));
+                var id = el.getAttribute('data-drive-file-id');
+                el.classList.toggle('is-preview-selected', id === sid);
             });
         }
 
-        async function showDriveModalPreview(idx) {
-            if (isNaN(idx) || !driveModalFilesCache[idx]) return;
-            var file = driveModalFilesCache[idx];
+        async function showDriveModalPreview(fileId) {
+            var file = findDriveModalFileById(fileId);
+            if (!file) return;
             var req = ++driveModalPreviewRequestId;
 
             var img = document.getElementById('driveModalPreviewImg');
@@ -1727,7 +1801,7 @@
             var load = document.getElementById('driveModalPreviewLoading');
             if (!img || !ph || !load) return;
 
-            setDriveModalPreviewRowSelected(idx);
+            setDriveModalPreviewRowSelected(fileId);
             ph.hidden = true;
             if (errEl) errEl.hidden = true;
             img.hidden = true;
@@ -1807,22 +1881,22 @@
                     var previewEl = e.target.closest('[data-drive-preview]');
                     if (!previewEl) return;
                     e.preventDefault();
-                    var pidx = parseInt(previewEl.getAttribute('data-drive-idx'), 10);
-                    showDriveModalPreview(pidx);
+                    var fid = previewEl.getAttribute('data-drive-file-id');
+                    if (fid) showDriveModalPreview(fid);
                 });
                 list.addEventListener('click', function (e) {
                     var previewEl = e.target.closest('[data-drive-preview]');
                     if (previewEl) {
-                        var pidx = parseInt(previewEl.getAttribute('data-drive-idx'), 10);
-                        showDriveModalPreview(pidx);
+                        var pfid = previewEl.getAttribute('data-drive-file-id');
+                        if (pfid) showDriveModalPreview(pfid);
                         return;
                     }
                     const loadEl = e.target.closest('[data-drive-load]');
                     const delEl = e.target.closest('[data-drive-delete]');
                     if (!loadEl && !delEl) return;
-                    const idx = parseInt((loadEl || delEl).getAttribute('data-drive-idx'), 10);
-                    if (isNaN(idx) || !driveModalFilesCache[idx]) return;
-                    const file = driveModalFilesCache[idx];
+                    const fileId = (loadEl || delEl).getAttribute('data-drive-file-id');
+                    const file = findDriveModalFileById(fileId);
+                    if (!file) return;
 
                     if (loadEl) {
                         (async function () {
@@ -1865,6 +1939,27 @@
                                 alert('Could not delete from Google Drive.\n\n' + msg);
                             }
                         })();
+                    }
+                });
+            }
+
+            const driveModalSearchInput = document.getElementById('driveModalSearchInput');
+            if (driveModalSearchInput && !driveModalSearchInput.dataset.bound) {
+                driveModalSearchInput.dataset.bound = '1';
+                driveModalSearchInput.addEventListener('input', function () {
+                    var prevSel = document.querySelector('.drive-modal-item.is-preview-selected');
+                    var prevId = prevSel ? prevSel.getAttribute('data-drive-file-id') : null;
+                    renderDriveModalList();
+                    if (prevId) {
+                        var q = getDriveModalSearchQuery();
+                        var still = filterDriveModalFilesByQuery(driveModalFilesCache, q).some(function (f) {
+                            return f.id === prevId;
+                        });
+                        if (!still) {
+                            clearDriveModalPreview();
+                        } else {
+                            setDriveModalPreviewRowSelected(prevId);
+                        }
                     }
                 });
             }
@@ -2510,7 +2605,7 @@
             }
         });
 
-        (function initCardMakerNamedSetsUi() {
+        function refreshCardMakerWorkingSetSelectAfterDriveSync() {
             if (typeof CardMakerSets === 'undefined') return;
             var sel = document.getElementById('cardmakerWorkingSet');
             var hid = document.getElementById('CardMakerSetId');
@@ -2519,12 +2614,26 @@
             if (!sel) return;
             var active = CardMakerSets.getActiveSetId();
             CardMakerSets.fillSelect(sel, true, '— None (120 default) —', active);
+            if (hid) hid.value = active || '';
             if (active && CardMakerSets.getNamedSetById(active)) {
                 if (st) st.value = String(CardMakerSets.getDefaultCardSetTotal());
-                if (hid) hid.value = active;
                 var aset = CardMakerSets.getNamedSetById(active);
                 if (nameHid) nameHid.value = aset ? aset.name : '';
+            } else {
+                if (nameHid) nameHid.value = '';
             }
+        }
+
+        (function initCardMakerNamedSetsUi() {
+            if (typeof CardMakerSets === 'undefined') return;
+            var sel = document.getElementById('cardmakerWorkingSet');
+            if (!sel) return;
+            refreshCardMakerWorkingSetSelectAfterDriveSync();
+            if (sel.dataset.cmNamedSetUiInit) return;
+            sel.dataset.cmNamedSetUiInit = '1';
+            var hid = document.getElementById('CardMakerSetId');
+            var nameHid = document.getElementById('CardMakerSetName');
+            var st = document.getElementById('CardSetTotal');
             sel.addEventListener('change', function () {
                 var id = sel.value;
                 CardMakerSets.setActiveSetId(id);

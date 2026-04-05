@@ -1059,6 +1059,59 @@
         } catch (e) {}
     }
 
+    function driveModifiedTimeMs(iso) {
+        if (iso == null || iso === '') return null;
+        var t = Date.parse(String(iso));
+        return isFinite(t) ? t : null;
+    }
+
+    function isRemoteDriveCardNewer(remoteIso, localIso) {
+        var r = driveModifiedTimeMs(remoteIso);
+        if (r == null) return false;
+        var l = driveModifiedTimeMs(localIso);
+        if (l == null) return true;
+        return r > l;
+    }
+
+    function refreshDomFacesForLibCardId(libId) {
+        var sid = String(libId || '');
+        if (!sid) return Promise.resolve();
+        var card = cardById(sid);
+        if (!card) return Promise.resolve();
+        delete cpCardFaceUrlCache[sid];
+        delete cpCardFaceUrlPending[sid];
+        return getOrRenderCardPlayFaceUrl(card).then(function (url) {
+            if (!url) return;
+            boards.forEach(function (board) {
+                if (!board || !board.field) return;
+                board.field.querySelectorAll('.cp-card-on-field').forEach(function (wrap) {
+                    if (wrap.getAttribute('data-cp-card-lib-id') !== sid) return;
+                    var img = wrap.querySelector('.cp-flip-face-front img');
+                    if (img) img.src = url;
+                });
+            });
+        });
+    }
+
+    function updateLibraryListRowsForCardIds(ids) {
+        if (!libraryListEl || !ids || !ids.length) return;
+        var want = {};
+        var i;
+        for (i = 0; i < ids.length; i++) want[String(ids[i])] = true;
+        libraryListEl.querySelectorAll('input[data-cp-card-id]').forEach(function (inp) {
+            var id = inp.getAttribute('data-cp-card-id');
+            if (!want[id]) return;
+            var card = cardById(id);
+            if (!card) return;
+            var row = inp.closest('.cp-lib-row');
+            if (!row) return;
+            var t = row.querySelector('.cp-card-title');
+            var s = row.querySelector('.cp-card-sub');
+            if (t) t.textContent = cardTitleFromState(card.state);
+            if (s) s.textContent = cardSubtitle(card.state, card.id);
+        });
+    }
+
     function getSelectedMultiplayerSeat() {
         var r = document.querySelector('input[name="cpMultiplayerSeat"]:checked');
         if (!r) return 1;
@@ -1652,7 +1705,13 @@
                         }
                         var rec = cur.value;
                         if (rec && rec.state && typeof rec.state === 'object') {
-                            out.push({ id: String(cur.key), state: rec.state, source: 'cache' });
+                            out.push({
+                                id: String(cur.key),
+                                state: rec.state,
+                                source: 'cache',
+                                modifiedTime: rec.modifiedTime != null ? String(rec.modifiedTime) : null,
+                                size: rec.size != null ? String(rec.size) : null
+                            });
                         }
                         cur.continue();
                     };
@@ -4458,6 +4517,96 @@
             });
     }
 
+    var cpLibDriveSyncInFlight = false;
+    var cpLibDriveSyncDebounceTimer = null;
+    var cpLibraryDriveSyncIntervalStarted = false;
+
+    function syncLibraryCardsFromDriveNow() {
+        if (cpLibDriveSyncInFlight) return Promise.resolve();
+        if (!window.CPDrive || !CPDrive.hasDriveConfig || !CPDrive.hasDriveConfig()) return Promise.resolve();
+        if (!CPDrive.isSignedIn || !CPDrive.isSignedIn()) return Promise.resolve();
+        if (!library.length) return Promise.resolve();
+
+        cpLibDriveSyncInFlight = true;
+        return CPDrive.ensureDriveTokenBeforeDriveOp().then(function (ok) {
+            if (!ok) return [];
+            return mapLimit(library.slice(), 6, function (entry) {
+                var fid = String(entry && entry.id != null ? entry.id : '');
+                if (!fid) return Promise.resolve(null);
+                return CPDrive.fetchDriveFileMetadata(fid).catch(function () { return null; }).then(function (meta) {
+                    if (!meta || !isRemoteDriveCardNewer(meta.modifiedTime, entry.modifiedTime)) return null;
+                    return CPDrive.fetchDriveFileMedia(fid).then(function (text) {
+                        var state;
+                        try {
+                            state = JSON.parse(text);
+                        } catch (e) {
+                            return null;
+                        }
+                        if (!isValidCardmakerProjectState(state)) return null;
+                        return idbWriteSpmSave(fid, meta, state).then(function () {
+                            entry.state = state;
+                            entry.modifiedTime = meta.modifiedTime != null ? String(meta.modifiedTime) : entry.modifiedTime;
+                            entry.size = meta.size != null ? String(meta.size) : entry.size;
+                            return fid;
+                        });
+                    }).catch(function () { return null; });
+                });
+            });
+        }).then(function (results) {
+            if (!results || !results.length) return null;
+            var updated = [];
+            var i;
+            for (i = 0; i < results.length; i++) {
+                if (results[i]) updated.push(results[i]);
+            }
+            return updated.length ? updated : null;
+        }).then(function (updated) {
+            if (!updated || !updated.length) return null;
+            var j;
+            for (j = 0; j < updated.length; j++) {
+                var fid = updated[j];
+                delete cpCardFaceUrlCache[fid];
+                delete cpCardFaceUrlPending[fid];
+            }
+            return Promise.all(updated.map(function (fid) { return refreshDomFacesForLibCardId(fid); })).then(function () {
+                updateLibraryListRowsForCardIds(updated);
+                if (commanderCard && updated.indexOf(commanderCard.id) !== -1) {
+                    updateCommanderUi();
+                    syncCommanderToPlayingField();
+                }
+                setStatus('Updated ' + updated.length + ' card' + (updated.length === 1 ? '' : 's') + ' from Google Drive.');
+                warmCardFaceUrlCacheIdle();
+                scheduleMultiplayerPush();
+            });
+        }).catch(function () { return null; }).then(function () {
+            cpLibDriveSyncInFlight = false;
+        });
+    }
+
+    function requestSyncLibraryCardsFromDrive() {
+        try {
+            if (cpLibDriveSyncDebounceTimer != null) clearTimeout(cpLibDriveSyncDebounceTimer);
+        } catch (e) { /* ignore */ }
+        cpLibDriveSyncDebounceTimer = setTimeout(function () {
+            cpLibDriveSyncDebounceTimer = null;
+            syncLibraryCardsFromDriveNow();
+        }, 450);
+    }
+
+    function startCardLibraryDriveAutoSync() {
+        if (cpLibraryDriveSyncIntervalStarted) return;
+        cpLibraryDriveSyncIntervalStarted = true;
+        setInterval(function () {
+            if (document.visibilityState === 'visible') requestSyncLibraryCardsFromDrive();
+        }, 45000);
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') requestSyncLibraryCardsFromDrive();
+        });
+        window.addEventListener('focus', function () {
+            requestSyncLibraryCardsFromDrive();
+        });
+    }
+
     /* —— Deck modal + Drive —— */
     var cpDeckModal = document.getElementById('cpDeckModal');
     var cpDeckNameInput = document.getElementById('cpDeckNameInput');
@@ -4764,6 +4913,7 @@
             }
             if (signed) {
                 updateDeckDriveUi();
+                requestSyncLibraryCardsFromDrive();
                 return refreshDriveDeckListUi();
             }
         }).catch(function (err) {
@@ -4995,6 +5145,7 @@
         return CPDrive.tryRestoreSession();
     }).then(function () {
         updateDeckDriveUi();
+        requestSyncLibraryCardsFromDrive();
     }).catch(function () {});
 
     attachDrawZoneDrag(boardP1);
@@ -5007,7 +5158,13 @@
     attachTreasureZoneContextMenu(boardP2);
     attachTreasurePileFieldContextMenu(boardP1);
     attachTreasurePileFieldContextMenu(boardP2);
-    refreshLibrary();
+    refreshLibrary().then(function () {
+        startCardLibraryDriveAutoSync();
+        requestSyncLibraryCardsFromDrive();
+    }).catch(function () {
+        startCardLibraryDriveAutoSync();
+        requestSyncLibraryCardsFromDrive();
+    });
     initCardPlayerFirebaseMultiplayer();
 })();
     </script>

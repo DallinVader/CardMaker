@@ -1143,7 +1143,7 @@
             <div class="spm-modal-panel">
                 <button type="button" class="spm-modal-close" data-spm-define-set-close aria-label="Close">&times;</button>
                 <h2 id="spmDefineSetTitle">Add named set</h2>
-                <p class="spm-modal-hint">Only creates the set here in your browser. Assign cards via <strong>Assign named set</strong> or pick this set in Card Maker to use its size instead of 120.</p>
+                <p class="spm-modal-hint">Creates the set locally and syncs it to your Google Drive app data when you’re signed in (<code>CardMaker.NamedSets.v1.json</code>). Assign cards via <strong>Assign named set</strong> or pick this set in Card Maker for its size instead of 120.</p>
                 <div class="spm-modal-field">
                     <label for="spmDefineSetName">Set name</label>
                     <input type="text" id="spmDefineSetName" class="spm-input" maxlength="80" autocomplete="off" />
@@ -1196,6 +1196,7 @@
 
     <script src="card-render.js"></script>
     <script src="cardmaker-sets.js"></script>
+    <script src="cardmaker-sets-drive.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
         const GOOGLE_CLIENT_ID = '984239146057-o6ujksfj9qk8tmqm9c8msrpidgm6492r.apps.googleusercontent.com';
@@ -1539,6 +1540,37 @@
             return text || ('HTTP ' + status);
         }
 
+        let spmNamedSetsDriveConfigured = false;
+        function configureSavedProjectsNamedSetsDrive() {
+            if (spmNamedSetsDriveConfigured || typeof CardMakerSetsDrive === 'undefined' || typeof CardMakerSets === 'undefined') {
+                return;
+            }
+            spmNamedSetsDriveConfigured = true;
+            CardMakerSetsDrive.init({
+                getToken: function () { return driveAccessToken; },
+                authHeaders: function (extra) { return driveAuthHeaders(driveAccessToken, extra); },
+                parseDriveError: parseDriveError,
+                onAfterPull: function () { refreshNamedSetDropdowns(); }
+            });
+            CardMakerSets.setNamedSetsMutateListener(function () {
+                if (driveAccessToken) {
+                    CardMakerSetsDrive.schedulePush();
+                }
+            });
+        }
+
+        async function syncNamedSetsWithDriveIfPossibleSpm() {
+            configureSavedProjectsNamedSetsDrive();
+            if (!driveAccessToken || typeof CardMakerSetsDrive === 'undefined') {
+                return;
+            }
+            try {
+                await CardMakerSetsDrive.pullMerge();
+            } catch (e) {
+                console.warn('Named sets Drive sync:', e);
+            }
+        }
+
         let gisTokenClient = null;
         let driveAccessToken = null;
 
@@ -1621,7 +1653,10 @@
                     driveAccessToken = tokenResponse.access_token;
                     spmStatus.textContent = 'Signed in (saved on this device)';
                     updateButtons();
-                    refreshAll().catch(function (e) { console.error(e); });
+                    (async function () {
+                        await syncNamedSetsWithDriveIfPossibleSpm();
+                        await refreshAll();
+                    })().catch(function (e) { console.error(e); });
                 } else {
                     spmStatus.textContent = 'Sign-in failed';
                     setMessage('Sign-in failed. Check OAuth origin.', true);
@@ -3755,6 +3790,7 @@
             if (ok) {
                 spmStatus.textContent = 'Loading saved projects…';
                 spmRefreshBtn.disabled = false;
+                await syncNamedSetsWithDriveIfPossibleSpm();
                 await refreshAll();
             }
         })();

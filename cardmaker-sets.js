@@ -1,10 +1,36 @@
 /**
  * Named card sets (name + total count) shared between Card Maker and Saved Projects.
- * Persists in localStorage only; each Drive save can store fields.CardMakerSetId.
+ * Persists in localStorage; when signed in, cardmaker-sets-drive.js syncs the same data
+ * to Google Drive appDataFolder. Each Drive save can store fields.CardMakerSetId.
  */
 (function (global) {
     var NAMED_SETS_KEY = 'cardmaker_named_sets_v1';
     var ACTIVE_SET_KEY = 'cardmaker_active_set_v1';
+    var NAMED_SETS_DRIVE_DOC_VERSION = 1;
+
+    var namedSetsMutateListener = null;
+    var namedSetsDriveNotifyDepth = 0;
+
+    function setNamedSetsMutateListener(fn) {
+        namedSetsMutateListener = typeof fn === 'function' ? fn : null;
+    }
+
+    function runWithNamedSetsDriveNotifySuppressed(fn) {
+        namedSetsDriveNotifyDepth++;
+        try {
+            return fn();
+        } finally {
+            namedSetsDriveNotifyDepth--;
+        }
+    }
+
+    function notifyNamedSetsMutated() {
+        if (namedSetsDriveNotifyDepth > 0) return;
+        if (!namedSetsMutateListener) return;
+        try {
+            namedSetsMutateListener();
+        } catch (e) { /* ignore */ }
+    }
 
     function readNamedSets() {
         try {
@@ -24,6 +50,7 @@
         try {
             localStorage.setItem(NAMED_SETS_KEY, JSON.stringify(arr || []));
         } catch (e) { /* ignore */ }
+        notifyNamedSetsMutated();
     }
 
     function genSetId() {
@@ -92,6 +119,58 @@
                 localStorage.removeItem(ACTIVE_SET_KEY);
             }
         } catch (e) { /* ignore */ }
+        notifyNamedSetsMutated();
+    }
+
+    function mergeNamedSetRecordArrays(localArr, remoteArr) {
+        var byId = Object.create(null);
+        function take(arr, remoteWins) {
+            (arr || []).forEach(function (s) {
+                if (!s || typeof s.id !== 'string' || typeof s.name !== 'string') return;
+                var t = normalizeTotal(s.total);
+                if (!isFinite(t)) return;
+                var rec = { id: s.id, name: String(s.name).trim(), total: t };
+                if (remoteWins || !byId[s.id]) byId[s.id] = rec;
+            });
+        }
+        take(localArr, false);
+        take(remoteArr, true);
+        return Object.keys(byId).map(function (k) {
+            return byId[k];
+        });
+    }
+
+    /** Merge Drive JSON into localStorage (remote wins on same id). Used only by Drive sync. */
+    function importNamedSetsFromDriveJson(jsonStr) {
+        var doc;
+        try {
+            doc = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
+        } catch (e) {
+            return;
+        }
+        if (!doc || typeof doc !== 'object') return;
+        var remote = doc.sets;
+        if (!Array.isArray(remote)) return;
+        runWithNamedSetsDriveNotifySuppressed(function () {
+            var merged = mergeNamedSetRecordArrays(readNamedSets(), remote);
+            try {
+                localStorage.setItem(NAMED_SETS_KEY, JSON.stringify(merged));
+            } catch (e) { /* ignore */ }
+            var aid = doc.activeSetId != null ? String(doc.activeSetId) : '';
+            if (aid && merged.some(function (x) { return x.id === aid; })) {
+                try {
+                    localStorage.setItem(ACTIVE_SET_KEY, aid);
+                } catch (e2) { /* ignore */ }
+            }
+        });
+    }
+
+    function exportNamedSetsDriveJson() {
+        return JSON.stringify({
+            v: NAMED_SETS_DRIVE_DOC_VERSION,
+            sets: readNamedSets(),
+            activeSetId: getActiveSetId() || ''
+        });
     }
 
     function getDefaultCardSetTotal() {
@@ -125,6 +204,7 @@
     global.CardMakerSets = {
         NAMED_SETS_KEY: NAMED_SETS_KEY,
         ACTIVE_SET_KEY: ACTIVE_SET_KEY,
+        NAMED_SETS_DRIVE_DOC_VERSION: NAMED_SETS_DRIVE_DOC_VERSION,
         readNamedSets: readNamedSets,
         writeNamedSets: writeNamedSets,
         genSetId: genSetId,
@@ -135,6 +215,11 @@
         setActiveSetId: setActiveSetId,
         getDefaultCardSetTotal: getDefaultCardSetTotal,
         normalizeTotal: normalizeTotal,
-        fillSelect: fillSelect
+        fillSelect: fillSelect,
+        setNamedSetsMutateListener: setNamedSetsMutateListener,
+        runWithNamedSetsDriveNotifySuppressed: runWithNamedSetsDriveNotifySuppressed,
+        importNamedSetsFromDriveJson: importNamedSetsFromDriveJson,
+        exportNamedSetsDriveJson: exportNamedSetsDriveJson,
+        mergeNamedSetRecordArrays: mergeNamedSetRecordArrays
     };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -1519,6 +1519,18 @@ canvas{
     margin-bottom: 10px;
 }
 
+.drive-modal-search-label {
+    display: block;
+    margin: 0 0 6px;
+    font-size: 12px;
+}
+
+.drive-modal-search-input {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+}
+
 .drive-modal-saves-split {
     flex: 1;
     display: flex;
