@@ -389,8 +389,11 @@
         
         // Keyboard shortcuts
         document.addEventListener('keydown', function(event) {
-            // Don't trigger shortcuts when typing in inputs
-            if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+            const tag = event.target && event.target.tagName;
+            const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' ||
+                (event.target && event.target.isContentEditable);
+            // Don't trigger shortcuts when typing in inputs or using native selects
+            if (inField) {
                 if (event.key === 'Escape') {
                     event.target.blur();
                 }
@@ -1128,6 +1131,18 @@
             applyDriveAccessToken(stored.access_token);
             if (isGoogleAccessTokenStale(stored)) {
                 await trySilentRefreshDriveToken();
+                const after = readPersistedDriveToken();
+                if (!after || isGoogleAccessTokenStale(after)) {
+                    clearPersistedDriveToken();
+                    driveAccessToken = null;
+                    if (window.gapi && gapi.client) {
+                        gapi.client.setToken(null);
+                    }
+                    updateDriveButtons();
+                    setDriveStatus('Session expired. Sign in with Google again to use Drive.');
+                    return;
+                }
+                applyDriveAccessToken(after.access_token);
             }
             setDriveStatus('Signed in (saved on this device). Save/load works for up to 12 hours; use Sign out to clear sooner.');
             await syncNamedSetsWithDriveIfPossible();
@@ -1140,6 +1155,16 @@
                 const ready = await initGoogleDriveClient(true);
                 if (ready) await trySilentRefreshDriveToken();
                 stored = readPersistedDriveToken();
+                if (stored && isGoogleAccessTokenStale(stored)) {
+                    clearPersistedDriveToken();
+                    driveAccessToken = null;
+                    if (window.gapi && gapi.client) {
+                        gapi.client.setToken(null);
+                    }
+                    updateDriveButtons();
+                    setDriveStatus('Session expired. Sign in with Google again to use Drive.');
+                    return false;
+                }
             }
             if (stored) {
                 if (!driveAccessToken || driveAccessToken !== stored.access_token) {
@@ -2031,9 +2056,16 @@
 
         document.addEventListener('keydown', function (ev) {
             if (ev.key !== 'Escape') return;
-            const modal = document.getElementById('driveProjectsModal');
-            if (modal && modal.classList.contains('is-open')) {
+            const driveModal = document.getElementById('driveProjectsModal');
+            if (driveModal && driveModal.classList.contains('is-open')) {
                 closeDriveProjectsModal();
+                ev.preventDefault();
+                return;
+            }
+            const fsModal = document.getElementById('fullscreenModal');
+            if (fsModal && fsModal.style.display === 'block') {
+                closeFullscreen();
+                ev.preventDefault();
             }
         });
 
@@ -2594,16 +2626,6 @@
             const modal = document.getElementById('fullscreenModal');
             modal.style.display = 'none';
         }
-
-        // Close fullscreen on Escape key (only when modal is open)
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape') {
-                const modal = document.getElementById('fullscreenModal');
-                if (modal.style.display === 'block') {
-                    closeFullscreen();
-                }
-            }
-        });
 
         function refreshCardMakerWorkingSetSelectAfterDriveSync() {
             if (typeof CardMakerSets === 'undefined') return;

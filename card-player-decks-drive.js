@@ -180,6 +180,10 @@
                 return false;
             }).then(function () {
                 stored = readPersistedDriveToken();
+                if (stored && isGoogleAccessTokenStale(stored)) {
+                    signOut();
+                    return false;
+                }
                 if (stored) {
                     applyDriveAccessToken(stored.access_token);
                     return true;
@@ -340,7 +344,19 @@
             if (!ready) return false;
             applyDriveAccessToken(stored.access_token);
             if (isGoogleAccessTokenStale(stored)) {
-                return trySilentRefreshDriveToken();
+                return trySilentRefreshDriveToken().then(function (ok) {
+                    if (!ok) {
+                        signOut();
+                        return false;
+                    }
+                    var after = readPersistedDriveToken();
+                    if (!after || isGoogleAccessTokenStale(after)) {
+                        signOut();
+                        return false;
+                    }
+                    applyDriveAccessToken(after.access_token);
+                    return true;
+                });
             }
             return true;
         });

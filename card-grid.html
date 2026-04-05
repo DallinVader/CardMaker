@@ -555,6 +555,10 @@
                     resolve();
                 }
             });
+            const after = readStoredDriveRecord();
+            if (after && isGoogleAccessTokenStale(after)) {
+                localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
+            }
         }
 
         function waitForGoogleScripts(maxWaitMs) {
@@ -1094,6 +1098,7 @@
             }
             if (printSetupModal && printSetupModal.classList.contains('is-open')) {
                 closePrintSetupModal();
+                e.preventDefault();
             }
         });
 

@@ -1618,6 +1618,14 @@
             if (rec && isGoogleAccessTokenStale(rec)) {
                 const waitOk = await waitForGoogleScripts(3000);
                 if (waitOk) await trySilentRefreshGoogleToken();
+                rec = readStoredDriveRecord();
+                if (rec && isGoogleAccessTokenStale(rec)) {
+                    localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
+                    driveAccessToken = null;
+                    updateButtons();
+                    spmStatus.textContent = 'Not connected';
+                    return false;
+                }
             }
             const stored = readStoredDriveToken();
             if (stored) {
