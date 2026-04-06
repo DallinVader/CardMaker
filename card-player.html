@@ -647,10 +647,10 @@
         }
         #cpDeckModal .cp-deck-lib-row {
             display: grid;
-            grid-template-columns: 52px minmax(0, 1fr) auto;
+            grid-template-columns: 42px minmax(0, 1fr) auto;
             align-items: center;
             gap: 12px;
-            padding: 10px 12px;
+            padding: 8px 10px;
             border-radius: 12px;
             margin-bottom: 6px;
             background: rgba(30, 41, 59, 0.45);
@@ -672,34 +672,49 @@
         #cpDeckModal .cp-deck-lib-empty[hidden] {
             display: none !important;
         }
-        #cpDeckModal .cp-deck-lib-thumb {
-            width: 52px;
-            height: 72px;
+        #cpDeckModal .cp-deck-lib-preview-hit {
+            position: relative;
+            width: 40px;
+            height: 48px;
             border-radius: 8px;
+            flex-shrink: 0;
             overflow: hidden;
-            background: rgba(15, 23, 42, 0.85);
-            border: 1px solid rgba(148, 163, 184, 0.2);
+            background: linear-gradient(145deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.88) 100%);
+            border: 1px solid rgba(148, 163, 184, 0.26);
+            box-shadow: 0 1px 6px rgba(0, 0, 0, 0.22);
+        }
+        #cpDeckModal .cp-deck-lib-preview-hit img.cp-deck-thumb-lazy {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: center;
+            display: block;
+            opacity: 0;
+            transition: opacity 0.1s ease-out;
+            pointer-events: none;
+        }
+        #cpDeckModal .cp-deck-lib-preview-hit img.cp-deck-thumb-lazy.is-loaded {
+            opacity: 1;
+        }
+        #cpDeckModal .cp-deck-lib-thumb-ph {
+            position: absolute;
+            inset: 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            flex-shrink: 0;
-        }
-        #cpDeckModal .cp-deck-lib-thumb img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            object-position: top center;
-            display: none;
-        }
-        #cpDeckModal .cp-deck-lib-thumb img.is-loaded { display: block; }
-        #cpDeckModal .cp-deck-lib-thumb-ph {
-            font-size: 9px;
+            font-size: 8px;
             font-weight: 800;
-            letter-spacing: 0.04em;
+            letter-spacing: 0.06em;
             color: #64748b;
             text-align: center;
-            padding: 4px;
             line-height: 1.2;
+            padding: 2px;
+            pointer-events: none;
+        }
+        #cpDeckModal .cp-deck-lib-preview-hit img.is-loaded + .cp-deck-lib-thumb-ph {
+            opacity: 0;
         }
         #cpDeckModal .cp-deck-lib-body .cp-card-title { color: #f1f5f9; }
         #cpDeckModal .cp-deck-lib-body .cp-card-sub { color: #94a3b8; }
@@ -748,6 +763,12 @@
             flex-wrap: wrap;
             gap: 10px;
             align-items: center;
+        }
+        #cpDeckModal .cp-deck-apply-row .drive-modal-btn-primary {
+            min-height: 44px;
+            padding-left: 18px;
+            padding-right: 18px;
+            font-weight: 800;
         }
         #cpDeckModal #cpDeckDriveList { max-height: min(220px, 30vh); }
         #cpDeckSearchModal .cp-deck-search-scroll .cp-list,
@@ -970,7 +991,7 @@
         <div class="drive-modal-panel" role="dialog" aria-modal="true" aria-labelledby="cpDeckModalTitle">
             <button type="button" class="drive-modal-close" id="cpDeckModalClose" aria-label="Close">&times;</button>
             <h2 id="cpDeckModalTitle" class="drive-modal-title">Deck builder</h2>
-            <p class="drive-modal-hint">Set copies per card, then <strong>Apply to play deck</strong>. Commander is chosen in the sidebar and stored in deck files. Drive decks: <code class="drive-code">name.cardmaker-deck.json</code> (app data).</p>
+            <p class="drive-modal-hint">Set copies per card, then <strong>Apply to play deck</strong> (updates the play deck and saves to Drive when you are signed in—same as <strong>Save</strong>). The left column shows a <strong>full rendered card</strong> (same as in play), loaded quickly as you scroll. Commander is chosen in the sidebar and stored in deck files. Drive decks: <code class="drive-code">name.cardmaker-deck.json</code> (app data).</p>
 
             <div class="cp-deck-modal-scroll">
                 <div class="cp-deck-modal-layout">
@@ -1113,6 +1134,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="card-render.js"></script>
+    <script src="cardmaker-sets.js"></script>
     <script src="card-player-decks-drive.js"></script>
     <script>
 (function () {
@@ -1255,11 +1277,19 @@
     /** dataUrl cache for renderCardMakerProjectToDataUrl — big win for Firestore restore & duplicate IDs. */
     var cpCardFaceUrlCache = Object.create(null);
     var cpCardFaceUrlPending = Object.create(null);
+    var cpDeckThumbUrlCache = Object.create(null);
+    var cpDeckThumbUrlPending = Object.create(null);
     var deckThumbIo = null;
+    /** Full composited card (frame, text, rarity, etc.) at reduced size — JPEG for fast decode/encode. */
+    var CP_DECK_THUMB_RENDER_OPTS = { maxOutputSide: 360, outputMime: 'image/jpeg', outputQuality: 0.78 };
+    /** When a full-size face is already cached for play, shrink to this max side for the deck list. */
+    var CP_DECK_THUMB_FROM_FULL_MAX = 380;
 
     function clearCardFaceUrlCache() {
         cpCardFaceUrlCache = Object.create(null);
         cpCardFaceUrlPending = Object.create(null);
+        cpDeckThumbUrlCache = Object.create(null);
+        cpDeckThumbUrlPending = Object.create(null);
     }
 
     function getOrRenderCardPlayFaceUrl(card) {
@@ -1285,6 +1315,119 @@
         });
         cpCardFaceUrlPending[id] = pend;
         return pend;
+    }
+
+    function downscaleDataUrlToMaxSide(dataUrl, maxSide) {
+        return new Promise(function (resolve) {
+            if (!dataUrl || !maxSide) {
+                resolve(null);
+                return;
+            }
+            var im = new Image();
+            im.onload = function () {
+                try {
+                    var w = im.naturalWidth || im.width;
+                    var h = im.naturalHeight || im.height;
+                    if (!w || !h) {
+                        resolve(null);
+                        return;
+                    }
+                    var s = Math.min(maxSide / w, maxSide / h, 1);
+                    var tw = Math.max(1, Math.round(w * s));
+                    var th = Math.max(1, Math.round(h * s));
+                    var c = document.createElement('canvas');
+                    c.width = tw;
+                    c.height = th;
+                    var ctx = c.getContext('2d');
+                    if (!ctx) {
+                        resolve(null);
+                        return;
+                    }
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(im, 0, 0, tw, th);
+                    resolve(c.toDataURL('image/jpeg', 0.8));
+                } catch (e) {
+                    resolve(null);
+                }
+            };
+            im.onerror = function () {
+                resolve(null);
+            };
+            im.src = dataUrl;
+        });
+    }
+
+    /**
+     * Deck list: always the full rendered card (same pipeline as play), preferring a quick JPEG downscale
+     * from an already-cached play face when possible.
+     */
+    function getDeckThumbPreviewUrl(card) {
+        if (!card || !card.state) return Promise.resolve(null);
+        var id = String(card.id || '');
+        if (!id) {
+            var st0 = stateForCpDeckPreviewRender(card.state);
+            var r0 = window.renderCardMakerProjectToDataUrl(st0, CP_DECK_THUMB_RENDER_OPTS);
+            return r0 && typeof r0.then === 'function' ? r0 : Promise.resolve(null);
+        }
+        var tCached = cpDeckThumbUrlCache[id];
+        if (tCached) return Promise.resolve(tCached);
+        var tPend = cpDeckThumbUrlPending[id];
+        if (tPend) return tPend;
+
+        function finishThumb(u) {
+            delete cpDeckThumbUrlPending[id];
+            if (u) cpDeckThumbUrlCache[id] = u;
+            return u || null;
+        }
+
+        var pend;
+        if (cpCardFaceUrlCache[id]) {
+            pend = downscaleDataUrlToMaxSide(cpCardFaceUrlCache[id], CP_DECK_THUMB_FROM_FULL_MAX).then(finishThumb);
+        } else if (cpCardFaceUrlPending[id]) {
+            pend = cpCardFaceUrlPending[id].then(function (fullUrl) {
+                if (fullUrl) {
+                    return downscaleDataUrlToMaxSide(fullUrl, CP_DECK_THUMB_FROM_FULL_MAX).then(finishThumb);
+                }
+                var st = stateForCpDeckPreviewRender(card.state);
+                var raw = window.renderCardMakerProjectToDataUrl(st, CP_DECK_THUMB_RENDER_OPTS);
+                if (!raw || typeof raw.then !== 'function') return finishThumb(null);
+                return raw.then(finishThumb, function () {
+                    return finishThumb(null);
+                });
+            });
+        } else {
+            var st2 = stateForCpDeckPreviewRender(card.state);
+            var raw2 = window.renderCardMakerProjectToDataUrl(st2, CP_DECK_THUMB_RENDER_OPTS);
+            if (!raw2 || typeof raw2.then !== 'function') {
+                pend = Promise.resolve(finishThumb(null));
+            } else {
+                pend = raw2.then(finishThumb, function () {
+                    return finishThumb(null);
+                });
+            }
+        }
+        cpDeckThumbUrlPending[id] = pend;
+        return pend;
+    }
+
+    /** Match Saved projects: fill CardMakerSetName from registry when missing (helps render). */
+    function stateForCpDeckPreviewRender(state) {
+        if (!state || typeof state !== 'object') return state;
+        var fields = state.fields || {};
+        var sid = fields.CardMakerSetId != null ? String(fields.CardMakerSetId).trim() : '';
+        var name = fields.CardMakerSetName != null ? String(fields.CardMakerSetName).trim() : '';
+        if (!sid || name || typeof CardMakerSets === 'undefined') {
+            return state;
+        }
+        var reg = CardMakerSets.getNamedSetById(sid);
+        if (!reg || !reg.name) return state;
+        return {
+            version: state.version,
+            updatedAt: state.updatedAt,
+            fields: Object.assign({}, fields, { CardMakerSetName: reg.name }),
+            images: state.images
+        };
     }
 
     /** Pre-render faces in idle time so multiplayer / first draw feels instant. */
@@ -1343,6 +1486,8 @@
         if (!card) return Promise.resolve();
         delete cpCardFaceUrlCache[sid];
         delete cpCardFaceUrlPending[sid];
+        delete cpDeckThumbUrlCache[sid];
+        delete cpDeckThumbUrlPending[sid];
         return getOrRenderCardPlayFaceUrl(card).then(function (url) {
             if (!url) return;
             boards.forEach(function (board) {
@@ -2379,6 +2524,12 @@
         if (emptyEl) {
             emptyEl.hidden = !hasRows || anyVisible;
         }
+        var deckMo = document.getElementById('cpDeckModal');
+        if (deckMo && deckMo.classList.contains('is-open')) {
+            requestAnimationFrame(function () {
+                eagerLoadVisibleDeckThumbs();
+            });
+        }
     }
 
     function sortDeckLibraryDom() {
@@ -2418,21 +2569,45 @@
         });
     }
 
+    function markDeckThumbDone(img, ok) {
+        if (!img) return;
+        img.setAttribute('data-cp-thumb-loaded', '1');
+        var box = img.closest('.cp-deck-lib-preview-hit');
+        var ph = box && box.querySelector('.cp-deck-lib-thumb-ph');
+        if (ok) {
+            img.classList.add('is-loaded');
+            if (ph) ph.style.opacity = '0';
+        } else {
+            if (ph) {
+                ph.textContent = '—';
+                ph.style.opacity = '1';
+            }
+        }
+    }
+
     function loadDeckModalThumbImg(img) {
         if (!img || img.getAttribute('data-cp-thumb-loaded') === '1') return;
         var id = img.getAttribute('data-cp-thumb-id');
         if (!id) return;
         var c = cardById(id);
-        if (!c) return;
-        getOrRenderCardPlayFaceUrl(c).then(function (url) {
-            img.setAttribute('data-cp-thumb-loaded', '1');
-            if (url) {
-                img.src = url;
-                img.classList.add('is-loaded');
-                var ph = img.parentElement && img.parentElement.querySelector('.cp-deck-lib-thumb-ph');
-                if (ph) ph.style.display = 'none';
+        if (!c) {
+            markDeckThumbDone(img, false);
+            return;
+        }
+        img.alt = '';
+        getDeckThumbPreviewUrl(c).then(function (url) {
+            if (!url) {
+                markDeckThumbDone(img, false);
+                return;
             }
-        }).catch(function () { /* ignore */ });
+            img.onload = function () {
+                markDeckThumbDone(img, true);
+            };
+            img.onerror = function () {
+                markDeckThumbDone(img, false);
+            };
+            img.src = url;
+        });
     }
 
     function teardownDeckThumbLazyLoad() {
@@ -2442,6 +2617,31 @@
             } catch (e) { /* ignore */ }
             deckThumbIo = null;
         }
+    }
+
+    function eagerLoadVisibleDeckThumbs() {
+        if (!libraryListEl) return;
+        var deckMo = document.getElementById('cpDeckModal');
+        if (!deckMo || !deckMo.classList.contains('is-open')) return;
+        var imgs = libraryListEl.querySelectorAll('img.cp-deck-thumb-lazy');
+        var maxEager = 36;
+        var n = 0;
+        var vh = window.innerHeight || 600;
+        Array.prototype.forEach.call(imgs, function (im) {
+            if (n >= maxEager) return;
+            if (im.getAttribute('data-cp-thumb-loaded') === '1') return;
+            var row = im.closest('.cp-deck-lib-row');
+            if (!row || row.hidden) return;
+            var r = im.getBoundingClientRect();
+            if (r.bottom < -100 || r.top > vh + 100) return;
+            if (deckThumbIo) {
+                try {
+                    deckThumbIo.unobserve(im);
+                } catch (e2) { /* ignore */ }
+            }
+            loadDeckModalThumbImg(im);
+            n++;
+        });
     }
 
     function setupDeckThumbLazyLoad() {
@@ -2456,16 +2656,22 @@
         deckThumbIo = new IntersectionObserver(function (entries) {
             entries.forEach(function (en) {
                 if (!en.isIntersecting) return;
-                deckThumbIo.unobserve(en.target);
-                loadDeckModalThumbImg(en.target);
+                var im = en.target;
+                var row = im.closest('.cp-deck-lib-row');
+                if (row && row.hidden) return;
+                try {
+                    deckThumbIo.unobserve(im);
+                } catch (e) { /* ignore */ }
+                loadDeckModalThumbImg(im);
             });
-        }, { root: libraryListEl, rootMargin: '48px', threshold: 0.08 });
+        }, { root: null, rootMargin: '140px 0px', threshold: 0 });
         Array.prototype.forEach.call(imgs, function (im) {
             deckThumbIo.observe(im);
         });
     }
 
     function renderLibraryList() {
+        teardownDeckThumbLazyLoad();
         var cards = allCards().slice().sort(function (a, b) {
             return cardTitleFromState(a.state).localeCompare(cardTitleFromState(b.state), undefined, { sensitivity: 'base' });
         });
@@ -2487,9 +2693,9 @@
             row.setAttribute('data-cp-filter-text', (title + ' ' + sub).toLowerCase());
             var inpId = 'cp-lib-qty-' + idx;
             row.innerHTML =
-                '<div class="cp-deck-lib-thumb" aria-hidden="true">' +
+                '<div class="cp-deck-lib-preview-hit" aria-hidden="true">' +
+                    '<img class="cp-deck-thumb-lazy" alt="" width="40" height="48" decoding="async" />' +
                     '<span class="cp-deck-lib-thumb-ph">…</span>' +
-                    '<img class="cp-deck-thumb-lazy" alt="" width="52" height="72" />' +
                 '</div>' +
                 '<div class="cp-lib-meta cp-deck-lib-body">' +
                     '<span class="cp-card-title"></span>' +
@@ -2506,9 +2712,9 @@
             if (qtyInp) {
                 qtyInp.setAttribute('data-cp-card-id', c.id);
             }
-            var imgEl = row.querySelector('img.cp-deck-thumb-lazy');
-            if (imgEl) {
-                imgEl.setAttribute('data-cp-thumb-id', c.id);
+            var thumbImg = row.querySelector('img.cp-deck-thumb-lazy');
+            if (thumbImg) {
+                thumbImg.setAttribute('data-cp-thumb-id', c.id);
             }
             updateDeckBuilderRowInDeckState(row, parseQtyInput(qtyInp));
             libraryListEl.appendChild(row);
@@ -2523,6 +2729,11 @@
         var deckMo = document.getElementById('cpDeckModal');
         if (deckMo && deckMo.classList.contains('is-open')) {
             setupDeckThumbLazyLoad();
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    eagerLoadVisibleDeckThumbs();
+                });
+            });
         }
     }
 
@@ -5008,6 +5219,8 @@
                 var fid = updated[j];
                 delete cpCardFaceUrlCache[fid];
                 delete cpCardFaceUrlPending[fid];
+                delete cpDeckThumbUrlCache[fid];
+                delete cpDeckThumbUrlPending[fid];
             }
             return Promise.all(updated.map(function (fid) { return refreshDomFacesForLibCardId(fid); })).then(function () {
                 updateLibraryListRowsForCardIds(updated);
@@ -5221,7 +5434,7 @@
     function renderDriveDeckList(files) {
         if (!cpDeckDriveList) return;
         if (!files || files.length === 0) {
-            cpDeckDriveList.innerHTML = '<div class="drive-modal-empty">No deck files yet. Enter a name and click <strong>Save to Drive</strong>.</div>';
+            cpDeckDriveList.innerHTML = '<div class="drive-modal-empty">No deck files yet. Enter a name and click <strong>Save</strong> or <strong>Apply to play deck</strong> (when signed in).</div>';
             return;
         }
         cpDeckDriveList.innerHTML = files.map(function (f, i) {
@@ -5329,6 +5542,69 @@
         });
     }
 
+    /**
+     * Updates the play deck from builder quantities, then saves the deck JSON to Drive when configured and signed in.
+     * @param {{ strictSave?: boolean }} opts strictSave: true for the Save button (errors if Drive unavailable); false for Apply (play deck always updates; Drive is best-effort with hints).
+     */
+    function persistDeckBuilderPlayDeckAndDrive(opts) {
+        opts = opts || {};
+        var strictSave = !!opts.strictSave;
+        setDeckModalMessage('');
+        var n = buildDeckFromSelection();
+        var playMsg;
+        if (localMultiplayerSeat === 2) {
+            playMsg = 'Player 2 deck set to ' + n + ' cards.';
+        } else if (localMultiplayerSeat === 1) {
+            playMsg = 'Player 1 deck set to ' + n + ' cards.';
+        } else {
+            playMsg = 'Both play decks set to ' + n + ' cards each.';
+        }
+        if (!window.CPDrive || !CPDrive.hasDriveConfig()) {
+            if (strictSave) {
+                setDeckModalMessage('Drive is not configured for this page.', true);
+            } else {
+                setDeckModalMessage(playMsg + ' Drive is not configured, so nothing was saved.', false);
+            }
+            return;
+        }
+        var nameBase = cpDeckNameInput && cpDeckNameInput.value.trim()
+            ? cpDeckNameInput.value.trim()
+            : 'deck';
+        var fileName;
+        var json;
+        try {
+            fileName = fullDeckDriveFileName(nameBase);
+            json = buildJsonStringForSave(nameBase);
+        } catch (e) {
+            setDeckModalMessage(e.message || String(e), true);
+            return;
+        }
+        CPDrive.ensureDriveTokenBeforeDriveOp().then(function (ok) {
+            if (!ok || !CPDrive.getAccessToken()) {
+                if (strictSave) {
+                    setDeckModalMessage('Sign in with Google first.', true);
+                } else {
+                    setDeckModalMessage(playMsg + ' Sign in with Google to save this list to Drive.', false);
+                }
+                return null;
+            }
+            return CPDrive.saveDeckToDrive(fileName, json);
+        }).then(function (v) {
+            if (v === null) return;
+            if (strictSave) {
+                setDeckModalMessage('Saved “' + displayDeckSaveLabel(fileName) + '” to Drive.');
+            } else {
+                setDeckModalMessage(playMsg + ' Also saved “' + displayDeckSaveLabel(fileName) + '” to Drive.');
+            }
+            try {
+                localStorage.setItem(DECK_NAME_STORAGE_KEY, sanitizeDeckBaseName(nameBase));
+            } catch (e2) { /* ignore */ }
+            return refreshDriveDeckListUi();
+        }).catch(function (err) {
+            setDeckModalMessage(err.message || String(err), true);
+        });
+    }
+
     document.getElementById('cpOpenDeckModal').addEventListener('click', openDeckModal);
     document.getElementById('cpDeckModalClose').addEventListener('click', closeDeckModal);
     document.getElementById('cpDeckModalBackdrop').addEventListener('click', closeDeckModal);
@@ -5344,16 +5620,7 @@
         applyDeckLibFilter();
     });
     document.getElementById('cpDeckApplyPlay').addEventListener('click', function () {
-        var n = buildDeckFromSelection();
-        var msg;
-        if (localMultiplayerSeat === 2) {
-            msg = 'Player 2 deck set to ' + n + ' cards.';
-        } else if (localMultiplayerSeat === 1) {
-            msg = 'Player 1 deck set to ' + n + ' cards.';
-        } else {
-            msg = 'Both play decks set to ' + n + ' cards each.';
-        }
-        setDeckModalMessage(msg + ' You can close the builder or keep editing.');
+        persistDeckBuilderPlayDeckAndDrive({ strictSave: false });
     });
 
     if (libraryListEl) {
@@ -5398,37 +5665,7 @@
     })();
 
     document.getElementById('cpDeckSaveDrive').addEventListener('click', function () {
-        setDeckModalMessage('');
-        if (!window.CPDrive || !CPDrive.hasDriveConfig()) {
-            setDeckModalMessage('Drive is not configured for this page.', true);
-            return;
-        }
-        var nameBase;
-        try {
-            nameBase = cpDeckNameInput && cpDeckNameInput.value.trim()
-                ? cpDeckNameInput.value.trim()
-                : 'deck';
-            var fileName = fullDeckDriveFileName(nameBase);
-            var json = buildJsonStringForSave(nameBase);
-            CPDrive.ensureDriveTokenBeforeDriveOp().then(function (ok) {
-                if (!ok || !CPDrive.getAccessToken()) {
-                    setDeckModalMessage('Sign in with Google first.', true);
-                    return null;
-                }
-                return CPDrive.saveDeckToDrive(fileName, json);
-            }).then(function (v) {
-                if (v === null) return;
-                setDeckModalMessage('Saved “' + displayDeckSaveLabel(fileName) + '” to Drive.');
-                try {
-                    localStorage.setItem(DECK_NAME_STORAGE_KEY, sanitizeDeckBaseName(nameBase));
-                } catch (e2) { /* ignore */ }
-                return refreshDriveDeckListUi();
-            }).catch(function (err) {
-                setDeckModalMessage(err.message || String(err), true);
-            });
-        } catch (e) {
-            setDeckModalMessage(e.message || String(e), true);
-        }
+        persistDeckBuilderPlayDeckAndDrive({ strictSave: true });
     });
 
     document.getElementById('cpDeckRefreshDriveList').addEventListener('click', function () {

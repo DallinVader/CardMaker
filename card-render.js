@@ -133,10 +133,15 @@
 
     /**
      * @param {object} parsed
-     * @returns {Promise<string|null>} PNG data URL or null
+     * @param {object} [options]
+     * @param {number} [options.maxOutputSide] If set (e.g. 400), scale the final card to fit within this max width/height and encode (default: full 2500×3500 PNG).
+     * @param {string} [options.outputMime] With maxOutputSide, use 'image/jpeg' for smaller/faster output (default jpeg when maxOutputSide set).
+     * @param {number} [options.outputQuality] JPEG quality 0–1 (default 0.82).
+     * @returns {Promise<string|null>} PNG or JPEG data URL or null
      */
-    async function renderCardMakerProjectToDataUrl(parsed) {
+    async function renderCardMakerProjectToDataUrl(parsed, options) {
         if (!parsed || typeof parsed !== 'object') return null;
+        var opts = options && typeof options === 'object' ? options : null;
         var images = parsed.images || {};
         var f = parsed.fields || {};
         var mainSrc = images.cardBaseSrc;
@@ -406,6 +411,26 @@
         }
 
         try {
+            var maxOut = opts && typeof opts.maxOutputSide === 'number' ? opts.maxOutputSide : 0;
+            if (maxOut > 0 && maxOut < CANVAS_W) {
+                var sc = Math.min(maxOut / CANVAS_W, maxOut / CANVAS_H, 1);
+                var tw = Math.max(1, Math.round(CANVAS_W * sc));
+                var th = Math.max(1, Math.round(CANVAS_H * sc));
+                var outCv = document.createElement('canvas');
+                outCv.width = tw;
+                outCv.height = th;
+                var octx = outCv.getContext('2d');
+                if (!octx) return null;
+                octx.imageSmoothingEnabled = true;
+                octx.imageSmoothingQuality = 'high';
+                octx.drawImage(canvas, 0, 0, CANVAS_W, CANVAS_H, 0, 0, tw, th);
+                var wantJpeg = !opts.outputMime || opts.outputMime === 'image/jpeg' || opts.outputMime === 'jpeg';
+                if (wantJpeg) {
+                    var q = typeof opts.outputQuality === 'number' ? opts.outputQuality : 0.82;
+                    return outCv.toDataURL('image/jpeg', q);
+                }
+                return outCv.toDataURL('image/png');
+            }
             return canvas.toDataURL('image/png');
         } catch (e) {
             console.warn('card-render: toDataURL failed (tainted or blocked canvas)', e);
