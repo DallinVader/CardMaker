@@ -61,6 +61,8 @@
                     </div>
                     <label class="drive-modal-label drive-modal-search-label" for="driveModalSearchInput">Search</label>
                     <input type="search" id="driveModalSearchInput" class="drive-modal-input drive-modal-search-input" placeholder="Filter by save file name…" autocomplete="off" enterkeyhint="search" />
+                    <label class="drive-modal-label drive-modal-search-label" for="driveModalSetFilter">Set</label>
+                    <select id="driveModalSetFilter" class="drive-modal-input drive-modal-search-input" title="Filter saves by named set (from Saved Projects)"></select>
                     <div class="drive-modal-saves-split">
                         <div id="driveModalList" class="drive-modal-list" role="list"></div>
                         <aside class="drive-modal-preview-aside" aria-label="Card preview">
@@ -380,6 +382,24 @@
         /** @type {Array<{id:string,name:string,modifiedTime?:string}>} */
         let driveModalFilesCache = [];
         let driveModalPreviewRequestId = 0;
+        let driveModalListHydrateGeneration = 0;
+        const DRIVE_MODAL_FETCH_SET_ID_CONCURRENCY = 12;
+
+        /** Small concurrency helper for loading many saves (set id from JSON). */
+        async function mapLimit(items, limit, fn) {
+            const out = new Array(items.length);
+            let idx = 0;
+            async function worker() {
+                while (idx < items.length) {
+                    const i = idx++;
+                    out[i] = await fn(items[i], i);
+                }
+            }
+            const workers = [];
+            for (let w = 0; w < Math.min(limit, items.length); w++) workers.push(worker());
+            await Promise.all(workers);
+            return out;
+        }
 
         // Collapsible sections functionality
         function toggleSection(header) {
@@ -1461,6 +1481,7 @@
                 if (driveAccessToken) {
                     CardMakerSetsDrive.schedulePush();
                 }
+                fillDriveModalSetFilterSelect();
             });
         }
 
@@ -1616,6 +1637,94 @@
             });
         }
 
+        function cardMakerSetIdFromDriveSaveJson(parsed) {
+            if (!parsed || typeof parsed !== 'object') return '';
+            var f = parsed.fields;
+            if (!f || typeof f !== 'object') return '';
+            var id = f.CardMakerSetId;
+            if (id == null) return '';
+            return String(id).trim();
+        }
+
+        function filterDriveModalFilesBySet(files, setVal) {
+            if (!setVal) return (files || []).slice();
+            if (setVal === '__none__') {
+                return (files || []).filter(function (f) {
+                    return !f || !String(f.cardMakerSetId || '').trim();
+                });
+            }
+            var sid = String(setVal);
+            return (files || []).filter(function (f) {
+                return f && String(f.cardMakerSetId || '').trim() === sid;
+            });
+        }
+
+        function getDriveModalFilteredFiles() {
+            var all = driveModalFilesCache || [];
+            var q = getDriveModalSearchQuery();
+            var bySearch = filterDriveModalFilesByQuery(all, q);
+            return filterDriveModalFilesBySet(bySearch, getDriveModalSetFilterValue());
+        }
+
+        function getDriveModalSetFilterValue() {
+            var sel = document.getElementById('driveModalSetFilter');
+            return sel ? String(sel.value || '') : '';
+        }
+
+        function fillDriveModalSetFilterSelect() {
+            var sel = document.getElementById('driveModalSetFilter');
+            if (!sel) return;
+            var prev = sel.value;
+            while (sel.firstChild) {
+                sel.removeChild(sel.firstChild);
+            }
+            var o0 = document.createElement('option');
+            o0.value = '';
+            o0.textContent = 'All sets';
+            sel.appendChild(o0);
+            var o1 = document.createElement('option');
+            o1.value = '__none__';
+            o1.textContent = 'Unassigned';
+            sel.appendChild(o1);
+            if (typeof CardMakerSets !== 'undefined') {
+                CardMakerSets.readNamedSets().forEach(function (s) {
+                    var o = document.createElement('option');
+                    o.value = s.id;
+                    o.textContent = s.name + ' (' + s.total + ')';
+                    sel.appendChild(o);
+                });
+            }
+            var ok = Array.from(sel.options).some(function (x) { return x.value === prev; });
+            sel.value = ok ? prev : '';
+        }
+
+        async function hydrateDriveModalFilesCardMakerSetIds(files) {
+            await mapLimit(files || [], DRIVE_MODAL_FETCH_SET_ID_CONCURRENCY, async function (f) {
+                if (!f || !f.id) return;
+                try {
+                    var parsed = await fetchDriveProjectJsonByFile(f);
+                    f.cardMakerSetId = cardMakerSetIdFromDriveSaveJson(parsed);
+                } catch (e) {
+                    console.warn('Drive modal: could not read set for save', f.id, e);
+                    f.cardMakerSetId = '';
+                }
+            });
+        }
+
+        function rerenderDriveModalListPreservePreview() {
+            var prevSel = document.querySelector('.drive-modal-item.is-preview-selected');
+            var prevId = prevSel ? prevSel.getAttribute('data-drive-file-id') : null;
+            renderDriveModalList();
+            if (prevId) {
+                var still = getDriveModalFilteredFiles().some(function (f) { return f.id === prevId; });
+                if (!still) {
+                    clearDriveModalPreview();
+                } else {
+                    setDriveModalPreviewRowSelected(prevId);
+                }
+            }
+        }
+
         function findDriveModalFileById(fileId) {
             if (!fileId || !driveModalFilesCache || !driveModalFilesCache.length) return null;
             var sid = String(fileId);
@@ -1635,10 +1744,9 @@
                 container.innerHTML = '<div class="drive-modal-empty">No saves yet. Enter a name above and click <strong>Save to Drive</strong>.</div>';
                 return;
             }
-            const q = getDriveModalSearchQuery();
-            const files = filterDriveModalFilesByQuery(all, q);
+            const files = getDriveModalFilteredFiles();
             if (!files.length) {
-                container.innerHTML = '<div class="drive-modal-empty">No saves match your search. Try a different name or clear the filter.</div>';
+                container.innerHTML = '<div class="drive-modal-empty">No saves match your search or set filter. Try different filters or choose <strong>All sets</strong>.</div>';
                 return;
             }
             container.innerHTML = files.map(function (f) {
@@ -1672,8 +1780,21 @@
             container.innerHTML = '<div class="drive-modal-loading">Loading your saves…</div>';
             try {
                 const files = await listDriveProjects();
+                (files || []).forEach(function (f) {
+                    if (f && f.cardMakerSetId === undefined) f.cardMakerSetId = '';
+                });
                 driveModalFilesCache = files;
+                fillDriveModalSetFilterSelect();
                 renderDriveModalList();
+                var hydrateGen = ++driveModalListHydrateGeneration;
+                hydrateDriveModalFilesCardMakerSetIds(files)
+                    .then(function () {
+                        if (hydrateGen !== driveModalListHydrateGeneration) return;
+                        rerenderDriveModalListPreservePreview();
+                    })
+                    .catch(function (e) {
+                        console.warn('Drive modal: could not prefetch set assignments', e);
+                    });
             } catch (err) {
                 console.error(err);
                 driveModalFilesCache = [];
@@ -1709,6 +1830,8 @@
             }
             const searchInp = document.getElementById('driveModalSearchInput');
             if (searchInp) searchInp.value = '';
+            var setF = document.getElementById('driveModalSetFilter');
+            if (setF) setF.value = '';
             modal.classList.add('is-open');
             modal.setAttribute('aria-hidden', 'false');
             document.body.style.overflow = 'hidden';
@@ -1972,20 +2095,16 @@
             if (driveModalSearchInput && !driveModalSearchInput.dataset.bound) {
                 driveModalSearchInput.dataset.bound = '1';
                 driveModalSearchInput.addEventListener('input', function () {
-                    var prevSel = document.querySelector('.drive-modal-item.is-preview-selected');
-                    var prevId = prevSel ? prevSel.getAttribute('data-drive-file-id') : null;
-                    renderDriveModalList();
-                    if (prevId) {
-                        var q = getDriveModalSearchQuery();
-                        var still = filterDriveModalFilesByQuery(driveModalFilesCache, q).some(function (f) {
-                            return f.id === prevId;
-                        });
-                        if (!still) {
-                            clearDriveModalPreview();
-                        } else {
-                            setDriveModalPreviewRowSelected(prevId);
-                        }
-                    }
+                    rerenderDriveModalListPreservePreview();
+                });
+            }
+
+            var driveModalSetFilter = document.getElementById('driveModalSetFilter');
+            if (driveModalSetFilter && !driveModalSetFilter.dataset.bound) {
+                driveModalSetFilter.dataset.bound = '1';
+                fillDriveModalSetFilterSelect();
+                driveModalSetFilter.addEventListener('change', function () {
+                    rerenderDriveModalListPreservePreview();
                 });
             }
 
