@@ -2911,6 +2911,14 @@
         var field = board.field;
         var dragging = false;
         var startX = 0, startY = 0, origLeft = 0, origTop = 0;
+        var elW = 0, elH = 0, maxLeft = 0, maxTop = 0;
+        var dragMoveRaf = null;
+        var pendingClientX = 0, pendingClientY = 0;
+        function detachDragWindowListeners() {
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+            window.removeEventListener('pointercancel', up);
+        }
         function down(ev) {
             if (ev.button !== 0) return;
             if (!canEditBoard(board)) return;
@@ -2919,19 +2927,44 @@
             startY = ev.clientY;
             origLeft = el.offsetLeft;
             origTop = el.offsetTop;
+            elW = el.offsetWidth;
+            elH = el.offsetHeight;
+            maxLeft = Math.max(0, field.clientWidth - elW);
+            maxTop = Math.max(0, field.clientHeight - elH);
+            pendingClientX = startX;
+            pendingClientY = startY;
             el.style.zIndex = String(4000 + (Date.now() % 1000));
             ev.preventDefault();
+            window.addEventListener('pointermove', move, { passive: true });
+            window.addEventListener('pointerup', up);
+            window.addEventListener('pointercancel', up);
         }
         function move(ev) {
             if (!dragging) return;
-            var dx = ev.clientX - startX;
-            var dy = ev.clientY - startY;
-            el.style.left = Math.max(0, Math.min(field.clientWidth - el.offsetWidth, origLeft + dx)) + 'px';
-            el.style.top = Math.max(0, Math.min(field.clientHeight - el.offsetHeight, origTop + dy)) + 'px';
+            pendingClientX = ev.clientX;
+            pendingClientY = ev.clientY;
+            if (dragMoveRaf != null) return;
+            dragMoveRaf = requestAnimationFrame(function () {
+                dragMoveRaf = null;
+                if (!dragging) return;
+                var dx = pendingClientX - startX;
+                var dy = pendingClientY - startY;
+                el.style.left = Math.max(0, Math.min(maxLeft, origLeft + dx)) + 'px';
+                el.style.top = Math.max(0, Math.min(maxTop, origTop + dy)) + 'px';
+            });
         }
         function up(ev) {
+            detachDragWindowListeners();
+            if (dragMoveRaf != null) {
+                cancelAnimationFrame(dragMoveRaf);
+                dragMoveRaf = null;
+            }
             if (!dragging) return;
             dragging = false;
+            var fdx = pendingClientX - startX;
+            var fdy = pendingClientY - startY;
+            el.style.left = Math.max(0, Math.min(maxLeft, origLeft + fdx)) + 'px';
+            el.style.top = Math.max(0, Math.min(maxTop, origTop + fdy)) + 'px';
             if (!ev) return;
             var handledSfx = false;
             var posChanged = Math.abs(el.offsetLeft - origLeft) + Math.abs(el.offsetTop - origTop) > 2;
@@ -3177,13 +3210,13 @@
             scheduleMultiplayerPush();
         }
         el.addEventListener('pointerdown', down);
-        window.addEventListener('pointermove', move);
-        window.addEventListener('pointerup', up);
-        window.addEventListener('pointercancel', up);
     }
 
     function attachDrawZoneDrag(board) {
         if (!board || !board.drawZone) return;
+        var deckGhostMoveRaf = null;
+        var deckGhostClientX = 0;
+        var deckGhostClientY = 0;
         function onDeckPointerMove(ev) {
             var d = board.deckDrag;
             if (!d.active) return;
@@ -3191,12 +3224,24 @@
             var dy = ev.clientY - d.startY;
             if (Math.abs(dx) + Math.abs(dy) > 8) d.moved = true;
             if (d.moved && board.ghost) {
-                board.ghost.style.display = 'block';
-                board.ghost.style.left = ev.clientX + 'px';
-                board.ghost.style.top = ev.clientY + 'px';
+                deckGhostClientX = ev.clientX;
+                deckGhostClientY = ev.clientY;
+                if (deckGhostMoveRaf != null) return;
+                deckGhostMoveRaf = requestAnimationFrame(function () {
+                    deckGhostMoveRaf = null;
+                    var d2 = board.deckDrag;
+                    if (!d2.active || !board.ghost || !d2.moved) return;
+                    board.ghost.style.display = 'block';
+                    board.ghost.style.left = deckGhostClientX + 'px';
+                    board.ghost.style.top = deckGhostClientY + 'px';
+                });
             }
         }
         function onDeckPointerUp(ev) {
+            if (deckGhostMoveRaf != null) {
+                cancelAnimationFrame(deckGhostMoveRaf);
+                deckGhostMoveRaf = null;
+            }
             var d = board.deckDrag;
             if (!d.active) return;
             d.active = false;
@@ -3231,7 +3276,7 @@
             d.startX = ev.clientX;
             d.startY = ev.clientY;
             ev.preventDefault();
-            window.addEventListener('pointermove', onDeckPointerMove);
+            window.addEventListener('pointermove', onDeckPointerMove, { passive: true });
             window.addEventListener('pointerup', onDeckPointerUp);
             window.addEventListener('pointercancel', onDeckPointerUp);
         });
