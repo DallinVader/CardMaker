@@ -651,6 +651,9 @@
             padding-top: 16px;
             border-top: 1px solid rgba(148,163,184,0.16);
         }
+        .spm-modal-actions .spm-modal-action-push-right {
+            margin-right: auto;
+        }
         .spm-modal-error {
             margin: 12px 0 0;
             font-size: 13px;
@@ -1171,6 +1174,7 @@
                 <div class="spm-modal-field">
                     <label for="spmEditSetPick">Set</label>
                     <select id="spmEditSetPick" class="spm-select"></select>
+                    <p id="spmEditSetAssignedLine" class="spm-modal-suffix" hidden aria-live="polite"></p>
                 </div>
                 <div class="spm-modal-field">
                     <label for="spmEditSetName">Name</label>
@@ -1182,6 +1186,7 @@
                 </div>
                 <p id="spmEditSetError" class="spm-modal-error" hidden></p>
                 <div class="spm-modal-actions">
+                    <button type="button" class="spm-btn spm-ghost spm-danger spm-modal-action-push-right" id="spmEditSetDeleteBtn">Delete set…</button>
                     <button type="button" class="spm-btn spm-ghost" data-spm-edit-set-close>Cancel</button>
                     <button type="button" class="spm-btn spm-primary" id="spmEditSetSaveBtn">Save changes</button>
                 </div>
@@ -3621,6 +3626,38 @@
             spmAddNamedSetBtn.addEventListener('click', function () { openSpmDefineSetModal(); });
         }
 
+        function countCardsAssignedToNamedSet(setId) {
+            var sid = setId != null ? String(setId).trim() : '';
+            if (!sid) return 0;
+            var n = 0;
+            for (var i = 0; i < projects.length; i++) {
+                var p = projects[i];
+                var pid = p && p.cardMakerSetId != null ? String(p.cardMakerSetId).trim() : '';
+                if (pid === sid) n++;
+            }
+            return n;
+        }
+
+        function refreshSpmEditSetAssignedCount() {
+            var line = document.getElementById('spmEditSetAssignedLine');
+            var sel = document.getElementById('spmEditSetPick');
+            if (!line || !sel) return;
+            if (!sel.value) {
+                line.textContent = '';
+                line.hidden = true;
+                return;
+            }
+            var c = countCardsAssignedToNamedSet(sel.value);
+            line.hidden = false;
+            if (c === 0) {
+                line.textContent = 'No cards in the list below are assigned to this set.';
+            } else if (c === 1) {
+                line.textContent = '1 card in the list below is assigned to this set.';
+            } else {
+                line.textContent = c + ' cards in the list below are assigned to this set.';
+            }
+        }
+
         function fillSpmEditSetPickOptions(preserveId) {
             var sel = document.getElementById('spmEditSetPick');
             if (!sel || typeof CardMakerSets === 'undefined') return;
@@ -3642,6 +3679,7 @@
             var sel = document.getElementById('spmEditSetPick');
             var n = document.getElementById('spmEditSetName');
             var t = document.getElementById('spmEditSetTotal');
+            refreshSpmEditSetAssignedCount();
             if (!sel || !sel.value || typeof CardMakerSets === 'undefined') return;
             var s = CardMakerSets.getNamedSetById(sel.value);
             if (!s) return;
@@ -3660,6 +3698,11 @@
             if (err) {
                 err.hidden = true;
                 err.textContent = '';
+            }
+            var assignedLine = document.getElementById('spmEditSetAssignedLine');
+            if (assignedLine) {
+                assignedLine.textContent = '';
+                assignedLine.hidden = true;
             }
         }
 
@@ -3730,6 +3773,50 @@
                 refreshNamedSetDropdowns();
                 setMessage('Updated named set “' + rec.name + '” (' + rec.total + ' cards).');
                 closeSpmEditSetModal();
+            });
+        }
+        var spmEditSetDeleteBtn = document.getElementById('spmEditSetDeleteBtn');
+        if (spmEditSetDeleteBtn) {
+            spmEditSetDeleteBtn.addEventListener('click', function () {
+                var errBox = document.getElementById('spmEditSetError');
+                function showEditSetErr(msg) {
+                    if (errBox) {
+                        errBox.textContent = msg;
+                        errBox.hidden = false;
+                    }
+                }
+                if (typeof CardMakerSets === 'undefined') {
+                    showEditSetErr('Reload the page and try again.');
+                    return;
+                }
+                var pick = document.getElementById('spmEditSetPick');
+                var id = pick ? pick.value : '';
+                if (!id) {
+                    showEditSetErr('Choose a set.');
+                    return;
+                }
+                var cur = CardMakerSets.getNamedSetById(id);
+                var label = cur ? cur.name : 'this set';
+                if (!window.confirm('Delete named set “' + label + '”? Saves that reference this set keep their stored card numbers; only the set definition is removed from this list.')) {
+                    return;
+                }
+                var removed = CardMakerSets.deleteNamedSet(id);
+                if (!removed) {
+                    showEditSetErr('Could not delete that set.');
+                    return;
+                }
+                if (errBox) {
+                    errBox.hidden = true;
+                    errBox.textContent = '';
+                }
+                refreshNamedSetDropdowns();
+                setMessage('Deleted named set “' + removed.name + '”.');
+                if (!CardMakerSets.readNamedSets().length) {
+                    closeSpmEditSetModal();
+                    return;
+                }
+                fillSpmEditSetPickOptions();
+                onSpmEditSetPickChange();
             });
         }
         var spmEditNamedSetBtn = document.getElementById('spmEditNamedSetBtn');

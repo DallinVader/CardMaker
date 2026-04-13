@@ -103,6 +103,26 @@
         return sets[ix];
     }
 
+    function deleteNamedSet(id) {
+        var nid = String(id || '').trim();
+        if (!nid) return null;
+        var sets = readNamedSets();
+        var removed = null;
+        var next = sets.filter(function (s) {
+            if (s.id === nid) {
+                removed = s;
+                return false;
+            }
+            return true;
+        });
+        if (!removed) return null;
+        writeNamedSets(next);
+        if (getActiveSetId() === nid) {
+            setActiveSetId('');
+        }
+        return removed;
+    }
+
     function getActiveSetId() {
         try {
             return localStorage.getItem(ACTIVE_SET_KEY) || '';
@@ -210,6 +230,7 @@
         genSetId: genSetId,
         addNamedSet: addNamedSet,
         updateNamedSet: updateNamedSet,
+        deleteNamedSet: deleteNamedSet,
         getNamedSetById: getNamedSetById,
         getActiveSetId: getActiveSetId,
         setActiveSetId: setActiveSetId,
