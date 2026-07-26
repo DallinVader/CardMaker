@@ -907,6 +907,16 @@
                     <button type="button" class="cp-btn cp-btn-primary" id="cpDraw" disabled>Draw to field</button>
                     <button type="button" class="cp-btn" id="cpClearField">Clear field</button>
                 </div>
+                <div class="cp-actions">
+                    <button type="button" class="cp-btn cp-btn-primary" id="cpDrawHand" title="Draw 7 to hand (opening hand)">Draw 7</button>
+                    <button type="button" class="cp-btn" id="cpDrawN" title="Draw a chosen number to hand">Draw N…</button>
+                    <button type="button" class="cp-btn" id="cpUntapAll" title="Set rotation to 0° on your field + treasure cards">Untap all</button>
+                </div>
+                <div class="cp-actions">
+                    <button type="button" class="cp-btn" id="cpShuffleDiscard" title="Shuffle your discard pile back into the deck">Discard → deck</button>
+                    <button type="button" class="cp-btn" id="cpMulligan" title="Return hand to deck, shuffle, draw 7">Mulligan</button>
+                </div>
+                <p class="cp-muted" style="font-size:12px;margin:8px 0 4px;">Tip: middle-click or double-click a card to flip it. Right-click to rotate (exhaust).</p>
                 <div class="cp-actions" style="align-items:center;">
                     <input type="text" class="cp-firebase-room" id="cpRoomId" placeholder="Room name (e.g. friday-game)" maxlength="48" autocomplete="off" aria-label="Room name" />
                 </div>
@@ -1134,13 +1144,16 @@
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="card-render.js"></script>
+    <script src="cardmaker-perf.js"></script>
+    <script src="cardmaker-drive-auth.js"></script>
+    <script src="cardmaker-cookie-consent.js"></script>
     <script src="cardmaker-sets.js"></script>
     <script src="card-player-decks-drive.js"></script>
     <script>
 (function () {
     var SPM_IDB_NAME = 'cardmaker-spm-saves';
     var SPM_IDB_STORE = 'byFileId';
-    var SPM_IDB_VERSION = 1;
+    var SPM_IDB_VERSION = 2;
 
     var library = [];
     var imported = [];
@@ -1268,7 +1281,14 @@
 
     function firestoreSliceFingerprint(obj) {
         try {
-            return stableStringify(obj == null ? {} : obj);
+            // Cheap stable-ish fingerprint (avoid deep key-sorted stringify on every push/snapshot).
+            var s = JSON.stringify(obj == null ? {} : obj);
+            var h = 2166136261;
+            for (var i = 0; i < s.length; i++) {
+                h ^= s.charCodeAt(i);
+                h = Math.imul(h, 16777619);
+            }
+            return s.length + ':' + (h >>> 0).toString(16);
         } catch (e) {
             return '';
         }
@@ -1282,8 +1302,11 @@
     var deckThumbIo = null;
     /** Full composited card (frame, text, rarity, etc.) at reduced size — JPEG for fast decode/encode. */
     var CP_DECK_THUMB_RENDER_OPTS = { maxOutputSide: 360, outputMime: 'image/jpeg', outputQuality: 0.78 };
+    /** Play-mat faces: sharp enough on screen, far cheaper than 2500×3500 PNG. */
+    var CP_PLAY_FACE_RENDER_OPTS = { maxOutputSide: 720, outputMime: 'image/jpeg', outputQuality: 0.82 };
     /** When a full-size face is already cached for play, shrink to this max side for the deck list. */
     var CP_DECK_THUMB_FROM_FULL_MAX = 380;
+    var CP_FACE_WARM_MAX = 24;
 
     function clearCardFaceUrlCache() {
         cpCardFaceUrlCache = Object.create(null);
@@ -1296,14 +1319,14 @@
         if (!card || !card.state) return Promise.resolve(null);
         var id = String(card.id || '');
         if (!id) {
-            var px = window.renderCardMakerProjectToDataUrl(card.state);
+            var px = window.renderCardMakerProjectToDataUrl(card.state, CP_PLAY_FACE_RENDER_OPTS);
             return px && typeof px.then === 'function' ? px : Promise.resolve(null);
         }
         var cached = cpCardFaceUrlCache[id];
         if (cached) return Promise.resolve(cached);
         var pend = cpCardFaceUrlPending[id];
         if (pend) return pend;
-        var raw = window.renderCardMakerProjectToDataUrl(card.state);
+        var raw = window.renderCardMakerProjectToDataUrl(card.state, CP_PLAY_FACE_RENDER_OPTS);
         if (!raw || typeof raw.then !== 'function') return Promise.resolve(null);
         pend = raw.then(function (url) {
             delete cpCardFaceUrlPending[id];
@@ -1435,7 +1458,7 @@
         try {
             var cards = allCards();
             if (cards.length === 0 || cards.length > 150) return;
-            var n = Math.min(cards.length, 48);
+            var n = Math.min(cards.length, CP_FACE_WARM_MAX);
             var i = 0;
             function runNext() {
                 if (i >= n) return;
@@ -2087,18 +2110,24 @@
     }
 
     function openSpmIdb() {
+        if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.openIdb) {
+            return CardMakerPerf.openIdb();
+        }
         return new Promise(function (resolve) {
             if (!window.indexedDB) {
                 resolve(null);
                 return;
             }
-            var req = indexedDB.open(SPM_IDB_NAME, SPM_IDB_VERSION);
+            var req = indexedDB.open(SPM_IDB_NAME, 2);
             req.onerror = function () { resolve(null); };
             req.onsuccess = function () { resolve(req.result); };
             req.onupgradeneeded = function (e) {
                 var db = e.target.result;
                 if (!db.objectStoreNames.contains(SPM_IDB_STORE)) {
                     db.createObjectStore(SPM_IDB_STORE);
+                }
+                if (!db.objectStoreNames.contains('thumbByKey')) {
+                    db.createObjectStore('thumbByKey');
                 }
             };
         });
@@ -2119,9 +2148,15 @@
                             return;
                         }
                         var rec = cur.value;
+                        var key = String(cur.key);
+                        // Skip editor draft sentinel
+                        if (key.indexOf('__cardmaker_') === 0) {
+                            cur.continue();
+                            return;
+                        }
                         if (rec && rec.state && typeof rec.state === 'object') {
                             out.push({
-                                id: String(cur.key),
+                                id: key,
                                 state: rec.state,
                                 source: 'cache',
                                 modifiedTime: rec.modifiedTime != null ? String(rec.modifiedTime) : null,
@@ -2140,6 +2175,11 @@
 
     /** Write one card project into the same IndexedDB store as Saved projects (by Drive file id). */
     function idbWriteSpmSave(fileId, fileMeta, state) {
+        if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.writeSaveCache) {
+            return CardMakerPerf.writeSaveCache(String(fileId), fileMeta || {}, state).then(function () {
+                return;
+            });
+        }
         return openSpmIdb().then(function (db) {
             if (!db || !state || typeof state !== 'object') {
                 return Promise.reject(new Error('IndexedDB unavailable'));
@@ -2158,6 +2198,25 @@
                     tx.objectStore(SPM_IDB_STORE).put(rec, String(fileId));
                 } catch (err) {
                     reject(err);
+                }
+            });
+        });
+    }
+
+    function idbReadSpmSave(fileId) {
+        if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.readSaveCache) {
+            return CardMakerPerf.readSaveCache(String(fileId));
+        }
+        return openSpmIdb().then(function (db) {
+            if (!db) return null;
+            return new Promise(function (resolve, reject) {
+                try {
+                    var tx = db.transaction(SPM_IDB_STORE, 'readonly');
+                    var r = tx.objectStore(SPM_IDB_STORE).get(String(fileId));
+                    r.onsuccess = function () { resolve(r.result || null); };
+                    r.onerror = function () { reject(r.error); };
+                } catch (e) {
+                    resolve(null);
                 }
             });
         });
@@ -2221,28 +2280,38 @@
         var failed = [];
         return mapLimit(fileIds, CP_DECK_HYDRATE_CONCURRENCY, function (fileId) {
             var fid = String(fileId);
-            return Promise.all([
-                CPDrive.fetchDriveFileMetadata(fid).catch(function () {
-                    return { modifiedTime: null, size: null };
-                }),
-                CPDrive.fetchDriveFileMedia(fid)
-            ]).then(function (pair) {
-                var meta = pair[0];
-                var text = pair[1];
-                var state;
-                try {
-                    state = JSON.parse(text);
-                } catch (e) {
-                    throw new Error('Invalid JSON');
-                }
-                if (!isValidCardmakerProjectState(state)) {
-                    throw new Error('Not a card project file');
-                }
-                return idbWriteSpmSave(fid, meta, state).then(function () {
-                    ok.push(fid);
-                    done++;
-                    if (typeof onProgress === 'function') onProgress(done, total);
-                    return null;
+            return CPDrive.fetchDriveFileMetadata(fid).catch(function () {
+                return { modifiedTime: null, size: null };
+            }).then(function (meta) {
+                return idbReadSpmSave(fid).then(function (cached) {
+                    var metaRef = { modifiedTime: cached && cached.modifiedTime, size: cached && cached.size };
+                    var unchanged = cached && cached.state && meta && meta.modifiedTime &&
+                        (typeof CardMakerPerf !== 'undefined'
+                            ? CardMakerPerf.driveFileMetaUnchanged(metaRef, meta)
+                            : (metaRef.modifiedTime === meta.modifiedTime));
+                    if (unchanged && isValidCardmakerProjectState(cached.state)) {
+                        ok.push(fid);
+                        done++;
+                        if (typeof onProgress === 'function') onProgress(done, total);
+                        return null;
+                    }
+                    return CPDrive.fetchDriveFileMedia(fid).then(function (text) {
+                        var state;
+                        try {
+                            state = JSON.parse(text);
+                        } catch (e) {
+                            throw new Error('Invalid JSON');
+                        }
+                        if (!isValidCardmakerProjectState(state)) {
+                            throw new Error('Not a card project file');
+                        }
+                        return idbWriteSpmSave(fid, meta, state).then(function () {
+                            ok.push(fid);
+                            done++;
+                            if (typeof onProgress === 'function') onProgress(done, total);
+                            return null;
+                        });
+                    });
                 });
             }).catch(function (err) {
                 failed.push({ id: fid, message: err && err.message ? err.message : String(err) });
@@ -3380,18 +3449,26 @@
 
     function attachMiddleClickFlip(wrap, flipInner) {
         wrap._cpShowingBack = false;
-        wrap.addEventListener('auxclick', function (ev) {
-            if (ev.button !== 1) return;
-            ev.preventDefault();
+        function toggleFlip() {
             if (wrap.getAttribute('data-cp-opponent-hand') === '1') return;
             if (!canEditBoard(wrap._cpBoard)) return;
             wrap._cpShowingBack = !wrap._cpShowingBack;
             flipInner.classList.toggle('cp-flip-inner--back', wrap._cpShowingBack);
             cpPlayFlipSfx();
             scheduleMultiplayerPush();
+        }
+        wrap.addEventListener('auxclick', function (ev) {
+            if (ev.button !== 1) return;
+            ev.preventDefault();
+            toggleFlip();
         });
         wrap.addEventListener('mousedown', function (ev) {
             if (ev.button === 1) ev.preventDefault();
+        });
+        wrap.addEventListener('dblclick', function (ev) {
+            if (ev.target && ev.target.closest && ev.target.closest('button')) return;
+            ev.preventDefault();
+            toggleFlip();
         });
     }
 
@@ -3588,8 +3665,9 @@
         wrap.style.setProperty('--cp-enlarge-shift', '0px');
         var dx = parseFloat(wrap.style.getPropertyValue('--cp-enlarge-dx')) || 0;
         var dy = parseFloat(wrap.style.getPropertyValue('--cp-enlarge-dy')) || 0;
+        // At most 2 measure/correct cycles (was 10) — avoids layout thrash during hover enlarge.
         var i;
-        for (i = 0; i < 10; i++) {
+        for (i = 0; i < 2; i++) {
             wrap.style.setProperty('--cp-enlarge-dx', dx + 'px');
             wrap.style.setProperty('--cp-enlarge-dy', dy + 'px');
             void wrap.offsetHeight;
@@ -3614,7 +3692,7 @@
         applyEnlargeLayoutFrame(wrap);
     }
 
-    var CP_ENLARGE_TRACK_MS = 400;
+    var CP_ENLARGE_TRACK_MS = 220;
     /** Ignore pointerleave briefly after enlarging so a translating hit-target does not fire leave and clear the preview. */
     var CP_ENLARGE_LEAVE_GRACE_MS = 650;
 
@@ -4519,6 +4597,122 @@
             updateStats();
             setStatus('Render failed.');
             scheduleMultiplayerPush();
+        });
+    }
+
+    function activePlayBoard() {
+        return localMultiplayerSeat === 2 ? boardP2 : boardP1;
+    }
+
+    /** Untap field + treasure (not hand / discard). */
+    function untapAllOnBoard(board) {
+        board = board || activePlayBoard();
+        if (!canEditBoard(board) || !board.field) return;
+        var n = 0;
+        board.field.querySelectorAll('.cp-card-on-field').forEach(function (w) {
+            if (w.classList.contains('cp-hand-card')) return;
+            if (w.getAttribute('data-cp-discard') === '1') return;
+            if ((w._cpRotationDeg || 0) === 0) return;
+            w._cpRotationDeg = 0;
+            var rotLayer = w.querySelector('.cp-card-rot');
+            if (rotLayer) rotLayer.style.transform = 'rotate(0deg)';
+            n++;
+        });
+        updateTreasureZoneBadgesBoard(board);
+        setStatus(n ? ('Untapped ' + n + ' card(s) on P' + (board.id === 'p2' ? '2' : '1') + '.') : 'Nothing to untap.');
+        scheduleMultiplayerPush();
+    }
+
+    function shuffleDiscardIntoDeck(board) {
+        board = board || activePlayBoard();
+        if (!canEditBoard(board) || !board.field) return;
+        var wraps = Array.from(board.field.querySelectorAll('.cp-card-on-field[data-cp-discard="1"]'));
+        if (!wraps.length) {
+            setStatus('Discard pile is empty.');
+            return;
+        }
+        var added = 0;
+        wraps.forEach(function (w) {
+            var entry = w._cpDeckEntry;
+            if (!entry) {
+                var libId = w.getAttribute('data-cp-card-lib-id') || '';
+                entry = libId ? cardById(libId) : null;
+            }
+            if (entry) {
+                board.deck.push(entry);
+                added++;
+            }
+            w.remove();
+        });
+        shuffleInPlace(board.deck);
+        updateStats();
+        relayoutZonePilesBoard(board);
+        setStatus('Shuffled ' + added + ' discard card(s) into P' + (board.id === 'p2' ? '2' : '1') + ' deck (' + board.deck.length + ').');
+        scheduleMultiplayerPush();
+    }
+
+    function drawNToHand(board, count) {
+        board = board || activePlayBoard();
+        if (!canEditBoard(board)) return Promise.resolve();
+        var n = parseInt(count, 10);
+        if (!(n >= 1)) {
+            setStatus('Enter a number ≥ 1.');
+            return Promise.resolve();
+        }
+        n = Math.min(n, board.deck.length);
+        if (n <= 0) {
+            setStatus(board.id === 'p2' ? 'Player 2 deck is empty.' : 'Deck is empty.');
+            return Promise.resolve();
+        }
+        var cards = [];
+        var i;
+        for (i = 0; i < n; i++) cards.push(board.deck.pop());
+        updateStats();
+        setStatus('Drawing ' + n + ' to hand…');
+        return Promise.all(cards.map(function (card) {
+            return getOrRenderCardPlayFaceUrl(card).then(function (url) {
+                return { card: card, url: url };
+            }, function () {
+                return { card: card, url: null };
+            });
+        })).then(function (results) {
+            var chain = Promise.resolve();
+            results.forEach(function (r) {
+                chain = chain.then(function () {
+                    if (!r.url) {
+                        board.deck.push(r.card);
+                        return null;
+                    }
+                    return placeCardInHand(r.url, r.card, board);
+                });
+            });
+            return chain;
+        }).then(function () {
+            updateStats();
+            setStatus('Drew ' + n + ' to hand (P' + (board.id === 'p2' ? '2' : '1') + ') · ' + board.deck.length + ' left.');
+            scheduleMultiplayerPush();
+        });
+    }
+
+    function mulliganBoard(board) {
+        board = board || activePlayBoard();
+        if (!canEditBoard(board) || !board.field) return;
+        if (!confirm('Mulligan? Return your hand to the deck, shuffle, then draw 7.')) return;
+        var handCards = Array.from(board.field.querySelectorAll('.cp-card-on-field.cp-hand-card'));
+        handCards.forEach(function (w) {
+            var entry = w._cpDeckEntry;
+            if (!entry) {
+                var libId = w.getAttribute('data-cp-card-lib-id') || '';
+                entry = libId ? cardById(libId) : null;
+            }
+            if (entry) board.deck.push(entry);
+            w.remove();
+        });
+        shuffleInPlace(board.deck);
+        updateStats();
+        relayoutHandCardsBoard(board);
+        drawNToHand(board, 7).then(function () {
+            setStatus('Mulligan complete (drew 7).');
         });
     }
 
@@ -5893,6 +6087,26 @@
     document.getElementById('cpUseAll').addEventListener('click', useAllAsDeck);
     document.getElementById('cpShuffle').addEventListener('click', shuffleDeck);
     document.getElementById('cpDraw').addEventListener('click', drawOne);
+    var cpDrawHandBtn = document.getElementById('cpDrawHand');
+    if (cpDrawHandBtn) {
+        cpDrawHandBtn.addEventListener('click', function () {
+            drawNToHand(activePlayBoard(), 7);
+        });
+    }
+    var cpDrawNBtn = document.getElementById('cpDrawN');
+    if (cpDrawNBtn) {
+        cpDrawNBtn.addEventListener('click', function () {
+            var raw = window.prompt('Draw how many cards to hand?', '1');
+            if (raw == null) return;
+            drawNToHand(activePlayBoard(), parseInt(raw, 10));
+        });
+    }
+    var cpUntapAllBtn = document.getElementById('cpUntapAll');
+    if (cpUntapAllBtn) cpUntapAllBtn.addEventListener('click', function () { untapAllOnBoard(activePlayBoard()); });
+    var cpShuffleDiscardBtn = document.getElementById('cpShuffleDiscard');
+    if (cpShuffleDiscardBtn) cpShuffleDiscardBtn.addEventListener('click', function () { shuffleDiscardIntoDeck(activePlayBoard()); });
+    var cpMulliganBtn = document.getElementById('cpMulligan');
+    if (cpMulliganBtn) cpMulliganBtn.addEventListener('click', function () { mulliganBoard(activePlayBoard()); });
     document.getElementById('cpClearField').addEventListener('click', clearField);
 
     document.getElementById('cpImportBtn').addEventListener('click', function () {

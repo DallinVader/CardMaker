@@ -1020,6 +1020,10 @@
                                 <button type="button" class="spm-small-btn" id="spmOpenCreateSetBtn" disabled title="Assign a named set, total size, and card numbers to selected saves">Assign named set…</button>
                             </div>
                             <p class="spm-bulk-meta" id="spmFilteredHint"></p>
+                            <span class="spm-bulk-meta" style="display:inline-flex;gap:6px;align-items:center;margin-left:8px;">
+                                <button type="button" class="spm-small-btn" id="spmPagePrev">Prev</button>
+                                <button type="button" class="spm-small-btn" id="spmPageNext">Next</button>
+                            </span>
                         </div>
                     </div>
                 </details>
@@ -1200,6 +1204,9 @@
     </div>
 
     <script src="card-render.js"></script>
+    <script src="cardmaker-perf.js"></script>
+    <script src="cardmaker-drive-auth.js"></script>
+    <script src="cardmaker-cookie-consent.js"></script>
     <script src="cardmaker-sets.js"></script>
     <script src="cardmaker-sets-drive.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -1244,6 +1251,8 @@
         const spmOpenPrintGridBtn = document.getElementById('spmOpenPrintGridBtn');
         const spmOpenCreateSetBtn = document.getElementById('spmOpenCreateSetBtn');
         const spmFilteredHint = document.getElementById('spmFilteredHint');
+        var SPM_PAGE_SIZE = 75;
+        var spmTablePage = 0;
 
         const selectedProjectIds = new Set();
 
@@ -1449,13 +1458,14 @@
         }
 
         function readStoredDriveRecord() {
+            if (typeof CardMakerDriveAuth !== 'undefined') return CardMakerDriveAuth.readRecord();
             try {
                 const raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
                 if (!raw) return null;
                 const data = JSON.parse(raw);
                 if (!data || !data.access_token || !data.expires_at) return null;
                 const sessionEnd = data.session_expires_at != null ? data.session_expires_at : data.expires_at;
-                if (Date.now() >= sessionEnd - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
+                if (Date.now() >= sessionEnd) {
                     localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
                     return null;
                 }
@@ -1472,31 +1482,32 @@
         }
 
         function persistDriveToken(tokenResponse) {
-            const expiresInSec = parseInt(tokenResponse.expires_in || '3600', 10);
-            const googleExpiresAt = Date.now() + expiresInSec * 1000 - DRIVE_TOKEN_EXPIRY_BUFFER_MS;
-            let sessionExpiresAt = Date.now() + DRIVE_SESSION_MAX_MS;
-            try {
-                const raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
-                if (raw) {
-                    const prev = JSON.parse(raw);
-                    if (prev && typeof prev.session_expires_at === 'number' &&
-                        Date.now() < prev.session_expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
-                        sessionExpiresAt = prev.session_expires_at;
-                    }
-                }
-            } catch (e) { /* ignore */ }
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                CardMakerDriveAuth.persistTokenResponse(tokenResponse);
+                return;
+            }
+            const expiresInSec = parseInt(tokenResponse.expires_in || '3600', 10) || 3600;
             localStorage.setItem(DRIVE_TOKEN_STORAGE_KEY, JSON.stringify({
                 access_token: tokenResponse.access_token,
-                expires_at: googleExpiresAt,
-                session_expires_at: sessionExpiresAt
+                expires_at: Date.now() + expiresInSec * 1000,
+                session_expires_at: Date.now() + (30 * 24 * 60 * 60 * 1000)
             }));
         }
 
         function isGoogleAccessTokenStale(data) {
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                return CardMakerDriveAuth.isAccessTokenStale(data);
+            }
             return !!(data && Date.now() >= data.expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS);
         }
 
         function trySilentRefreshGoogleToken() {
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                return CardMakerDriveAuth.ensureFreshToken({ interactive: false }).then(function (ok) {
+                    driveAccessToken = CardMakerDriveAuth.getAccessToken();
+                    return ok;
+                });
+            }
             const client = initTokenClient();
             if (!client) return Promise.resolve(false);
             return new Promise(function (resolve) {
@@ -1591,12 +1602,30 @@
         function initTokenClient() {
             if (gisTokenClient) return gisTokenClient;
             if (!window.google || !google.accounts || !google.accounts.oauth2) return null;
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                CardMakerDriveAuth.init({
+                    clientId: GOOGLE_CLIENT_ID,
+                    scope: DRIVE_SCOPE,
+                    onChange: function () {
+                        driveAccessToken = CardMakerDriveAuth.getAccessToken();
+                        updateButtons();
+                    },
+                    onStatus: function (msg) {
+                        if (msg) spmStatus.textContent = msg;
+                    }
+                });
+                gisTokenClient = CardMakerDriveAuth.createTokenClient(google.accounts.oauth2, {
+                    clientId: GOOGLE_CLIENT_ID,
+                    scope: DRIVE_SCOPE
+                });
+                return gisTokenClient;
+            }
             gisTokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: GOOGLE_CLIENT_ID,
                 scope: DRIVE_SCOPE,
                 callback: function () {},
                 error_callback: function (err) {
-                    console.error('GIS error:', err);
+                    console.warn('GIS error:', err);
                     setMessage('Google sign-in failed.', true);
                     spmStatus.textContent = 'Sign-in failed';
                 }
@@ -1619,13 +1648,24 @@
         }
 
         async function ensureSignedIn() {
+            const waitOk = await waitForGoogleScripts(3000);
+            if (waitOk) initTokenClient();
+            if (typeof CardMakerDriveAuth !== 'undefined' && waitOk) {
+                const ok = await CardMakerDriveAuth.ensureFreshToken({ interactive: true });
+                driveAccessToken = CardMakerDriveAuth.getAccessToken();
+                updateButtons();
+                if (ok && driveAccessToken) {
+                    spmStatus.textContent = 'Signed in (saved on this device)';
+                    return true;
+                }
+                spmStatus.textContent = 'Not connected';
+                return false;
+            }
             let rec = readStoredDriveRecord();
             if (rec && isGoogleAccessTokenStale(rec)) {
-                const waitOk = await waitForGoogleScripts(3000);
                 if (waitOk) await trySilentRefreshGoogleToken();
                 rec = readStoredDriveRecord();
                 if (rec && isGoogleAccessTokenStale(rec)) {
-                    localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
                     driveAccessToken = null;
                     updateButtons();
                     spmStatus.textContent = 'Not connected';
@@ -1660,6 +1700,22 @@
             }
             spmStatus.textContent = 'Opening Google sign-in…';
             setMessage('');
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                const signed = await CardMakerDriveAuth.signIn({ forceConsent: false });
+                driveAccessToken = CardMakerDriveAuth.getAccessToken();
+                updateButtons();
+                if (signed) {
+                    spmStatus.textContent = 'Signed in (saved on this device)';
+                    (async function () {
+                        await syncNamedSetsWithDriveIfPossibleSpm();
+                        await refreshAll();
+                    })().catch(function (e) { console.error(e); });
+                } else {
+                    spmStatus.textContent = 'Sign-in failed';
+                    setMessage('Sign-in failed. Check OAuth origin.', true);
+                }
+                return;
+            }
             client.callback = function (tokenResponse) {
                 if (tokenResponse && tokenResponse.access_token) {
                     persistDriveToken(tokenResponse);
@@ -1675,11 +1731,15 @@
                     setMessage('Sign-in failed. Check OAuth origin.', true);
                 }
             };
-            client.requestAccessToken({ prompt: 'consent' });
+            client.requestAccessToken({ prompt: '' });
         }
 
         function handleSignOut() {
-            localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                CardMakerDriveAuth.signOut();
+            } else {
+                localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
+            }
             driveAccessToken = null;
             projects = [];
             selectedProjectIds.clear();
@@ -1709,14 +1769,18 @@
                 createNewCardOnDrive().catch(function (e) { console.error(e); });
             });
         }
-        spmSearchInput.addEventListener('input', function () { applyFiltersAndRender(); });
+        function resetSpmPageAndRender() {
+            spmTablePage = 0;
+            applyFiltersAndRender();
+        }
+        spmSearchInput.addEventListener('input', function () { resetSpmPageAndRender(); });
         spmSortSelect.addEventListener('change', function () {
             updateHeaderArrows();
-            applyFiltersAndRender();
+            resetSpmPageAndRender();
         });
-        if (spmFilterType) spmFilterType.addEventListener('change', function () { applyFiltersAndRender(); });
-        if (spmFilterSubtype) spmFilterSubtype.addEventListener('change', function () { applyFiltersAndRender(); });
-        if (spmFilterRarity) spmFilterRarity.addEventListener('change', function () { applyFiltersAndRender(); });
+        if (spmFilterType) spmFilterType.addEventListener('change', function () { resetSpmPageAndRender(); });
+        if (spmFilterSubtype) spmFilterSubtype.addEventListener('change', function () { resetSpmPageAndRender(); });
+        if (spmFilterRarity) spmFilterRarity.addEventListener('change', function () { resetSpmPageAndRender(); });
         if (spmClearFiltersBtn) {
             spmClearFiltersBtn.addEventListener('click', function () {
                 if (spmFilterType) spmFilterType.value = '';
@@ -1724,12 +1788,27 @@
                 if (spmFilterRarity) spmFilterRarity.value = '';
                 var sf = document.getElementById('spmFilterSet');
                 if (sf) sf.value = '';
-                applyFiltersAndRender();
+                resetSpmPageAndRender();
             });
         }
         var spmFilterSetEl = document.getElementById('spmFilterSet');
         if (spmFilterSetEl) {
-            spmFilterSetEl.addEventListener('change', function () { applyFiltersAndRender(); });
+            spmFilterSetEl.addEventListener('change', function () { resetSpmPageAndRender(); });
+        }
+        var spmPagePrevBtn = document.getElementById('spmPagePrev');
+        var spmPageNextBtn = document.getElementById('spmPageNext');
+        if (spmPagePrevBtn) {
+            spmPagePrevBtn.addEventListener('click', function () {
+                if (spmTablePage <= 0) return;
+                spmTablePage -= 1;
+                applyFiltersAndRender();
+            });
+        }
+        if (spmPageNextBtn) {
+            spmPageNextBtn.addEventListener('click', function () {
+                spmTablePage += 1;
+                applyFiltersAndRender();
+            });
         }
         var spmActiveSetSelectEl = document.getElementById('spmActiveSetSelect');
         if (spmActiveSetSelectEl && typeof CardMakerSets !== 'undefined') {
@@ -1857,14 +1936,24 @@
         async function listCardMakerProjects() {
             const u = new URL(DRIVE_FILES_API);
             u.searchParams.set('spaces', 'appDataFolder');
-            u.searchParams.set('fields', 'files(id,name,modifiedTime,size)');
+            u.searchParams.set('fields', 'files(id,name,modifiedTime,size,appProperties)');
             u.searchParams.set('pageSize', '200');
             const res = await fetch(u.toString(), { headers: driveAuthHeaders(driveAccessToken) });
             const text = await res.text();
             if (!res.ok) throw new Error(parseDriveError(text, res.status));
             const data = JSON.parse(text);
             return (data.files || []).filter(function (f) {
-                return f.name && f.name.toLowerCase().endsWith(PROJECT_FILE_EXTENSION) && f.name.indexOf('cardmaker') !== -1;
+                if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.isCardmakerProjectFileName) {
+                    return CardMakerPerf.isCardmakerProjectFileName(f.name);
+                }
+                return f.name && f.name.toLowerCase().endsWith(PROJECT_FILE_EXTENSION);
+            }).map(function (f) {
+                if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.applyAppPropertiesToFileMeta) {
+                    CardMakerPerf.applyAppPropertiesToFileMeta(f);
+                } else if (f.appProperties && f.appProperties.cmSetId) {
+                    f.cardMakerSetId = String(f.appProperties.cmSetId).trim();
+                }
+                return f;
             });
         }
 
@@ -1884,17 +1973,19 @@
             return JSON.parse(txt);
         }
 
-        async function driveCreateAppDataMetadata(fileName) {
+        async function driveCreateAppDataMetadata(fileName, appProperties) {
             const u = new URL(DRIVE_FILES_API);
-            u.searchParams.set('fields', 'id,name');
+            u.searchParams.set('fields', 'id,name,modifiedTime,size,appProperties');
+            var body = {
+                name: fileName,
+                mimeType: 'application/json',
+                parents: ['appDataFolder']
+            };
+            if (appProperties) body.appProperties = appProperties;
             const res = await fetch(u.toString(), {
                 method: 'POST',
                 headers: driveAuthHeaders(driveAccessToken, { 'Content-Type': 'application/json; charset=UTF-8' }),
-                body: JSON.stringify({
-                    name: fileName,
-                    mimeType: 'application/json',
-                    parents: ['appDataFolder']
-                })
+                body: JSON.stringify(body)
             });
             const text = await res.text();
             if (!res.ok) throw new Error(parseDriveError(text, res.status));
@@ -1905,6 +1996,30 @@
             if (!project || !project.file || !meta) return;
             if (meta.modifiedTime) project.file.modifiedTime = meta.modifiedTime;
             if (meta.size != null) project.file.size = meta.size;
+            if (meta.appProperties) {
+                project.file.appProperties = meta.appProperties;
+                if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.applyAppPropertiesToFileMeta) {
+                    CardMakerPerf.applyAppPropertiesToFileMeta(project.file);
+                    if (project.file.cardMakerSetId != null) project.cardMakerSetId = project.file.cardMakerSetId;
+                }
+            }
+        }
+
+        async function drivePatchAppProperties(fileId, appProperties) {
+            if (!fileId || !appProperties) return null;
+            const u = new URL(DRIVE_FILES_API + '/' + encodeURIComponent(fileId));
+            u.searchParams.set('fields', 'id,appProperties,modifiedTime,size');
+            const res = await fetch(u.toString(), {
+                method: 'PATCH',
+                headers: driveAuthHeaders(driveAccessToken, { 'Content-Type': 'application/json; charset=UTF-8' }),
+                body: JSON.stringify({ appProperties: appProperties })
+            });
+            const text = await res.text();
+            if (!res.ok) {
+                console.warn('Drive appProperties patch failed', parseDriveError(text, res.status));
+                return null;
+            }
+            try { return JSON.parse(text); } catch (e) { return null; }
         }
 
         /** PATCH file content; returns { modifiedTime, size } so the table “Updated” column can refresh without a full reload. */
@@ -1920,14 +2035,30 @@
             });
             const txt = await res.text();
             if (!res.ok) throw new Error(parseDriveError(txt, res.status));
+            var upMeta = null;
             try {
                 const j = JSON.parse(txt);
-                if (j && j.modifiedTime) return { modifiedTime: j.modifiedTime, size: j.size };
+                if (j && j.modifiedTime) upMeta = { modifiedTime: j.modifiedTime, size: j.size };
             } catch (e) { /* ignore */ }
-            return {
-                modifiedTime: new Date().toISOString(),
-                size: new Blob([payload]).size
-            };
+            if (!upMeta) {
+                upMeta = {
+                    modifiedTime: new Date().toISOString(),
+                    size: new Blob([payload]).size
+                };
+            }
+            if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.buildAppPropertiesFromState) {
+                var appProps = CardMakerPerf.buildAppPropertiesFromState(stateObj);
+                var patched = await drivePatchAppProperties(fileId, appProps);
+                if (patched) {
+                    if (patched.modifiedTime) upMeta.modifiedTime = patched.modifiedTime;
+                    if (patched.size != null) upMeta.size = patched.size;
+                    if (patched.appProperties) upMeta.appProperties = patched.appProperties;
+                } else {
+                    upMeta.appProperties = appProps;
+                }
+            }
+            await spmWriteSaveCache(fileId, upMeta, stateObj);
+            return upMeta;
         }
 
         async function driveRenameFile(fileId, newName) {
@@ -1972,9 +2103,12 @@
         /** Persist full save JSON in IndexedDB so refresh / new tab can skip re-download when Drive metadata matches. */
         const SPM_IDB_NAME = 'cardmaker-spm-saves';
         const SPM_IDB_STORE = 'byFileId';
-        const SPM_IDB_VERSION = 1;
+        const SPM_IDB_VERSION = 2;
         var spmIdbOpenPromise = null;
         function openSpmIdb() {
+            if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.openIdb) {
+                return CardMakerPerf.openIdb();
+            }
             if (spmIdbOpenPromise) return spmIdbOpenPromise;
             spmIdbOpenPromise = new Promise(function (resolve) {
                 if (!window.indexedDB) {
@@ -1994,11 +2128,17 @@
                     if (!db.objectStoreNames.contains(SPM_IDB_STORE)) {
                         db.createObjectStore(SPM_IDB_STORE);
                     }
+                    if (!db.objectStoreNames.contains('thumbByKey')) {
+                        db.createObjectStore('thumbByKey');
+                    }
                 };
             });
             return spmIdbOpenPromise;
         }
         function driveFileMetaUnchanged(prevFile, nextFile) {
+            if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.driveFileMetaUnchanged) {
+                return CardMakerPerf.driveFileMetaUnchanged(prevFile, nextFile);
+            }
             if (!prevFile || !nextFile) return false;
             if (!prevFile.modifiedTime || !nextFile.modifiedTime) return false;
             if (prevFile.modifiedTime !== nextFile.modifiedTime) return false;
@@ -2006,6 +2146,9 @@
             return String(prevFile.size) === String(nextFile.size);
         }
         async function spmReadSaveCache(fileId) {
+            if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.readSaveCache) {
+                return CardMakerPerf.readSaveCache(fileId);
+            }
             var db = await openSpmIdb();
             if (!db) return null;
             try {
@@ -2025,6 +2168,9 @@
             }
         }
         async function spmWriteSaveCache(fileId, fileMeta, state) {
+            if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.writeSaveCache) {
+                return CardMakerPerf.writeSaveCache(fileId, fileMeta, state);
+            }
             var db = await openSpmIdb();
             if (!db || !fileMeta) return;
             try {
@@ -2048,6 +2194,9 @@
             }
         }
         async function spmPruneSaveCache(keepIds) {
+            if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.pruneSaveCache) {
+                return CardMakerPerf.pruneSaveCache(keepIds);
+            }
             var db = await openSpmIdb();
             if (!db || !keepIds) return;
             try {
@@ -2297,6 +2446,14 @@
         }
 
         function makePlaceholderProject(file) {
+            var setId = '';
+            if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.setIdFromDriveFile) {
+                setId = CardMakerPerf.setIdFromDriveFile(file) || '';
+            } else if (file && file.cardMakerSetId) {
+                setId = String(file.cardMakerSetId).trim();
+            } else if (file && file.appProperties && file.appProperties.cmSetId) {
+                setId = String(file.appProperties.cmSetId).trim();
+            }
             return {
                 file: file,
                 _loading: true,
@@ -2309,7 +2466,7 @@
                 cardSetN: NaN,
                 cardSetT: NaN,
                 cardSetLabel: '',
-                cardMakerSetId: ''
+                cardMakerSetId: setId
             };
         }
 
@@ -2526,7 +2683,7 @@
             if (base === 'rarity') spmSortSelect.value = (cur === 'rarityAsc') ? 'rarityDesc' : 'rarityAsc';
             if (base === 'updated') spmSortSelect.value = (cur === 'updatedAsc') ? 'updatedDesc' : 'updatedAsc';
             updateHeaderArrows();
-            applyFiltersAndRender();
+            resetSpmPageAndRender();
         }
 
         document.querySelectorAll('.spm-th-sortable[data-sort-base]').forEach(function (th) {
@@ -2632,13 +2789,29 @@
 
         function applyFiltersAndRender() {
             const sorted = getVisibleSortedProjects();
-            renderTable(sorted);
+            var total = sorted.length;
+            var maxPage = Math.max(0, Math.ceil(total / SPM_PAGE_SIZE) - 1);
+            if (spmTablePage > maxPage) spmTablePage = maxPage;
+            if (spmTablePage < 0) spmTablePage = 0;
+            var start = spmTablePage * SPM_PAGE_SIZE;
+            var pageItems = sorted.slice(start, start + SPM_PAGE_SIZE);
+            renderTable(pageItems);
             if (spmFilteredHint) {
-                spmFilteredHint.textContent = projects.length
-                    ? ('Showing ' + sorted.length + ' of ' + projects.length + ' loaded')
-                    : '';
+                if (!projects.length) {
+                    spmFilteredHint.textContent = '';
+                } else if (total === 0) {
+                    spmFilteredHint.textContent = 'Showing 0 of 0';
+                } else {
+                    var from = start + 1;
+                    var to = Math.min(start + SPM_PAGE_SIZE, total);
+                    spmFilteredHint.textContent = 'Showing ' + from + '–' + to + ' of ' + total;
+                }
             }
-            if (spmExportCsvBtn) spmExportCsvBtn.disabled = sorted.length === 0;
+            var prevBtn = document.getElementById('spmPagePrev');
+            var nextBtn = document.getElementById('spmPageNext');
+            if (prevBtn) prevBtn.disabled = spmTablePage <= 0 || total === 0;
+            if (nextBtn) nextBtn.disabled = spmTablePage >= maxPage || total === 0;
+            if (spmExportCsvBtn) spmExportCsvBtn.disabled = total === 0;
             syncSelectAllCheckbox();
             updateBulkUi();
         }
@@ -2650,27 +2823,50 @@
             }
             const btn = spmNewCardBtn;
             if (btn) btn.disabled = true;
+            var tempId = 'temp_' + Date.now();
+            var pair = pickUnusedCardNumberPair(projects);
+            var base = 'new-card-' + Date.now();
+            var fullName = fullDriveFileNameFromBase(base);
+            var sid = typeof CardMakerSets !== 'undefined' ? CardMakerSets.getActiveSetId() : '';
+            var state = buildBlankProjectState(pair.n, pair.t, sid);
+            var tempFile = {
+                id: tempId,
+                name: fullName,
+                modifiedTime: new Date().toISOString(),
+                size: null
+            };
+            var optimistic = buildProjectFromState(tempFile, state);
+            projects.push(optimistic);
+            var tc = parseInt(spmTotalCount.textContent, 10);
+            if (isFinite(tc)) spmTotalCount.textContent = String(tc + 1);
+            else spmTotalCount.textContent = String(projects.length);
+            applyFiltersAndRender();
+            setMessage('Creating…');
             try {
-                setMessage('Creating new card…');
-                const pair = pickUnusedCardNumberPair(projects);
-                const base = 'new-card-' + Date.now();
-                const fullName = fullDriveFileNameFromBase(base);
-                const created = await driveCreateAppDataMetadata(fullName);
+                var appProps = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.buildAppPropertiesFromState)
+                    ? CardMakerPerf.buildAppPropertiesFromState(state)
+                    : null;
+                const created = await driveCreateAppDataMetadata(fullName, appProps);
                 if (!created || !created.id) throw new Error('Drive create returned no file id.');
-                var sid = typeof CardMakerSets !== 'undefined' ? CardMakerSets.getActiveSetId() : '';
-                const state = buildBlankProjectState(pair.n, pair.t, sid);
                 const upMeta = await uploadProjectStateBytes(created.id, state);
                 const fileObj = {
                     id: created.id,
                     name: fullName,
                     modifiedTime: upMeta && upMeta.modifiedTime ? upMeta.modifiedTime : new Date().toISOString(),
-                    size: upMeta && upMeta.size != null ? upMeta.size : null
+                    size: upMeta && upMeta.size != null ? upMeta.size : null,
+                    appProperties: (upMeta && upMeta.appProperties) || appProps || created.appProperties || null
                 };
+                if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.applyAppPropertiesToFileMeta) {
+                    CardMakerPerf.applyAppPropertiesToFileMeta(fileObj);
+                }
                 const newProject = buildProjectFromState(fileObj, state);
-                projects.push(newProject);
-                var tc = parseInt(spmTotalCount.textContent, 10);
-                if (isFinite(tc)) spmTotalCount.textContent = String(tc + 1);
-                else spmTotalCount.textContent = String(projects.length);
+                var idx = projects.findIndex(function (p) { return p.file && p.file.id === tempId; });
+                if (idx >= 0) projects[idx] = newProject;
+                else projects.push(newProject);
+                if (selectedProjectIds.has(tempId)) {
+                    selectedProjectIds.delete(tempId);
+                    selectedProjectIds.add(created.id);
+                }
                 recalculateSummaryFromProjects();
                 setMessage(
                     'Created “' + displaySaveLabel(fileObj.name) + '” with unused card # ' + pair.n + ' / ' + pair.t + '. Use Open to edit in Card Maker.',
@@ -2678,6 +2874,12 @@
                 );
             } catch (e) {
                 console.error(e);
+                projects = projects.filter(function (p) { return !(p.file && p.file.id === tempId); });
+                selectedProjectIds.delete(tempId);
+                var tc2 = parseInt(spmTotalCount.textContent, 10);
+                if (isFinite(tc2) && tc2 > 0) spmTotalCount.textContent = String(tc2 - 1);
+                else spmTotalCount.textContent = String(projects.length);
+                applyFiltersAndRender();
                 setMessage('Could not create card: ' + (e && e.message ? e.message : String(e)), true);
             } finally {
                 updateButtons();
@@ -2719,6 +2921,7 @@
 
                 projects = files.map(makePlaceholderProject);
                 spmLoadedCount.textContent = '0/' + files.length;
+                spmTablePage = 0;
                 applyFiltersAndRender();
 
                 var loadedSoFar = 0;
@@ -3051,10 +3254,25 @@
 
         async function resolveSpmProjectPreviewUrl(project) {
             if (!project || !project.state || typeof project.state !== 'object') return null;
+            var file = project.file;
+            var thumbOpts = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.THUMB_RENDER_OPTS)
+                ? CardMakerPerf.THUMB_RENDER_OPTS
+                : { maxOutputSide: 400, outputMime: 'image/jpeg', outputQuality: 0.78 };
+            if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.readThumbCache && file && file.id && file.modifiedTime) {
+                try {
+                    var thumbRec = await CardMakerPerf.readThumbCache(file.id, file.modifiedTime);
+                    if (thumbRec && thumbRec.dataUrl) return thumbRec.dataUrl;
+                } catch (e) { /* ignore */ }
+            }
             if (typeof window.renderCardMakerProjectToDataUrl === 'function') {
                 try {
-                    var url = await window.renderCardMakerProjectToDataUrl(stateForCardPreviewRender(project.state));
-                    if (url && String(url).length > 32) return url;
+                    var url = await window.renderCardMakerProjectToDataUrl(stateForCardPreviewRender(project.state), thumbOpts);
+                    if (url && String(url).length > 32) {
+                        if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.writeThumbCache && file && file.id && file.modifiedTime) {
+                            CardMakerPerf.writeThumbCache(file.id, file.modifiedTime, url);
+                        }
+                        return url;
+                    }
                 } catch (err) {
                     console.warn('Card preview render:', err);
                 }
@@ -3280,7 +3498,10 @@
                 return;
             }
             try {
-                var url = await window.renderCardMakerProjectToDataUrl(draft);
+                var thumbOpts = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.THUMB_RENDER_OPTS)
+                    ? CardMakerPerf.THUMB_RENDER_OPTS
+                    : { maxOutputSide: 400, outputMime: 'image/jpeg', outputQuality: 0.78 };
+                var url = await window.renderCardMakerProjectToDataUrl(draft, thumbOpts);
                 if (req !== editModalPreviewReq) return;
                 if (url && String(url).length > 32) {
                     ph.setAttribute('hidden', '');
@@ -3507,6 +3728,15 @@
                 project.cardSetLabel = csEdit.label;
                 project.cardMakerSetId = setIdStr;
                 project.fields = project.state.fields;
+                if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.writeThumbCache &&
+                    typeof window.renderCardMakerProjectToDataUrl === 'function' &&
+                    project.file.id && project.file.modifiedTime) {
+                    try {
+                        var thumbOpts = CardMakerPerf.THUMB_RENDER_OPTS || { maxOutputSide: 400, outputMime: 'image/jpeg', outputQuality: 0.78 };
+                        var thumbUrl = await window.renderCardMakerProjectToDataUrl(stateForCardPreviewRender(project.state), thumbOpts);
+                        if (thumbUrl) CardMakerPerf.writeThumbCache(project.file.id, project.file.modifiedTime, thumbUrl);
+                    } catch (thumbErr) { /* ignore thumb refresh */ }
+                }
                 recalculateSummaryFromProjects();
                 setMessage('Saved changes for “' + displaySaveLabel(project.file.name) + '”.');
                 closeSpmEditModal();

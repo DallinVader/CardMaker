@@ -388,6 +388,9 @@
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="card-render.js"></script>
+    <script src="cardmaker-perf.js"></script>
+    <script src="cardmaker-drive-auth.js"></script>
+    <script src="cardmaker-cookie-consent.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
@@ -481,13 +484,14 @@
         }
 
         function readStoredDriveRecord() {
+            if (typeof CardMakerDriveAuth !== 'undefined') return CardMakerDriveAuth.readRecord();
             try {
                 const raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
                 if (!raw) return null;
                 const data = JSON.parse(raw);
                 if (!data || !data.access_token || !data.expires_at) return null;
                 const sessionEnd = data.session_expires_at != null ? data.session_expires_at : data.expires_at;
-                if (Date.now() >= sessionEnd - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
+                if (Date.now() >= sessionEnd) {
                     localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
                     return null;
                 }
@@ -499,36 +503,41 @@
         }
 
         function readStoredDriveToken() {
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                const t = CardMakerDriveAuth.getAccessToken();
+                if (t) return t;
+            }
             const d = readStoredDriveRecord();
             return d ? d.access_token : null;
         }
 
         function persistDriveToken(tokenResponse) {
-            const expiresInSec = parseInt(tokenResponse.expires_in || '3600', 10);
-            const googleExpiresAt = Date.now() + expiresInSec * 1000 - DRIVE_TOKEN_EXPIRY_BUFFER_MS;
-            let sessionExpiresAt = Date.now() + DRIVE_SESSION_MAX_MS;
-            try {
-                const raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
-                if (raw) {
-                    const prev = JSON.parse(raw);
-                    if (prev && typeof prev.session_expires_at === 'number' &&
-                        Date.now() < prev.session_expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
-                        sessionExpiresAt = prev.session_expires_at;
-                    }
-                }
-            } catch (e) { /* ignore */ }
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                CardMakerDriveAuth.persistTokenResponse(tokenResponse);
+                return;
+            }
+            const expiresInSec = parseInt(tokenResponse.expires_in || '3600', 10) || 3600;
             localStorage.setItem(DRIVE_TOKEN_STORAGE_KEY, JSON.stringify({
                 access_token: tokenResponse.access_token,
-                expires_at: googleExpiresAt,
-                session_expires_at: sessionExpiresAt
+                expires_at: Date.now() + expiresInSec * 1000,
+                session_expires_at: Date.now() + (30 * 24 * 60 * 60 * 1000)
             }));
         }
 
         function isGoogleAccessTokenStale(data) {
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                return CardMakerDriveAuth.isAccessTokenStale(data);
+            }
             return !!(data && Date.now() >= data.expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS);
         }
 
         async function maybeRefreshGridDriveTokenIfStale() {
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                const okScripts = await waitForGoogleScripts(3000);
+                if (okScripts) ensureGridTokenClient();
+                await CardMakerDriveAuth.ensureFreshToken({ interactive: true });
+                return;
+            }
             const rec = readStoredDriveRecord();
             if (!rec || !isGoogleAccessTokenStale(rec)) return;
             const ok = await waitForGoogleScripts(3000);
@@ -555,10 +564,6 @@
                     resolve();
                 }
             });
-            const after = readStoredDriveRecord();
-            if (after && isGoogleAccessTokenStale(after)) {
-                localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
-            }
         }
 
         function waitForGoogleScripts(maxWaitMs) {
@@ -584,12 +589,26 @@
         function ensureGridTokenClient() {
             if (gisTokenClient) return true;
             if (!window.google || !google.accounts || !google.accounts.oauth2) return false;
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                CardMakerDriveAuth.init({
+                    clientId: GOOGLE_CLIENT_ID,
+                    scope: DRIVE_SCOPE,
+                    onStatus: function (msg) {
+                        if (msg) setGridLoadModalMessage(msg, false);
+                    }
+                });
+                gisTokenClient = CardMakerDriveAuth.createTokenClient(google.accounts.oauth2, {
+                    clientId: GOOGLE_CLIENT_ID,
+                    scope: DRIVE_SCOPE
+                });
+                return !!gisTokenClient;
+            }
             gisTokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: GOOGLE_CLIENT_ID,
                 scope: DRIVE_SCOPE,
                 callback: function () {},
                 error_callback: function (err) {
-                    console.error('GIS error:', err);
+                    console.warn('GIS error:', err);
                     setGridLoadModalMessage('Sign-in popup blocked or OAuth origin mismatch.', true);
                 }
             });
@@ -680,7 +699,10 @@
 
                 let dataUrl = null;
                 if (typeof window.renderCardMakerProjectToDataUrl === 'function') {
-                    dataUrl = await window.renderCardMakerProjectToDataUrl(state);
+                    var thumbOpts = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.THUMB_RENDER_OPTS)
+                        ? CardMakerPerf.THUMB_RENDER_OPTS
+                        : { maxOutputSide: 400, outputMime: 'image/jpeg', outputQuality: 0.78 };
+                    dataUrl = await window.renderCardMakerProjectToDataUrl(state, thumbOpts);
                 }
                 if (req !== gridLoadModalPreviewRequestId) return;
                 if (!dataUrl && state.images) {
@@ -779,7 +801,10 @@
         function listCardMakerProjects(token) {
             return listAppDataFolderFiles(token).then(function (files) {
                 return files.filter(function (f) {
-                    return f.name && f.name.indexOf('cardmaker') !== -1;
+                    if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.isCardmakerProjectFileName) {
+                        return CardMakerPerf.isCardmakerProjectFileName(f.name);
+                    }
+                    return f.name && String(f.name).toLowerCase().endsWith('.cardmaker.json');
                 }).sort(function (a, b) {
                     return new Date(b.modifiedTime || 0) - new Date(a.modifiedTime || 0);
                 });
@@ -1165,6 +1190,17 @@
                 return;
             }
             setGridLoadModalMessage('Opening Google sign-in…', false);
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                const signed = await CardMakerDriveAuth.signIn({ forceConsent: false });
+                if (signed) {
+                    setGridLoadModalMessage('Signed in.', false);
+                    refreshGridLoadModalList();
+                    consumePrintImportFromSavedProjects().catch(function (e) { console.error(e); });
+                } else {
+                    setGridLoadModalMessage('Sign-in failed.', true);
+                }
+                return;
+            }
             gisTokenClient.callback = function (tokenResponse) {
                 if (tokenResponse && tokenResponse.access_token) {
                     persistDriveToken(tokenResponse);
@@ -1175,7 +1211,7 @@
                     setGridLoadModalMessage('Sign-in failed.', true);
                 }
             };
-            gisTokenClient.requestAccessToken({ prompt: 'consent' });
+            gisTokenClient.requestAccessToken({ prompt: '' });
         });
 
         gridDriveRefreshBtn.addEventListener('click', function () {

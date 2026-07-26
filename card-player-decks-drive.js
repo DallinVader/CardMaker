@@ -1,14 +1,12 @@
 /**
  * Google Drive appDataFolder helpers for Card Player deck files (.cardmaker-deck.json).
- * Shares OAuth token storage with Card Maker (cardmaker_drive_session_v1).
+ * Shares OAuth token storage with Card Maker via CardMakerDriveAuth / cardmaker_drive_session_v1.
  */
 (function (global) {
     var GOOGLE_CLIENT_ID = '984239146057-o6ujksfj9qk8tmqm9c8msrpidgm6492r.apps.googleusercontent.com';
     var GOOGLE_DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
     var DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
     var DRIVE_TOKEN_STORAGE_KEY = 'cardmaker_drive_session_v1';
-    var DRIVE_TOKEN_EXPIRY_BUFFER_MS = 120000;
-    var DRIVE_SESSION_MAX_MS = 12 * 60 * 60 * 1000;
     var DRIVE_FILES_API = 'https://www.googleapis.com/drive/v3/files';
     var DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3/files';
     var DECK_FILE_EXTENSION = '.cardmaker-deck.json';
@@ -32,14 +30,22 @@
         statusCb = typeof fn === 'function' ? fn : function () {};
     }
 
+    function syncAccessTokenFromAuth() {
+        if (typeof CardMakerDriveAuth !== 'undefined') {
+            driveAccessToken = CardMakerDriveAuth.getAccessToken();
+        }
+        return driveAccessToken;
+    }
+
     function readPersistedDriveToken() {
+        if (typeof CardMakerDriveAuth !== 'undefined') return CardMakerDriveAuth.readRecord();
         try {
             var raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
             if (!raw) return null;
             var data = JSON.parse(raw);
             if (!data || !data.access_token || !data.expires_at) return null;
             var sessionEnd = data.session_expires_at != null ? data.session_expires_at : data.expires_at;
-            if (Date.now() >= sessionEnd - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
+            if (Date.now() >= sessionEnd) {
                 localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
                 return null;
             }
@@ -50,68 +56,15 @@
         }
     }
 
-    function persistDriveToken(tokenResponse) {
-        if (!tokenResponse || !tokenResponse.access_token) return;
-        var expiresInSec = typeof tokenResponse.expires_in === 'number' ? tokenResponse.expires_in : 3600;
-        var googleExpiresAt = Date.now() + expiresInSec * 1000 - DRIVE_TOKEN_EXPIRY_BUFFER_MS;
-        var sessionExpiresAt = Date.now() + DRIVE_SESSION_MAX_MS;
-        try {
-            var raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
-            if (raw) {
-                var prev = JSON.parse(raw);
-                if (prev && typeof prev.session_expires_at === 'number' &&
-                    Date.now() < prev.session_expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
-                    sessionExpiresAt = prev.session_expires_at;
-                }
-            }
-        } catch (e) { /* ignore */ }
-        localStorage.setItem(DRIVE_TOKEN_STORAGE_KEY, JSON.stringify({
-            access_token: tokenResponse.access_token,
-            expires_at: googleExpiresAt,
-            session_expires_at: sessionExpiresAt
-        }));
-    }
-
-    function isGoogleAccessTokenStale(data) {
-        return !!(data && Date.now() >= data.expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS);
-    }
-
     function applyDriveAccessToken(accessToken) {
         driveAccessToken = accessToken;
-        if (global.gapi && global.gapi.client) {
-            global.gapi.client.setToken({ access_token: accessToken });
+        if (typeof CardMakerDriveAuth !== 'undefined') {
+            CardMakerDriveAuth.applyToken(accessToken);
+            return;
         }
-    }
-
-    function trySilentRefreshDriveToken() {
-        if (!gisTokenClient) return Promise.resolve(false);
-        return new Promise(function (resolve) {
-            var finished = false;
-            var t = setTimeout(function () {
-                if (!finished) {
-                    finished = true;
-                    resolve(false);
-                }
-            }, 12000);
-            gisTokenClient.callback = function (tr) {
-                if (finished) return;
-                finished = true;
-                clearTimeout(t);
-                if (tr && tr.access_token) {
-                    persistDriveToken(tr);
-                    applyDriveAccessToken(tr.access_token);
-                    resolve(true);
-                } else {
-                    resolve(false);
-                }
-            };
-            try {
-                gisTokenClient.requestAccessToken({ prompt: '' });
-            } catch (e) {
-                clearTimeout(t);
-                resolve(false);
-            }
-        });
+        if (global.gapi && global.gapi.client) {
+            global.gapi.client.setToken(accessToken ? { access_token: accessToken } : null);
+        }
     }
 
     function formatGoogleInitError(err) {
@@ -137,8 +90,40 @@
                 resolve(false);
                 return;
             }
-            if (gapiClientInitialized) {
+
+            function finishWithTokenClient() {
+                if (!gisTokenClient) {
+                    if (typeof CardMakerDriveAuth !== 'undefined') {
+                        CardMakerDriveAuth.init({
+                            clientId: GOOGLE_CLIENT_ID,
+                            scope: DRIVE_SCOPE,
+                            onChange: function () {
+                                syncAccessTokenFromAuth();
+                            },
+                            onStatus: function (msg) {
+                                if (msg) setStatus(msg);
+                            }
+                        });
+                        gisTokenClient = CardMakerDriveAuth.createTokenClient(google.accounts.oauth2, {
+                            clientId: GOOGLE_CLIENT_ID,
+                            scope: DRIVE_SCOPE
+                        });
+                    } else {
+                        gisTokenClient = google.accounts.oauth2.initTokenClient({
+                            client_id: GOOGLE_CLIENT_ID,
+                            scope: DRIVE_SCOPE,
+                            callback: function () {},
+                            error_callback: function (err) {
+                                console.warn('GIS error:', err);
+                            }
+                        });
+                    }
+                }
                 resolve(true);
+            }
+
+            if (gapiClientInitialized) {
+                finishWithTokenClient();
                 return;
             }
             global.gapi.load('client', {
@@ -146,17 +131,7 @@
                     global.gapi.client.init({ discoveryDocs: [GOOGLE_DISCOVERY_DOC] })
                         .then(function () {
                             gapiClientInitialized = true;
-                            if (!gisTokenClient) {
-                                gisTokenClient = google.accounts.oauth2.initTokenClient({
-                                    client_id: GOOGLE_CLIENT_ID,
-                                    scope: DRIVE_SCOPE,
-                                    callback: function () {},
-                                    error_callback: function (err) {
-                                        console.error('GIS error:', err);
-                                    }
-                                });
-                            }
-                            resolve(true);
+                            finishWithTokenClient();
                         })
                         .catch(function (error) {
                             console.error(error);
@@ -173,41 +148,25 @@
     }
 
     function ensureDriveTokenBeforeDriveOp() {
-        var stored = readPersistedDriveToken();
-        if (stored && isGoogleAccessTokenStale(stored)) {
-            return initGoogleDriveClient(true).then(function (ready) {
-                if (ready) return trySilentRefreshDriveToken();
-                return false;
-            }).then(function () {
-                stored = readPersistedDriveToken();
-                if (stored && isGoogleAccessTokenStale(stored)) {
-                    signOut();
-                    return false;
-                }
-                if (stored) {
-                    applyDriveAccessToken(stored.access_token);
-                    return true;
-                }
-                return !!driveAccessToken;
-            });
-        }
-        if (stored) {
-            if (!driveAccessToken || driveAccessToken !== stored.access_token) {
-                return initGoogleDriveClient(true).then(function (ready) {
-                    if (!ready) return false;
-                    applyDriveAccessToken(stored.access_token);
-                    return true;
+        return initGoogleDriveClient(true).then(function (ready) {
+            if (!ready) return !!syncAccessTokenFromAuth();
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                return CardMakerDriveAuth.ensureFreshToken({ interactive: true }).then(function (ok) {
+                    syncAccessTokenFromAuth();
+                    return !!(ok && driveAccessToken);
                 });
             }
-            if (global.gapi && global.gapi.client) {
-                global.gapi.client.setToken({ access_token: driveAccessToken });
+            var stored = readPersistedDriveToken();
+            if (stored) {
+                applyDriveAccessToken(stored.access_token);
+                return true;
             }
-            return Promise.resolve(true);
-        }
-        return Promise.resolve(!!driveAccessToken);
+            return !!driveAccessToken;
+        });
     }
 
     function driveAuthHeaders(extra) {
+        syncAccessTokenFromAuth();
         var h = { Authorization: 'Bearer ' + driveAccessToken };
         if (extra) {
             Object.keys(extra).forEach(function (k) { h[k] = extra[k]; });
@@ -342,22 +301,13 @@
         if (!stored) return Promise.resolve(false);
         return initGoogleDriveClient(true).then(function (ready) {
             if (!ready) return false;
-            applyDriveAccessToken(stored.access_token);
-            if (isGoogleAccessTokenStale(stored)) {
-                return trySilentRefreshDriveToken().then(function (ok) {
-                    if (!ok) {
-                        signOut();
-                        return false;
-                    }
-                    var after = readPersistedDriveToken();
-                    if (!after || isGoogleAccessTokenStale(after)) {
-                        signOut();
-                        return false;
-                    }
-                    applyDriveAccessToken(after.access_token);
-                    return true;
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                return CardMakerDriveAuth.tryRestore({ interactive: false }).then(function (ok) {
+                    syncAccessTokenFromAuth();
+                    return !!(ok && driveAccessToken);
                 });
             }
+            applyDriveAccessToken(stored.access_token);
             return true;
         });
     }
@@ -365,10 +315,20 @@
     function signIn() {
         return initGoogleDriveClient(false).then(function (ready) {
             if (!ready) return false;
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                return CardMakerDriveAuth.signIn({ forceConsent: false }).then(function (ok) {
+                    syncAccessTokenFromAuth();
+                    return ok;
+                });
+            }
             return new Promise(function (resolve) {
                 gisTokenClient.callback = function (tokenResponse) {
                     if (tokenResponse && tokenResponse.access_token) {
-                        persistDriveToken(tokenResponse);
+                        localStorage.setItem(DRIVE_TOKEN_STORAGE_KEY, JSON.stringify({
+                            access_token: tokenResponse.access_token,
+                            expires_at: Date.now() + (parseInt(String(tokenResponse.expires_in || '3600'), 10) || 3600) * 1000,
+                            session_expires_at: Date.now() + (30 * 24 * 60 * 60 * 1000)
+                        }));
                         applyDriveAccessToken(tokenResponse.access_token);
                         resolve(true);
                     } else {
@@ -376,7 +336,7 @@
                     }
                 };
                 try {
-                    gisTokenClient.requestAccessToken({ prompt: 'consent' });
+                    gisTokenClient.requestAccessToken({ prompt: '' });
                 } catch (e) {
                     resolve(false);
                 }
@@ -385,14 +345,19 @@
     }
 
     function signOut() {
-        localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
-        driveAccessToken = null;
-        if (global.gapi && global.gapi.client) {
-            global.gapi.client.setToken(null);
+        if (typeof CardMakerDriveAuth !== 'undefined') {
+            CardMakerDriveAuth.signOut();
+        } else {
+            localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
+            if (global.gapi && global.gapi.client) {
+                global.gapi.client.setToken(null);
+            }
         }
+        driveAccessToken = null;
     }
 
     function isSignedIn() {
+        syncAccessTokenFromAuth();
         return !!driveAccessToken && !!readPersistedDriveToken();
     }
 
@@ -406,7 +371,9 @@
         signIn: signIn,
         signOut: signOut,
         isSignedIn: isSignedIn,
-        getAccessToken: function () { return driveAccessToken; },
+        getAccessToken: function () {
+            return syncAccessTokenFromAuth();
+        },
         listDeckFiles: listDeckFiles,
         saveDeckToDrive: saveDeckToDrive,
         fetchDriveFileMedia: fetchDriveFileMedia,

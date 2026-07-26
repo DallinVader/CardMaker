@@ -84,7 +84,7 @@
         <div class="cm-wrap">
         <div class="main-container">
             <div class="card-preview">
-                <canvas id="cardCanvas" width="2500" height="3500"></canvas>
+                <canvas id="cardCanvas" width="1250" height="1750"></canvas>
             </div>
             
             <div class="controls-panel cm-panel cm-editor-panel">
@@ -360,6 +360,9 @@
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="card-render.js"></script>
+    <script src="cardmaker-perf.js"></script>
+    <script src="cardmaker-drive-auth.js"></script>
+    <script src="cardmaker-cookie-consent.js"></script>
     <script src="cardmaker-sets.js"></script>
     <script src="cardmaker-sets-drive.js"></script>
     <script>
@@ -384,6 +387,17 @@
         let driveModalPreviewRequestId = 0;
         let driveModalListHydrateGeneration = 0;
         const DRIVE_MODAL_FETCH_SET_ID_CONCURRENCY = 12;
+        /** Track which Drive file is open so Save overwrites that id (not only by name). */
+        let currentDriveFileId = null;
+        let currentDriveFileName = '';
+        let projectDirty = false;
+        let suppressDirtyTracking = false;
+        let editorReadyForDirty = false;
+        let editorDraftTimer = null;
+        const EDITOR_DRAFT_DEBOUNCE_MS = 1800;
+        const FULL_CANVAS_W = 2500;
+        const FULL_CANVAS_H = 3500;
+        const LIVE_CANVAS_SCALE = 0.5;
 
         /** Small concurrency helper for loading many saves (set id from JSON). */
         async function mapLimit(items, limit, fn) {
@@ -455,9 +469,87 @@
         
         const canvas = document.getElementById('cardCanvas');
         const ctx = canvas.getContext('2d');
+        canvas.width = Math.round(FULL_CANVAS_W * LIVE_CANVAS_SCALE);
+        canvas.height = Math.round(FULL_CANVAS_H * LIVE_CANVAS_SCALE);
         // 0.125" bleed on each side for a 2.5" x 3.5" card => 2.75" x 3.75"
         // Scale factor is 2.75 / 2.5 = 1.1
         const BLEED_SCALE = 1.1;
+
+        function markProjectDirty() {
+            if (suppressDirtyTracking || !editorReadyForDirty) return;
+            projectDirty = true;
+            scheduleEditorDraftAutosave();
+            updateDirtyUi();
+        }
+
+        function clearProjectDirty() {
+            projectDirty = false;
+            updateDirtyUi();
+        }
+
+        function updateDirtyUi() {
+            var st = document.getElementById('driveStatusText');
+            if (!st) return;
+            var base = st.getAttribute('data-base-status');
+            if (base == null) base = st.textContent || '';
+            if (projectDirty && String(st.textContent || '').indexOf('(unsaved)') === -1) {
+                st.setAttribute('data-base-status', base);
+                st.textContent = (base ? base + ' ' : '') + '(unsaved)';
+            }
+        }
+
+        function scheduleEditorDraftAutosave() {
+            if (typeof CardMakerPerf === 'undefined') return;
+            if (editorDraftTimer) clearTimeout(editorDraftTimer);
+            editorDraftTimer = setTimeout(function () {
+                editorDraftTimer = null;
+                try {
+                    var payload = {
+                        savedAt: new Date().toISOString(),
+                        driveFileId: currentDriveFileId,
+                        driveFileName: currentDriveFileName,
+                        state: buildProjectState()
+                    };
+                    CardMakerPerf.writeEditorDraft(payload);
+                } catch (e) {
+                    console.warn('Editor draft autosave', e);
+                }
+            }, EDITOR_DRAFT_DEBOUNCE_MS);
+        }
+
+        async function maybeRestoreEditorDraft() {
+            if (typeof CardMakerPerf === 'undefined') return;
+            try {
+                var draft = await CardMakerPerf.readEditorDraft();
+                if (!draft || !draft.state || !draft.state.fields) return;
+                if (!confirm('Restore unsaved draft from this browser?\n\nSaved locally at ' +
+                    (draft.savedAt ? new Date(draft.savedAt).toLocaleString() : 'unknown') + '.')) {
+                    await CardMakerPerf.clearEditorDraft();
+                    return;
+                }
+                suppressDirtyTracking = true;
+                await new Promise(function (resolve) {
+                    applyProjectState(draft.state, resolve);
+                });
+                currentDriveFileId = draft.driveFileId || null;
+                currentDriveFileName = draft.driveFileName || '';
+                suppressDirtyTracking = false;
+                projectDirty = true;
+                updateDirtyUi();
+                setDriveStatus(currentDriveFileId
+                    ? 'Restored local draft (linked to Drive save).'
+                    : 'Restored local draft (not yet on Drive).');
+            } catch (e) {
+                console.warn('Restore draft', e);
+                suppressDirtyTracking = false;
+            }
+        }
+
+        window.addEventListener('beforeunload', function (e) {
+            if (!projectDirty) return;
+            e.preventDefault();
+            e.returnValue = '';
+        });
 
         let IsSwitchedOn = true;
         const CARD_RARITY_ORDER = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic', 'Fantastical'];
@@ -939,7 +1031,9 @@
 
         function setDriveStatus(message) {
             const statusEl = document.getElementById('driveStatusText');
-            if (statusEl) statusEl.textContent = message;
+            if (!statusEl) return;
+            statusEl.setAttribute('data-base-status', message || '');
+            statusEl.textContent = (message || '') + (projectDirty ? ' (unsaved)' : '');
         }
 
         function hasDriveConfig() {
@@ -966,13 +1060,14 @@
         }
 
         function readPersistedDriveToken() {
+            if (typeof CardMakerDriveAuth !== 'undefined') return CardMakerDriveAuth.readRecord();
             try {
                 const raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
                 if (!raw) return null;
                 const data = JSON.parse(raw);
                 if (!data || !data.access_token || !data.expires_at) return null;
                 const sessionEnd = data.session_expires_at != null ? data.session_expires_at : data.expires_at;
-                if (Date.now() >= sessionEnd - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
+                if (Date.now() >= sessionEnd) {
                     localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
                     return null;
                 }
@@ -984,32 +1079,34 @@
         }
 
         function persistDriveToken(tokenResponse) {
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                CardMakerDriveAuth.persistTokenResponse(tokenResponse);
+                return;
+            }
             if (!tokenResponse || !tokenResponse.access_token) return;
-            const expiresInSec = typeof tokenResponse.expires_in === 'number' ? tokenResponse.expires_in : 3600;
-            const googleExpiresAt = Date.now() + expiresInSec * 1000 - DRIVE_TOKEN_EXPIRY_BUFFER_MS;
-            let sessionExpiresAt = Date.now() + DRIVE_SESSION_MAX_MS;
-            try {
-                const raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
-                if (raw) {
-                    const prev = JSON.parse(raw);
-                    if (prev && typeof prev.session_expires_at === 'number' &&
-                        Date.now() < prev.session_expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
-                        sessionExpiresAt = prev.session_expires_at;
-                    }
-                }
-            } catch (e) { /* ignore */ }
+            const expiresInSec = parseInt(String(tokenResponse.expires_in || '3600'), 10) || 3600;
             localStorage.setItem(DRIVE_TOKEN_STORAGE_KEY, JSON.stringify({
                 access_token: tokenResponse.access_token,
-                expires_at: googleExpiresAt,
-                session_expires_at: sessionExpiresAt
+                expires_at: Date.now() + expiresInSec * 1000,
+                session_expires_at: Date.now() + (30 * 24 * 60 * 60 * 1000)
             }));
         }
 
         function isGoogleAccessTokenStale(data) {
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                return CardMakerDriveAuth.isAccessTokenStale(data);
+            }
             return !!(data && Date.now() >= data.expires_at - DRIVE_TOKEN_EXPIRY_BUFFER_MS);
         }
 
         function trySilentRefreshDriveToken() {
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                return CardMakerDriveAuth.ensureFreshToken({ interactive: false }).then(function (ok) {
+                    driveAccessToken = CardMakerDriveAuth.getAccessToken();
+                    if (driveAccessToken) applyDriveAccessToken(driveAccessToken);
+                    return ok;
+                });
+            }
             if (!gisTokenClient) return Promise.resolve(false);
             return new Promise(function (resolve) {
                 let finished = false;
@@ -1041,6 +1138,11 @@
         }
 
         function clearPersistedDriveToken() {
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                CardMakerDriveAuth.clearSession();
+                driveAccessToken = null;
+                return;
+            }
             localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
         }
 
@@ -1081,16 +1183,36 @@
             }
 
             if (!gisTokenClient) {
-                gisTokenClient = google.accounts.oauth2.initTokenClient({
-                    client_id: GOOGLE_CLIENT_ID,
-                    scope: DRIVE_SCOPE,
-                    callback: function () {},
-                    error_callback: function (err) {
-                        console.error('GIS error:', err);
-                        setDriveStatus('Google sign-in popup was closed/blocked or config is invalid.');
-                        alert('Google sign-in failed. If no popup appears, allow popups for this site and verify localhost/GitHub origin in OAuth settings.');
-                    }
-                });
+                if (typeof CardMakerDriveAuth !== 'undefined') {
+                    CardMakerDriveAuth.init({
+                        clientId: GOOGLE_CLIENT_ID,
+                        scope: DRIVE_SCOPE,
+                        onChange: function () {
+                            driveAccessToken = CardMakerDriveAuth.getAccessToken();
+                            updateDriveButtons();
+                        },
+                        onStatus: function (msg) {
+                            if (msg) setDriveStatus(msg);
+                        }
+                    });
+                    gisTokenClient = CardMakerDriveAuth.createTokenClient(google.accounts.oauth2, {
+                        clientId: GOOGLE_CLIENT_ID,
+                        scope: DRIVE_SCOPE
+                    });
+                } else {
+                    gisTokenClient = google.accounts.oauth2.initTokenClient({
+                        client_id: GOOGLE_CLIENT_ID,
+                        scope: DRIVE_SCOPE,
+                        callback: function () {},
+                        error_callback: function (err) {
+                            console.error('GIS error:', err);
+                            setDriveStatus('Google sign-in popup was closed/blocked or config is invalid.');
+                            if (!silent) {
+                                alert('Google sign-in failed. If no popup appears, allow popups for this site and verify localhost/GitHub origin in OAuth settings.');
+                            }
+                        }
+                    });
+                }
             }
 
             return true;
@@ -1098,18 +1220,24 @@
 
         function applyDriveAccessToken(accessToken) {
             driveAccessToken = accessToken;
-            if (window.gapi && gapi.client) {
-                gapi.client.setToken({ access_token: accessToken });
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                CardMakerDriveAuth.applyToken(accessToken);
+            } else if (window.gapi && gapi.client) {
+                gapi.client.setToken(accessToken ? { access_token: accessToken } : null);
             }
             updateDriveButtons();
         }
 
         function handleGoogleSignOut() {
-            clearPersistedDriveToken();
-            driveAccessToken = null;
-            if (window.gapi && gapi.client) {
-                gapi.client.setToken(null);
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                CardMakerDriveAuth.signOut();
+            } else {
+                clearPersistedDriveToken();
+                if (window.gapi && gapi.client) {
+                    gapi.client.setToken(null);
+                }
             }
+            driveAccessToken = null;
             updateDriveButtons();
             setDriveStatus('Signed out.');
         }
@@ -1148,39 +1276,55 @@
                 setDriveStatus('Not signed in. Click "Sign in with Google" to connect Drive.');
                 return;
             }
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                const ok = await CardMakerDriveAuth.tryRestore({ interactive: false });
+                driveAccessToken = CardMakerDriveAuth.getAccessToken();
+                updateDriveButtons();
+                if (!ok && !driveAccessToken) {
+                    setDriveStatus('Session expired. Sign in with Google again to use Drive.');
+                    return;
+                }
+                setDriveStatus('Signed in (saved on this device). Stay on the page and Drive will refresh automatically.');
+                syncNamedSetsWithDriveIfPossible().catch(function (e) { console.warn(e); });
+                return;
+            }
             applyDriveAccessToken(stored.access_token);
             if (isGoogleAccessTokenStale(stored)) {
                 await trySilentRefreshDriveToken();
                 const after = readPersistedDriveToken();
                 if (!after || isGoogleAccessTokenStale(after)) {
-                    clearPersistedDriveToken();
                     driveAccessToken = null;
-                    if (window.gapi && gapi.client) {
-                        gapi.client.setToken(null);
-                    }
                     updateDriveButtons();
                     setDriveStatus('Session expired. Sign in with Google again to use Drive.');
                     return;
                 }
                 applyDriveAccessToken(after.access_token);
             }
-            setDriveStatus('Signed in (saved on this device). Save/load works for up to 12 hours; use Sign out to clear sooner.');
-            await syncNamedSetsWithDriveIfPossible();
+            setDriveStatus('Signed in (saved on this device). Stay on the page and Drive will refresh automatically.');
+            syncNamedSetsWithDriveIfPossible().catch(function (e) { console.warn(e); });
         }
 
         /** Re-attach token from localStorage if gapi was reset (e.g. first save after restore race). */
         async function ensureDriveTokenBeforeDriveOp() {
+            if (typeof CardMakerDriveAuth !== 'undefined') {
+                const ready = await initGoogleDriveClient(true);
+                if (!ready) return !!driveAccessToken;
+                const ok = await CardMakerDriveAuth.ensureFreshToken({ interactive: true });
+                driveAccessToken = CardMakerDriveAuth.getAccessToken();
+                updateDriveButtons();
+                if (!ok || !driveAccessToken) {
+                    setDriveStatus('Session expired. Sign in with Google again to use Drive.');
+                    return false;
+                }
+                return true;
+            }
             let stored = readPersistedDriveToken();
             if (stored && isGoogleAccessTokenStale(stored)) {
                 const ready = await initGoogleDriveClient(true);
                 if (ready) await trySilentRefreshDriveToken();
                 stored = readPersistedDriveToken();
                 if (stored && isGoogleAccessTokenStale(stored)) {
-                    clearPersistedDriveToken();
                     driveAccessToken = null;
-                    if (window.gapi && gapi.client) {
-                        gapi.client.setToken(null);
-                    }
                     updateDriveButtons();
                     setDriveStatus('Session expired. Sign in with Google again to use Drive.');
                     return false;
@@ -1217,11 +1361,24 @@
                     return;
                 }
                 setDriveStatus('Opening Google sign-in...');
+                if (typeof CardMakerDriveAuth !== 'undefined') {
+                    const ok = await CardMakerDriveAuth.signIn({ forceConsent: false });
+                    driveAccessToken = CardMakerDriveAuth.getAccessToken();
+                    updateDriveButtons();
+                    if (ok) {
+                        setDriveStatus('Signed in (saved on this device). Stay on the page and Drive will refresh automatically.');
+                        syncNamedSetsWithDriveIfPossible().catch(function (e) { console.warn(e); });
+                    } else {
+                        setDriveStatus('Sign-in failed. Check OAuth origin settings.');
+                        alert('Sign-in failed. Ensure this exact origin is in OAuth Authorized JavaScript origins:\n' + window.location.origin);
+                    }
+                    return;
+                }
                 gisTokenClient.callback = function (tokenResponse) {
                     if (tokenResponse && tokenResponse.access_token) {
                         persistDriveToken(tokenResponse);
                         applyDriveAccessToken(tokenResponse.access_token);
-                        setDriveStatus('Signed in. Session is saved on this device for up to 12 hours (or until you sign out).');
+                        setDriveStatus('Signed in (saved on this device). Stay on the page and Drive will refresh automatically.');
                         syncNamedSetsWithDriveIfPossible().catch(function (e) { console.warn(e); });
                     } else {
                         console.error('Token response:', tokenResponse);
@@ -1229,7 +1386,7 @@
                         alert('Sign-in failed. Ensure this exact origin is in OAuth Authorized JavaScript origins:\n' + window.location.origin);
                     }
                 };
-                gisTokenClient.requestAccessToken({ prompt: 'consent' });
+                gisTokenClient.requestAccessToken({ prompt: '' });
             } catch (error) {
                 console.error(error);
                 setDriveStatus('Sign-in failed due to runtime error.');
@@ -1501,7 +1658,7 @@
         async function listAppDataFolderFiles() {
             const u = new URL(DRIVE_FILES_API);
             u.searchParams.set('spaces', 'appDataFolder');
-            u.searchParams.set('fields', 'files(id,name,mimeType,modifiedTime,size)');
+            u.searchParams.set('fields', 'files(id,name,mimeType,modifiedTime,size,appProperties)');
             u.searchParams.set('pageSize', '100');
             const res = await fetch(u.toString(), { headers: driveAuthHeaders() });
             const text = await res.text();
@@ -1509,7 +1666,11 @@
                 throw new Error(parseDriveError(text, res.status));
             }
             const data = JSON.parse(text);
-            return data.files || [];
+            return (data.files || []).map(function (f) {
+                if (typeof CardMakerPerf !== 'undefined') CardMakerPerf.applyAppPropertiesToFileMeta(f);
+                else if (f.appProperties && f.appProperties.cmSetId) f.cardMakerSetId = String(f.appProperties.cmSetId).trim();
+                return f;
+            });
         }
 
         async function findDriveProjectByName(fileName) {
@@ -1521,17 +1682,19 @@
         }
 
         /** Create metadata-only file in appDataFolder: POST /drive/v3/files */
-        async function driveCreateAppDataMetadata(fileName) {
+        async function driveCreateAppDataMetadata(fileName, appProperties) {
             const u = new URL(DRIVE_FILES_API);
-            u.searchParams.set('fields', 'id,name');
+            u.searchParams.set('fields', 'id,name,modifiedTime,size,appProperties');
+            var body = {
+                name: fileName,
+                mimeType: 'application/json',
+                parents: ['appDataFolder']
+            };
+            if (appProperties) body.appProperties = appProperties;
             const res = await fetch(u.toString(), {
                 method: 'POST',
                 headers: driveAuthHeaders({ 'Content-Type': 'application/json; charset=UTF-8' }),
-                body: JSON.stringify({
-                    name: fileName,
-                    mimeType: 'application/json',
-                    parents: ['appDataFolder']
-                })
+                body: JSON.stringify(body)
             });
             const text = await res.text();
             if (!res.ok) {
@@ -1544,6 +1707,7 @@
         async function driveUploadMedia(fileId, jsonContent) {
             const u = new URL(DRIVE_UPLOAD_API + '/' + encodeURIComponent(fileId));
             u.searchParams.set('uploadType', 'media');
+            u.searchParams.set('fields', 'id,name,modifiedTime,size');
             const res = await fetch(u.toString(), {
                 method: 'PATCH',
                 headers: driveAuthHeaders({ 'Content-Type': 'application/json; charset=UTF-8' }),
@@ -1553,18 +1717,52 @@
             if (!res.ok) {
                 throw new Error(parseDriveError(text, res.status));
             }
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                return {
+                    id: fileId,
+                    modifiedTime: new Date().toISOString(),
+                    size: new Blob([jsonContent]).size
+                };
+            }
         }
 
-        async function uploadProjectToDrive(fileName, jsonContent, existingFileId) {
-            if (existingFileId) {
-                await driveUploadMedia(existingFileId, jsonContent);
-            } else {
-                const created = await driveCreateAppDataMetadata(fileName);
-                if (!created || !created.id) {
-                    throw new Error('Drive create returned no file id.');
-                }
-                await driveUploadMedia(created.id, jsonContent);
+        async function drivePatchAppProperties(fileId, appProperties) {
+            if (!fileId || !appProperties) return null;
+            const u = new URL(DRIVE_FILES_API + '/' + encodeURIComponent(fileId));
+            u.searchParams.set('fields', 'id,appProperties,modifiedTime,size');
+            const res = await fetch(u.toString(), {
+                method: 'PATCH',
+                headers: driveAuthHeaders({ 'Content-Type': 'application/json; charset=UTF-8' }),
+                body: JSON.stringify({ appProperties: appProperties })
+            });
+            const text = await res.text();
+            if (!res.ok) {
+                console.warn('Drive appProperties patch failed', parseDriveError(text, res.status));
+                return null;
             }
+            try { return JSON.parse(text); } catch (e) { return null; }
+        }
+
+        async function uploadProjectToDrive(fileName, jsonContent, existingFileId, appProperties) {
+            var meta;
+            if (existingFileId) {
+                meta = await driveUploadMedia(existingFileId, jsonContent);
+                if (appProperties) await drivePatchAppProperties(existingFileId, appProperties);
+                return { id: existingFileId, name: fileName, modifiedTime: meta && meta.modifiedTime, size: meta && meta.size };
+            }
+            const created = await driveCreateAppDataMetadata(fileName, appProperties);
+            if (!created || !created.id) {
+                throw new Error('Drive create returned no file id.');
+            }
+            meta = await driveUploadMedia(created.id, jsonContent);
+            return {
+                id: created.id,
+                name: fileName,
+                modifiedTime: (meta && meta.modifiedTime) || created.modifiedTime,
+                size: meta && meta.size
+            };
         }
 
         async function saveProjectToDriveWithName(projectName) {
@@ -1572,11 +1770,33 @@
             if (!trimmed) throw new Error('Enter a project name.');
 
             const fileName = trimmed + PROJECT_FILE_EXTENSION;
-            const payload = JSON.stringify(buildProjectState());
+            var state = buildProjectState();
+            const payload = JSON.stringify(state);
+            const appProps = typeof CardMakerPerf !== 'undefined'
+                ? CardMakerPerf.buildAppPropertiesFromState(state)
+                : null;
             setDriveStatus('Saving "' + fileName + '"...');
-            const existing = await findDriveProjectByName(fileName);
-            await uploadProjectToDrive(fileName, payload, existing ? existing.id : null);
+
+            var targetId = null;
+            if (currentDriveFileId && currentDriveFileName === fileName) {
+                targetId = currentDriveFileId;
+            } else if (currentDriveFileId && displaySaveLabel(currentDriveFileName) === trimmed) {
+                targetId = currentDriveFileId;
+            } else {
+                const existing = await findDriveProjectByName(fileName);
+                targetId = existing ? existing.id : null;
+            }
+
+            const savedMeta = await uploadProjectToDrive(fileName, payload, targetId, appProps);
+            currentDriveFileId = savedMeta.id;
+            currentDriveFileName = fileName;
+            if (typeof CardMakerPerf !== 'undefined') {
+                await CardMakerPerf.writeSaveCache(savedMeta.id, savedMeta, state);
+                await CardMakerPerf.clearEditorDraft();
+            }
+            clearProjectDirty();
             setDriveStatus('Saved "' + fileName + '" to Google Drive.');
+            return savedMeta;
         }
 
         function setDriveModalMessage(text, isError) {
@@ -1701,9 +1921,25 @@
         async function hydrateDriveModalFilesCardMakerSetIds(files) {
             await mapLimit(files || [], DRIVE_MODAL_FETCH_SET_ID_CONCURRENCY, async function (f) {
                 if (!f || !f.id) return;
+                if (f.cardMakerSetId && String(f.cardMakerSetId).trim()) return;
+                if (f.appProperties && f.appProperties.cmSetId != null && String(f.appProperties.cmSetId).trim()) {
+                    f.cardMakerSetId = String(f.appProperties.cmSetId).trim();
+                    return;
+                }
                 try {
+                    if (typeof CardMakerPerf !== 'undefined') {
+                        var cached = await CardMakerPerf.readSaveCache(f.id);
+                        var metaRef = { modifiedTime: cached && cached.modifiedTime, size: cached && cached.size };
+                        if (cached && cached.state && CardMakerPerf.driveFileMetaUnchanged(metaRef, f)) {
+                            f.cardMakerSetId = cardMakerSetIdFromDriveSaveJson(cached.state);
+                            return;
+                        }
+                    }
                     var parsed = await fetchDriveProjectJsonByFile(f);
                     f.cardMakerSetId = cardMakerSetIdFromDriveSaveJson(parsed);
+                    if (typeof CardMakerPerf !== 'undefined') {
+                        await CardMakerPerf.writeSaveCache(f.id, f, parsed);
+                    }
                 } catch (e) {
                     console.warn('Drive modal: could not read set for save', f.id, e);
                     f.cardMakerSetId = '';
@@ -1862,15 +2098,53 @@
             return JSON.parse(content);
         }
 
+        async function loadProjectStatePreferringCache(file) {
+            if (typeof CardMakerPerf !== 'undefined' && file && file.id) {
+                var cached = await CardMakerPerf.readSaveCache(file.id);
+                if (cached && cached.state && typeof cached.state === 'object') {
+                    // Open-from-link often has only an id (no Drive modifiedTime). Use IDB immediately.
+                    if (!file.modifiedTime) {
+                        return cached.state;
+                    }
+                    var metaRef = { modifiedTime: cached.modifiedTime, size: cached.size };
+                    if (CardMakerPerf.driveFileMetaUnchanged(metaRef, file)) {
+                        return cached.state;
+                    }
+                }
+            }
+            var state = await fetchDriveProjectJsonByFile(file);
+            if (typeof CardMakerPerf !== 'undefined' && file && file.id) {
+                await CardMakerPerf.writeSaveCache(file.id, file, state);
+            }
+            return state;
+        }
+
+        /**
+         * Apply a project and mark it as the open Drive file.
+         * @returns {Promise<void>}
+         */
+        async function applyLoadedProjectState(state, file) {
+            suppressDirtyTracking = true;
+            try {
+                await new Promise(function (resolve) {
+                    applyProjectState(state, resolve);
+                });
+            } finally {
+                suppressDirtyTracking = false;
+            }
+            currentDriveFileId = file && file.id ? file.id : currentDriveFileId;
+            currentDriveFileName = (file && file.name) ? file.name : currentDriveFileName;
+            if (typeof CardMakerPerf !== 'undefined') await CardMakerPerf.clearEditorDraft();
+            clearProjectDirty();
+        }
+
         async function loadProjectFromDriveByFile(file) {
             var label = displaySaveLabel(file.name);
             showCardLoadingBar('Loading “' + label + '”…');
             try {
                 setDriveStatus('Loading "' + label + '"...');
-                const state = await fetchDriveProjectJsonByFile(file);
-                await new Promise(function (resolve) {
-                    applyProjectState(state, resolve);
-                });
+                const state = await loadProjectStatePreferringCache(file);
+                await applyLoadedProjectState(state, file);
                 setDriveStatus('Loaded "' + label + '".');
             } finally {
                 hideCardLoadingBar();
@@ -1880,6 +2154,7 @@
         /**
          * Open a save by Drive file id when arriving from Saved Projects Manager:
          * index.html?openDriveFile=DRIVE_FILE_ID
+         * Shows the loading UI immediately; prefers IndexedDB so the card appears before Drive auth finishes.
          */
         async function maybeOpenDriveFileFromQuery() {
             var params;
@@ -1890,12 +2165,69 @@
             }
             var fileId = params.get('openDriveFile');
             if (!fileId || !hasDriveConfig()) return;
-            if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) {
-                setDriveStatus('Sign in with Google to open this save (link from Saved Projects Manager).');
-                return;
-            }
+
+            var file = { id: fileId, name: fileId + '.cardmaker.json' };
+            var label = displaySaveLabel(file.name);
+            showCardLoadingBar('Opening card…');
+            setDriveStatus('Opening linked save…');
+
             try {
-                await loadProjectFromDriveByFile({ id: fileId, name: fileId + '.cardmaker.json' });
+                // 1) Instant path: local cache (no Google scripts / token needed)
+                var cachedState = null;
+                if (typeof CardMakerPerf !== 'undefined') {
+                    showCardLoadingBar('Loading from cache…');
+                    var cached = await CardMakerPerf.readSaveCache(fileId);
+                    if (cached && cached.state && typeof cached.state === 'object') {
+                        cachedState = cached.state;
+                        if (cachedState.fields && cachedState.fields.Title) {
+                            label = String(cachedState.fields.Title).trim() || label;
+                        }
+                        showCardLoadingBar('Opening “' + label + '”…');
+                        await applyLoadedProjectState(cachedState, file);
+                        setDriveStatus('Loaded “' + label + '” from cache.');
+                        hideCardLoadingBar();
+                        try {
+                            var u0 = new URL(window.location.href);
+                            u0.searchParams.delete('openDriveFile');
+                            history.replaceState({}, '', u0.pathname + u0.search + u0.hash);
+                        } catch (e0) { /* ignore */ }
+
+                                // Revalidate from Drive in the background when signed in (don’t block UI).
+                        (async function () {
+                            try {
+                                if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) return;
+                                var fresh = await fetchDriveProjectJsonByFile(file);
+                                if (!fresh || typeof fresh !== 'object') return;
+                                var prevMeta = {
+                                    modifiedTime: cached.modifiedTime || null,
+                                    size: cached.size != null ? cached.size : null
+                                };
+                                await CardMakerPerf.writeSaveCache(fileId, prevMeta, fresh);
+                                // Only re-apply if still viewing this file and content likely changed.
+                                if (currentDriveFileId === fileId) {
+                                    var a = JSON.stringify(cachedState);
+                                    var b = JSON.stringify(fresh);
+                                    if (a !== b) {
+                                        await applyLoadedProjectState(fresh, file);
+                                        setDriveStatus('Updated “' + label + '” from Drive.');
+                                    }
+                                }
+                            } catch (bgErr) {
+                                console.warn('Background Drive refresh after cache open:', bgErr);
+                            }
+                        })();
+                        return;
+                    }
+                }
+
+                // 2) No cache: need Drive. Keep loader visible while auth + download run.
+                showCardLoadingBar('Connecting to Google Drive…');
+                if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) {
+                    setDriveStatus('Sign in with Google to open this save (link from Saved Projects Manager).');
+                    return;
+                }
+                showCardLoadingBar('Downloading “' + label + '”…');
+                await loadProjectFromDriveByFile(file);
                 try {
                     var u = new URL(window.location.href);
                     u.searchParams.delete('openDriveFile');
@@ -1906,6 +2238,8 @@
                 var msg = err && err.message ? err.message : String(err);
                 setDriveStatus('Could not open linked save: ' + msg.slice(0, 120));
                 alert('Could not open this save from the link.\n\n' + msg);
+            } finally {
+                hideCardLoadingBar();
             }
         }
 
@@ -1960,12 +2294,24 @@
                 if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) {
                     throw new Error('Sign in with Google first.');
                 }
-                var state = await fetchDriveProjectJsonByFile(file);
+                var state = await loadProjectStatePreferringCache(file);
                 if (req !== driveModalPreviewRequestId) return;
 
                 var dataUrl = null;
-                if (typeof window.renderCardMakerProjectToDataUrl === 'function') {
-                    dataUrl = await window.renderCardMakerProjectToDataUrl(state);
+                var thumbOpts = (typeof CardMakerPerf !== 'undefined')
+                    ? CardMakerPerf.THUMB_RENDER_OPTS
+                    : { maxOutputSide: 400, outputMime: 'image/jpeg', outputQuality: 0.78 };
+
+                if (typeof CardMakerPerf !== 'undefined' && file.modifiedTime) {
+                    var thumbRec = await CardMakerPerf.readThumbCache(file.id, file.modifiedTime);
+                    if (thumbRec && thumbRec.dataUrl) dataUrl = thumbRec.dataUrl;
+                }
+
+                if (!dataUrl && typeof window.renderCardMakerProjectToDataUrl === 'function') {
+                    dataUrl = await window.renderCardMakerProjectToDataUrl(state, thumbOpts);
+                    if (dataUrl && typeof CardMakerPerf !== 'undefined' && file.modifiedTime) {
+                        CardMakerPerf.writeThumbCache(file.id, file.modifiedTime, dataUrl);
+                    }
                 }
                 if (req !== driveModalPreviewRequestId) return;
                 if (!dataUrl && state.images) {
@@ -1995,7 +2341,10 @@
         async function listDriveProjects() {
             const files = await listAppDataFolderFiles();
             return files.filter(function (f) {
-                return f.name && f.name.indexOf('cardmaker') !== -1;
+                if (typeof CardMakerPerf !== 'undefined') {
+                    return CardMakerPerf.isCardmakerProjectFileName(f.name);
+                }
+                return f.name && String(f.name).toLowerCase().endsWith(PROJECT_FILE_EXTENSION);
             }).sort(function (a, b) {
                 const ta = new Date(a.modifiedTime || 0).getTime();
                 const tb = new Date(b.modifiedTime || 0).getTime();
@@ -2049,13 +2398,16 @@
                     if (loadEl) {
                         (async function () {
                             try {
+                                showCardLoadingBar('Connecting…');
                                 if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) {
+                                    hideCardLoadingBar();
                                     alert('Sign in with Google first.');
                                     return;
                                 }
                                 await loadProjectFromDriveByFile(file);
                                 closeDriveProjectsModal();
                             } catch (err) {
+                                hideCardLoadingBar();
                                 console.error(err);
                                 const msg = err && err.message ? err.message : String(err);
                                 setDriveModalMessage('Load failed: ' + msg, true);
@@ -2255,46 +2607,56 @@
         document.getElementById('CardBaseCustom').addEventListener('change', function (event) {
             var file = event.target.files && event.target.files[0];
             if (!file) return;
-            var img = new Image();
-            var reader = new FileReader();
-            reader.onload = function (e) {
-                img.src = e.target.result;
-            };
-            reader.onloadend = function () {
-                MainImage = img;
-                MainImage.hy = 0;
-                MainImage.wx = 0;
-                MainImage.onload = function () {
+            (async function () {
+                var dataUrl = file;
+                if (typeof CardMakerPerf !== 'undefined') {
+                    dataUrl = await CardMakerPerf.compressImageToDataUrl(file);
+                } else {
+                    dataUrl = await new Promise(function (resolve, reject) {
+                        var reader = new FileReader();
+                        reader.onload = function (e) { resolve(e.target.result); };
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
+                }
+                var img = new Image();
+                img.onload = function () {
+                    MainImage = img;
+                    MainImage.hy = 0;
+                    MainImage.wx = 0;
                     redrawCanvas();
                 };
-            };
-            reader.readAsDataURL(file);
+                img.src = dataUrl;
+            })().catch(function (e) { console.error(e); });
         });
         
         // Art image file upload
         document.getElementById("Art").addEventListener("change", function (event) {
-            let file = event.target.files;
-            let img = new Image();
-            let reader = new FileReader();
-            
-            reader.onload = function(e) {
-                img.src = e.target.result; // Set image source to uploaded file as data URL
-                // Update body background image with the uploaded art
-                document.body.style.backgroundImage = `url('${e.target.result}')`;
-            };
-
+            let file = event.target.files && event.target.files[0];
+            if (!file) return;
             const ExtraHight = parseInt(document.getElementById("ArtHightPos").value) || 0;
-            
-            reader.onloadend = function() {
-                ArtImage.hy = ExtraHight;
-                ArtImage = img;
-                ArtImage.onload = function() {
+            (async function () {
+                var dataUrl;
+                if (typeof CardMakerPerf !== 'undefined') {
+                    dataUrl = await CardMakerPerf.compressImageToDataUrl(file);
+                } else {
+                    dataUrl = await new Promise(function (resolve, reject) {
+                        var reader = new FileReader();
+                        reader.onload = function (e) { resolve(e.target.result); };
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
+                }
+                document.body.style.backgroundImage = "url('" + dataUrl + "')";
+                var img = new Image();
+                img.onload = function () {
+                    ArtImage = img;
+                    ArtImage.hy = ExtraHight;
                     ImageSizeNoRedraw();
-                    redrawCanvas();   // Redraw the canvas
+                    redrawCanvas();
                 };
-            };
-
-            reader.readAsDataURL(file[0]); // Read the first file as data URL
+                img.src = dataUrl;
+            })().catch(function (e) { console.error(e); });
         });
 
         function wrapSetNameTextLines(ctx, text, maxWidth) {
@@ -2316,20 +2678,21 @@
         }
 
         /** Same behavior as card-render.js drawSetNameBottomRight (editor canvas). */
-        function drawSetNameBottomRightEditor(ctx, rawName, rightX, centerY, maxWidth) {
+        function drawSetNameBottomRightEditor(ctx, rawName, rightX, centerY, maxWidth, fontScale) {
             var name = String(rawName || '').trim();
             if (!name) return;
+            var fs = fontScale != null ? fontScale : (canvas.width / FULL_CANVAS_W);
             ctx.textAlign = 'right';
             ctx.textBaseline = 'middle';
             var px;
-            for (px = 64; px >= 28; px -= 2) {
+            for (px = Math.round(64 * fs); px >= Math.round(28 * fs); px -= Math.max(1, Math.round(2 * fs))) {
                 ctx.font = px + 'px Medieval';
                 if (ctx.measureText(name).width <= maxWidth) {
                     ctx.fillText(name, rightX, centerY);
                     return;
                 }
             }
-            ctx.font = '28px Medieval';
+            ctx.font = Math.round(28 * fs) + 'px Medieval';
             var lines = wrapSetNameTextLines(ctx, name, maxWidth);
             var maxLines = 3;
             if (lines.length > maxLines) {
@@ -2348,22 +2711,39 @@
                 ctx.fillText(w + '…', rightX, centerY);
                 return;
             }
-            var lineH = 34;
+            var lineH = 34 * fs;
             var startY = centerY - ((lines.length - 1) * lineH) / 2;
             for (var li = 0; li < lines.length; li++) {
                 ctx.fillText(lines[li], rightX, startY + li * lineH);
             }
         }
 
-        // Redraw the canvas with all images and text
+        // Redraw the canvas with all images and text (live canvas may be scaled down for performance)
+        var redrawCanvasRaf = null;
+        function redrawCanvasImmediate() {
+            if (redrawCanvasRaf != null) {
+                cancelAnimationFrame(redrawCanvasRaf);
+                redrawCanvasRaf = null;
+            }
+            redrawCanvasNow();
+        }
         function redrawCanvas() {
+            markProjectDirty();
+            if (redrawCanvasRaf != null) return;
+            redrawCanvasRaf = requestAnimationFrame(function () {
+                redrawCanvasRaf = null;
+                redrawCanvasNow();
+            });
+        }
+        function redrawCanvasNow() {
         syncCardRarityUi();
+        const fs = canvas.width / FULL_CANVAS_W;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = 'black'; // Reset fillStyle to black at the start
         
             // Get the value of ExtraHight (add a check if it is set, to avoid NaN issues)
-            const ExtraHightP = parseInt(document.getElementById("ArtHightPos").value) || 0;
-            const ExtraWidthP = parseInt(document.getElementById("ArtWidthPos").value) || 0;
+            const ExtraHightP = (parseInt(document.getElementById("ArtHightPos").value) || 0) * fs;
+            const ExtraWidthP = (parseInt(document.getElementById("ArtWidthPos").value) || 0) * fs;
             
             //Draw art image
             const spectRatio = MainImage.width / MainImage.height;
@@ -2371,8 +2751,8 @@
                 ImageSizeNoRedraw();
             }
             const artSize = ArtImage.h || 116;
-            let mgWidth = ArtImage.width * (artSize / 100);
-            let mgHeight = ArtImage.height * (artSize / 100);
+            let mgWidth = ArtImage.width * (artSize / 100) * fs;
+            let mgHeight = ArtImage.height * (artSize / 100) * fs;
 
             ctx.drawImage(ArtImage, (canvas.width - mgWidth - ExtraWidthP) / 2, (canvas.height - mgHeight - ExtraHightP) / 8, mgWidth, mgHeight);
 
@@ -2387,7 +2767,7 @@
             }
             ctx.drawImage(MainImage, (canvas.width - imgWidth) / 2, (canvas.height - imgHeight) / 8, imgWidth, imgHeight);
             
-            ctx.font = "200px Medieval"
+            ctx.font = Math.round(200 * fs) + "px Medieval"
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = 'black';
@@ -2406,7 +2786,7 @@
             if (IsSwitchedOn) {
                 ctx.drawImage(DamageImg, dImgX, dImgY, DimgWidth, DimgHeight);
                 document.fonts.load('10px Medieval').then(() => {
-                    ctx.font = "175px Medieval"
+                    ctx.font = Math.round(175 * fs) + "px Medieval"
                     ctx.textAlign = 'center';
                     ctx.fillStyle = 'black';
                     ctx.fillText(Dam.value, canvas.width / 12.5, canvas.height / 12.5)
@@ -2423,26 +2803,26 @@
                 }
             }
             
-            ctx.font = TitleSize.value + "px Medieval"
+            ctx.font = Math.round(Number(TitleSize.value) * fs) + "px Medieval"
             ctx.textAlign = TitleCenterAlign.checked ? 'center' : 'left';
             const titleX = TitleCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10);
             ctx.fillText(CardTitle.value, titleX, canvas.height / 12.5)
 
-            ctx.font = TypeFontSize.value + "px Medieval"
+            ctx.font = Math.round(Number(TypeFontSize.value) * fs) + "px Medieval"
             ctx.textAlign = 'center';
             ctx.fillText(Type.value, (canvas.width / 5), canvas.height /7.3)
-            ctx.font = SubtypeFontSize.value + "px Medieval"
+            ctx.font = Math.round(Number(SubtypeFontSize.value) * fs) + "px Medieval"
             ctx.textAlign = 'center';
             ctx.fillText(Subtype.value, canvas.width - (canvas.width / 5), canvas.height /7.3)
 
             ctx.fillStyle = 'black';
 
-            ctx.font = TreasureFontSize.value + "px Medieval"
+            ctx.font = Math.round(Number(TreasureFontSize.value) * fs) + "px Medieval"
             ctx.textAlign = 'center';
             ctx.fillText(TreasureCost.value, canvas.width - (canvas.width / 6.9), canvas.height / 1.99)
 
 
-            ctx.font = QuoteFontSize.value + "px Medieval"
+            ctx.font = Math.round(Number(QuoteFontSize.value) * fs) + "px Medieval"
             ctx.textAlign = QuoteCenterAlign.checked ? 'center' : 'left';
             const quoteX = QuoteCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10);
             ctx.fillText(Quote.value, quoteX, canvas.height - (canvas.height / 13))
@@ -2469,8 +2849,8 @@
             var setNameStr = setNameHidEl && setNameHidEl.value ? String(setNameHidEl.value).trim() : '';
             if (setSn !== null || rarLabel || setNameStr) {
                 ctx.save();
-                const setDigitFontPx = 80;
-                const setSlashFontPx = 138;
+                const setDigitFontPx = Math.round(80 * fs);
+                const setSlashFontPx = Math.round(138 * fs);
                 ctx.textBaseline = 'middle';
                 ctx.fillStyle = '#ffffff';
                 const leftPadX = canvas.width / 10;
@@ -2495,35 +2875,35 @@
                 }
                 if (rarLabel) {
                     ctx.textAlign = 'left';
-                    ctx.font = '70px Medieval';
+                    ctx.font = Math.round(70 * fs) + 'px Medieval';
                     ctx.fillText(rarLabel, rarityX, rarityY);
                 }
                 if (setNameStr) {
                     var rightPadX = canvas.width - (canvas.width / 10);
                     var maxNameW = canvas.width * 0.52;
-                    drawSetNameBottomRightEditor(ctx, setNameStr, rightPadX, rarityY, maxNameW);
+                    drawSetNameBottomRightEditor(ctx, setNameStr, rightPadX, rarityY, maxNameW, fs);
                 }
                 ctx.restore();
             }
             ctx.fillStyle = 'black';
 
-            ctx.font = DiscriptionFontSize.value + "px Medieval"
+            ctx.font = Math.round(Number(DiscriptionFontSize.value) * fs) + "px Medieval"
             ctx.textAlign = MainDescriptionCenterAlign.checked ? 'center' : 'left';
             const descriptionX = MainDescriptionCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10);
             i = 0;
             WrapText(Discription.value).forEach(lin => {
                 i++;
-                ctx.fillText(lin, descriptionX, (canvas.height / 1.6) + (125 * i))
+                ctx.fillText(lin, descriptionX, (canvas.height / 1.6) + (125 * fs * i))
             });
 
 
-            ctx.font = SubFontSize.value + "px Medieval"
+            ctx.font = Math.round(Number(SubFontSize.value) * fs) + "px Medieval"
             ctx.textAlign = SubDescriptionCenterAlign.checked ? 'center' : 'left';
             const subDescriptionX = SubDescriptionCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10);
             i = 0;
             WrapText(SubDisciption.value).forEach(lin => {
                 i++;
-                ctx.fillText(lin, subDescriptionX, (canvas.height / 1.9) + (100 * i))
+                ctx.fillText(lin, subDescriptionX, (canvas.height / 1.9) + (100 * fs * i))
             });
             
             // Update fullscreen canvas if modal is open (with black bleed)
@@ -2661,17 +3041,42 @@
         updateExportBleedHint();
         updateDriveButtons();
         initDriveProjectsModalUi();
+        setTimeout(function () {
+            editorReadyForDirty = true;
+            clearProjectDirty();
+        }, 800);
+
+        // If opening a card from SPM, show the loader immediately (before Google scripts / auth).
+        (function showOpenLoaderEarly() {
+            try {
+                var params = new URLSearchParams(window.location.search || '');
+                if (params.get('openDriveFile')) {
+                    showCardLoadingBar('Opening card…');
+                    setDriveStatus('Opening linked save…');
+                }
+            } catch (e) { /* ignore */ }
+        })();
+
         if (hasDriveConfig()) {
             if (readPersistedDriveToken()) {
-                setDriveStatus('Restoring Google session…');
-            } else {
+                setDriveStatus(document.getElementById('cmCardLoadingBar') && !document.getElementById('cmCardLoadingBar').hidden
+                    ? 'Opening linked save…'
+                    : 'Restoring Google session…');
+            } else if (!(new URLSearchParams(window.location.search || '').get('openDriveFile'))) {
                 setDriveStatus('Not signed in. Click "Sign in with Google" to connect Drive.');
             }
+            // Open the linked card ASAP (cache-first); restore session in parallel for Drive fallback/refresh.
+            var openPromise = maybeOpenDriveFileFromQuery();
             tryRestoreDriveSession()
-                .then(function () { return maybeOpenDriveFileFromQuery(); })
+                .then(function () { return openPromise; })
+                .then(function () {
+                    var params = new URLSearchParams(window.location.search || '');
+                    if (!params.get('openDriveFile')) return maybeRestoreEditorDraft();
+                })
                 .catch(function (e) { console.error(e); });
         } else {
             setDriveStatus('Set GOOGLE_CLIENT_ID in index.html first.');
+            maybeRestoreEditorDraft().catch(function (e) { console.error(e); });
         }
         
         // Download the final card at the selected format (optional black bleed within selected size)
@@ -2686,11 +3091,20 @@
 
             const widthSlider = document.getElementById('exportWidth');
             const totalWidth = widthSlider ? parseInt(widthSlider.value, 10) || 800 : 800;
-            const aspectRatio = 3500 / 2500; // Match original canvas 2500 x 3500 ratio
+            const aspectRatio = FULL_CANVAS_H / FULL_CANVAS_W;
             const totalHeight = Math.round(totalWidth * aspectRatio);
 
             const includeBleedEl = document.getElementById('exportIncludeBleed');
             const includeBleed = includeBleedEl ? includeBleedEl.checked : true;
+
+            // Temporarily render at full resolution for crisp export
+            var prevW = canvas.width;
+            var prevH = canvas.height;
+            canvas.width = FULL_CANVAS_W;
+            canvas.height = FULL_CANVAS_H;
+            suppressDirtyTracking = true;
+            redrawCanvasImmediate();
+            suppressDirtyTracking = false;
 
             const exportCanvas = document.createElement('canvas');
             const exportCtx = exportCanvas.getContext('2d');
@@ -2712,6 +3126,12 @@
                 exportCanvas.height = totalHeight;
                 exportCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, totalWidth, totalHeight);
             }
+
+            canvas.width = prevW;
+            canvas.height = prevH;
+            suppressDirtyTracking = true;
+            redrawCanvasImmediate();
+            suppressDirtyTracking = false;
 
             let dataUrl;
             try {
