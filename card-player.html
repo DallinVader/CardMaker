@@ -1253,6 +1253,9 @@
     var boards = [boardP1, boardP2];
 
     var applyingRemoteFirestoreSync = false;
+    /** Coalesce concurrent Firestore snapshots so applies never overlap. */
+    var firestoreApplyBusy = false;
+    var firestoreApplyPending = null;
     var firebaseMultiplayerUnsub = null;
     var firebaseMultiplayerDbRef = null;
     var firebaseMultiplayerPushTimer = null;
@@ -1281,8 +1284,8 @@
 
     function firestoreSliceFingerprint(obj) {
         try {
-            // Cheap stable-ish fingerprint (avoid deep key-sorted stringify on every push/snapshot).
-            var s = JSON.stringify(obj == null ? {} : obj);
+            // Key-sorted stringify so Firestore map key order does not falsely dirty local seat.
+            var s = stableStringify(obj == null ? {} : obj);
             var h = 2166136261;
             for (var i = 0; i < s.length; i++) {
                 h ^= s.charCodeAt(i);
@@ -1296,6 +1299,7 @@
 
     /** dataUrl cache for renderCardMakerProjectToDataUrl — big win for Firestore restore & duplicate IDs. */
     var cpCardFaceUrlCache = Object.create(null);
+    var cpCardFaceUrlOrder = [];
     var cpCardFaceUrlPending = Object.create(null);
     var cpDeckThumbUrlCache = Object.create(null);
     var cpDeckThumbUrlPending = Object.create(null);
@@ -1307,12 +1311,48 @@
     /** When a full-size face is already cached for play, shrink to this max side for the deck list. */
     var CP_DECK_THUMB_FROM_FULL_MAX = 380;
     var CP_FACE_WARM_MAX = 24;
+    var CP_FACE_CACHE_MAX = 48;
+    var cardByIdIndex = Object.create(null);
 
     function clearCardFaceUrlCache() {
         cpCardFaceUrlCache = Object.create(null);
+        cpCardFaceUrlOrder = [];
         cpCardFaceUrlPending = Object.create(null);
         cpDeckThumbUrlCache = Object.create(null);
         cpDeckThumbUrlPending = Object.create(null);
+    }
+
+    function rememberPlayFaceUrl(id, url) {
+        if (!id || !url) return;
+        if (cpCardFaceUrlCache[id]) {
+            var oi = cpCardFaceUrlOrder.indexOf(id);
+            if (oi >= 0) cpCardFaceUrlOrder.splice(oi, 1);
+        }
+        cpCardFaceUrlCache[id] = url;
+        cpCardFaceUrlOrder.push(id);
+        while (cpCardFaceUrlOrder.length > CP_FACE_CACHE_MAX) {
+            var drop = cpCardFaceUrlOrder.shift();
+            if (drop && drop !== id) delete cpCardFaceUrlCache[drop];
+        }
+    }
+
+    function touchPlayFaceUrl(id) {
+        if (!id || !cpCardFaceUrlCache[id]) return;
+        var oi = cpCardFaceUrlOrder.indexOf(id);
+        if (oi >= 0) {
+            cpCardFaceUrlOrder.splice(oi, 1);
+            cpCardFaceUrlOrder.push(id);
+        }
+    }
+
+    function rebuildCardByIdIndex() {
+        cardByIdIndex = Object.create(null);
+        var cards = allCards();
+        var i;
+        for (i = 0; i < cards.length; i++) {
+            var c = cards[i];
+            if (c && c.id) cardByIdIndex[String(c.id)] = c;
+        }
     }
 
     function getOrRenderCardPlayFaceUrl(card) {
@@ -1323,14 +1363,17 @@
             return px && typeof px.then === 'function' ? px : Promise.resolve(null);
         }
         var cached = cpCardFaceUrlCache[id];
-        if (cached) return Promise.resolve(cached);
+        if (cached) {
+            touchPlayFaceUrl(id);
+            return Promise.resolve(cached);
+        }
         var pend = cpCardFaceUrlPending[id];
         if (pend) return pend;
         var raw = window.renderCardMakerProjectToDataUrl(card.state, CP_PLAY_FACE_RENDER_OPTS);
         if (!raw || typeof raw.then !== 'function') return Promise.resolve(null);
         pend = raw.then(function (url) {
             delete cpCardFaceUrlPending[id];
-            if (url) cpCardFaceUrlCache[id] = url;
+            if (url) rememberPlayFaceUrl(id, url);
             return url || null;
         }, function () {
             delete cpCardFaceUrlPending[id];
@@ -1453,11 +1496,24 @@
         };
     }
 
-    /** Pre-render faces in idle time so multiplayer / first draw feels instant. */
+    /** Pre-render faces in idle time so multiplayer / first draw feels instant. Prefer deck tops. */
     function warmCardFaceUrlCacheIdle() {
         try {
-            var cards = allCards();
-            if (cards.length === 0 || cards.length > 150) return;
+            var seen = Object.create(null);
+            var cards = [];
+            function pushCard(c) {
+                if (!c || !c.id || seen[c.id]) return;
+                seen[c.id] = 1;
+                cards.push(c);
+            }
+            var di;
+            for (di = Math.max(0, deck.length - 12); di < deck.length; di++) pushCard(deck[di]);
+            for (di = Math.max(0, deckP2.length - 12); di < deckP2.length; di++) pushCard(deckP2[di]);
+            if (commanderCard) pushCard(commanderCard);
+            var lib = allCards();
+            var li;
+            for (li = 0; li < lib.length && cards.length < CP_FACE_WARM_MAX; li++) pushCard(lib[li]);
+            if (cards.length === 0) return;
             var n = Math.min(cards.length, CP_FACE_WARM_MAX);
             var i = 0;
             function runNext() {
@@ -2814,10 +2870,18 @@
     }
 
     function cardById(id) {
+        if (id == null || id === '') return null;
+        var key = String(id);
+        if (Object.prototype.hasOwnProperty.call(cardByIdIndex, key)) {
+            return cardByIdIndex[key];
+        }
         var cards = allCards();
         var i;
         for (i = 0; i < cards.length; i++) {
-            if (cards[i].id === id) return cards[i];
+            if (cards[i].id === id || String(cards[i].id) === key) {
+                cardByIdIndex[key] = cards[i];
+                return cards[i];
+            }
         }
         return null;
     }
@@ -3479,7 +3543,6 @@
         if (!wrap || !wrap.classList.contains('cp-card-enlarged')) return;
         var margin = 14;
         wrap.style.setProperty('--cp-enlarge-shift', '0px');
-        void wrap.offsetHeight;
         var r = wrap.getBoundingClientRect();
         var delta = 0;
         var maxBottom = window.innerHeight - margin;
@@ -3665,19 +3728,12 @@
         wrap.style.setProperty('--cp-enlarge-shift', '0px');
         var dx = parseFloat(wrap.style.getPropertyValue('--cp-enlarge-dx')) || 0;
         var dy = parseFloat(wrap.style.getPropertyValue('--cp-enlarge-dy')) || 0;
-        // At most 2 measure/correct cycles (was 10) — avoids layout thrash during hover enlarge.
-        var i;
-        for (i = 0; i < 2; i++) {
-            wrap.style.setProperty('--cp-enlarge-dx', dx + 'px');
-            wrap.style.setProperty('--cp-enlarge-dy', dy + 'px');
-            void wrap.offsetHeight;
-            var r = wrap.getBoundingClientRect();
-            var ex = cx0 - (r.left + r.width / 2);
-            var ey = cy0 - (r.top + r.height / 2);
-            if (Math.abs(ex) < 0.45 && Math.abs(ey) < 0.45) break;
-            dx += ex;
-            dy += ey;
-        }
+        // Single measure/correct cycle — enough for hover enlarge without layout thrash.
+        wrap.style.setProperty('--cp-enlarge-dx', dx + 'px');
+        wrap.style.setProperty('--cp-enlarge-dy', dy + 'px');
+        var r = wrap.getBoundingClientRect();
+        dx += cx0 - (r.left + r.width / 2);
+        dy += cy0 - (r.top + r.height / 2);
         var cap = 420;
         dx = Math.max(-cap, Math.min(cap, dx));
         dy = Math.max(-cap, Math.min(cap, dy));
@@ -3692,7 +3748,7 @@
         applyEnlargeLayoutFrame(wrap);
     }
 
-    var CP_ENLARGE_TRACK_MS = 220;
+    var CP_ENLARGE_TRACK_MS = 140;
     /** Ignore pointerleave briefly after enlarging so a translating hit-target does not fire leave and clear the preview. */
     var CP_ENLARGE_LEAVE_GRACE_MS = 650;
 
@@ -3784,11 +3840,6 @@
         wrap.addEventListener('pointerenter', function () {
             if (!motionOk()) return;
             clearEnlarge();
-            armIdleEnlarge();
-        });
-        wrap.addEventListener('pointermove', function () {
-            if (!motionOk()) return;
-            if (wrap.classList.contains('cp-card-enlarged')) return;
             armIdleEnlarge();
         });
         wrap.addEventListener('pointerleave', function () {
@@ -3987,38 +4038,57 @@
     }
 
     /** Places or removes the commander token on each field (not part of the deck pile). */
-    function syncCommanderToPlayingField() {
-        boards.forEach(removeCommanderPiecesFromBoard);
+    function syncCommanderToPlayingField(opts) {
+        opts = opts || {};
+        var skipPush = !!(opts.skipPush || applyingRemoteFirestoreSync);
+        function maybePush() {
+            if (!skipPush) scheduleMultiplayerPush();
+        }
         if (!commanderCard || !commanderCard.state) {
-            scheduleMultiplayerPush();
-            return;
+            boards.forEach(removeCommanderPiecesFromBoard);
+            maybePush();
+            return Promise.resolve();
         }
         var card = commanderCard;
-        getOrRenderCardPlayFaceUrl(card).then(function (url) {
+        var cmdId = String(card.id || '');
+        return getOrRenderCardPlayFaceUrl(card).then(function (url) {
             if (!url) {
-                scheduleMultiplayerPush();
+                maybePush();
                 return;
             }
-            if (!commanderCard || commanderCard.id !== card.id) {
-                scheduleMultiplayerPush();
+            if (!commanderCard || String(commanderCard.id) !== cmdId) {
+                maybePush();
                 return;
             }
             boards.forEach(function (board) {
                 if (!board.field) return;
-                var parts = buildCardWrap(url, null);
-                var wrap = parts.wrap;
-                wrap.setAttribute('data-cp-commander', '1');
-                wrap.setAttribute('data-cp-commander-in-zone', '1');
-                wrap.setAttribute('data-cp-card-lib-id', String(card.id));
-                wrap.style.left = '0px';
-                wrap.style.top = '0px';
-                board.field.appendChild(wrap);
-                wireCardInteractions(wrap, parts.rotLayer, parts.flipInner, board);
+                var existing = null;
+                board.field.querySelectorAll('.cp-card-on-field[data-cp-commander="1"]').forEach(function (el) {
+                    if (String(el.getAttribute('data-cp-card-lib-id') || '') === cmdId) existing = el;
+                });
+                if (!existing) {
+                    board.field.querySelectorAll('.cp-card-on-field[data-cp-commander="1"]').forEach(function (el) {
+                        el.remove();
+                    });
+                    var parts = buildCardWrap(url, null);
+                    var wrap = parts.wrap;
+                    wrap.setAttribute('data-cp-commander', '1');
+                    wrap.setAttribute('data-cp-commander-in-zone', '1');
+                    wrap.setAttribute('data-cp-card-lib-id', cmdId);
+                    wrap.style.left = '0px';
+                    wrap.style.top = '0px';
+                    board.field.appendChild(wrap);
+                    wireCardInteractions(wrap, parts.rotLayer, parts.flipInner, board);
+                } else {
+                    var frontImg = existing.querySelector('.cp-flip-face-front img');
+                    if (frontImg && frontImg.getAttribute('src') !== url) frontImg.src = url;
+                    existing.setAttribute('data-cp-commander-in-zone', '1');
+                }
                 relayoutCommanderZoneBoard(board);
             });
-            scheduleMultiplayerPush();
+            maybePush();
         }).catch(function () {
-            scheduleMultiplayerPush();
+            maybePush();
         });
     }
 
@@ -4676,17 +4746,51 @@
                 return { card: card, url: null };
             });
         })).then(function (results) {
-            var chain = Promise.resolve();
+            var wraps = [];
             results.forEach(function (r) {
-                chain = chain.then(function () {
-                    if (!r.url) {
-                        board.deck.push(r.card);
-                        return null;
-                    }
-                    return placeCardInHand(r.url, r.card, board);
-                });
+                if (!r.url) {
+                    board.deck.push(r.card);
+                    return;
+                }
+                var parts = buildCardWrap(r.url, r.card);
+                var wrap = parts.wrap;
+                wrap.classList.add('cp-hand-card');
+                board.field.appendChild(wrap);
+                wireCardInteractions(wrap, parts.rotLayer, parts.flipInner, board);
+                applyOpponentHandPrivacy(wrap, board);
+                wraps.push(wrap);
             });
-            return chain;
+            if (!wraps.length) return null;
+            if (cpPrefersReducedMotion()) {
+                relayoutHandCardsBoard(board);
+                cpPlaySfx();
+                return null;
+            }
+            var start = deckDrawStartPosition(board);
+            wraps.forEach(function (w) {
+                w.style.left = start.l + 'px';
+                w.style.top = start.t + 'px';
+                w.style.zIndex = '6350';
+            });
+            var items = handLayoutItems(board);
+            var targetByWrap = Object.create(null);
+            items.forEach(function (it) {
+                var iid = it.w.getAttribute('data-cp-instance-id') || '';
+                if (iid) targetByWrap[iid] = it;
+                if (wraps.indexOf(it.w) < 0) {
+                    it.w.style.left = it.l + 'px';
+                    it.w.style.top = it.t + 'px';
+                    it.w.style.zIndex = String(it.z);
+                }
+            });
+            return Promise.all(wraps.map(function (w) {
+                var iid = w.getAttribute('data-cp-instance-id') || '';
+                var target = iid ? targetByWrap[iid] : null;
+                if (!target) return Promise.resolve();
+                return animateOpponentCardLayout(w, target.l, target.t, target.z);
+            })).then(function () {
+                cpPlaySfx();
+            });
         }).then(function () {
             updateStats();
             setStatus('Drew ' + n + ' to hand (P' + (board.id === 'p2' ? '2' : '1') + ') · ' + board.deck.length + ' left.');
@@ -5095,41 +5199,51 @@
                     if (localMultiplayerSeat === 1) needP1 = false;
                     if (localMultiplayerSeat === 2) needP2 = false;
                 }
+                /* After the first successful sync of our seat, local UI is authoritative — never re-apply our mat from opponent snapshots. */
+                if (localMultiplayerSeat === 1 && lastSyncedFirestoreSlices.p1 != null) needP1 = false;
+                if (localMultiplayerSeat === 2 && lastSyncedFirestoreSlices.p2 != null) needP2 = false;
                 if (!needShared && !needP1 && !needP2) {
                     resolve();
                     return;
                 }
-                if (needShared) {
+                var dirtyBoards = [];
+                Promise.resolve().then(function () {
+                    var seatTasks = [];
+                    if (needP1) {
+                        dirtyBoards.push(boardP1);
+                        seatTasks.push(applyOnePlayerSliceFromFirestore(p1, boardP1, deck, {
+                            animateRemoteMoves: localMultiplayerSeat !== 1,
+                            playOpponentSfx: localMultiplayerSeat !== null && localMultiplayerSeat !== 1
+                        }).then(function () {
+                            lastSyncedFirestoreSlices.p1 = firestoreSliceFingerprint(p1);
+                        }));
+                    }
+                    if (needP2) {
+                        dirtyBoards.push(boardP2);
+                        seatTasks.push(applyOnePlayerSliceFromFirestore(p2, boardP2, deckP2, {
+                            animateRemoteMoves: localMultiplayerSeat !== 2,
+                            playOpponentSfx: localMultiplayerSeat !== null && localMultiplayerSeat !== 2
+                        }).then(function () {
+                            lastSyncedFirestoreSlices.p2 = firestoreSliceFingerprint(p2);
+                        }));
+                    }
+                    return Promise.all(seatTasks);
+                }).then(function () {
+                    if (!needShared) return null;
                     var cmdId = (d.shared && d.shared.commanderId) || '';
                     commanderCard = cmdId ? cardById(cmdId) : null;
                     persistCommanderId();
                     updateCommanderUi();
-                    syncCommanderToPlayingField();
-                    lastSyncedFirestoreSlices.shared = fpS;
-                }
-                var tasks = [];
-                if (needP1) {
-                    tasks.push(applyOnePlayerSliceFromFirestore(p1, boardP1, deck, {
-                        animateRemoteMoves: localMultiplayerSeat !== 1,
-                        playOpponentSfx: localMultiplayerSeat !== null && localMultiplayerSeat !== 1
-                    }).then(function () {
-                        lastSyncedFirestoreSlices.p1 = firestoreSliceFingerprint(p1);
-                    }));
-                }
-                if (needP2) {
-                    tasks.push(applyOnePlayerSliceFromFirestore(p2, boardP2, deckP2, {
-                        animateRemoteMoves: localMultiplayerSeat !== 2,
-                        playOpponentSfx: localMultiplayerSeat !== null && localMultiplayerSeat !== 2
-                    }).then(function () {
-                        lastSyncedFirestoreSlices.p2 = firestoreSliceFingerprint(p2);
-                    }));
-                }
-                Promise.all(tasks).then(function () {
+                    return syncCommanderToPlayingField({ skipPush: true }).then(function () {
+                        lastSyncedFirestoreSlices.shared = fpS;
+                    });
+                }).then(function () {
                     updateStats();
-                    return Promise.all([
-                        finalizeBoardZoneLayoutsRemote(boardP1, localMultiplayerSeat !== 1),
-                        finalizeBoardZoneLayoutsRemote(boardP2, localMultiplayerSeat !== 2)
-                    ]);
+                    return Promise.all(dirtyBoards.map(function (b) {
+                        var animate = (b === boardP1 && localMultiplayerSeat !== 1) ||
+                            (b === boardP2 && localMultiplayerSeat !== 2);
+                        return finalizeBoardZoneLayoutsRemote(b, animate);
+                    }));
                 }).then(function () {
                     resolve();
                 }).catch(function () {
@@ -5184,6 +5298,32 @@
         });
     }
 
+    function enqueueFirestoreRemoteApply(dat) {
+        firestoreApplyPending = dat;
+        if (firestoreApplyBusy) return;
+        firestoreApplyBusy = true;
+        applyingRemoteFirestoreSync = true;
+        function pump() {
+            var next = firestoreApplyPending;
+            firestoreApplyPending = null;
+            if (!next) {
+                firestoreApplyBusy = false;
+                applyingRemoteFirestoreSync = false;
+                return Promise.resolve();
+            }
+            return applyPlayStateFromFirestorePayload(next).then(function () {
+                if (firestoreApplyPending) return pump();
+                firestoreApplyBusy = false;
+                applyingRemoteFirestoreSync = false;
+            }, function () {
+                if (firestoreApplyPending) return pump();
+                firestoreApplyBusy = false;
+                applyingRemoteFirestoreSync = false;
+            });
+        }
+        pump();
+    }
+
     function scheduleMultiplayerPush() {
         if (applyingRemoteFirestoreSync || !firebaseMultiplayerDbRef || !window.firebase) return;
         if (firebaseMultiplayerPushTimer) clearTimeout(firebaseMultiplayerPushTimer);
@@ -5235,6 +5375,9 @@
             clearTimeout(firebaseMultiplayerPushTimer);
             firebaseMultiplayerPushTimer = null;
         }
+        firestoreApplyBusy = false;
+        firestoreApplyPending = null;
+        applyingRemoteFirestoreSync = false;
         if (ref && seat && window.firebase) {
             try {
                 var auth = firebase.auth();
@@ -5357,12 +5500,7 @@
                         if (snap.metadata.hasPendingWrites) return;
                         var dat = snap.data();
                         if (!dat || (dat.v !== 1 && dat.v !== 2)) return;
-                        applyingRemoteFirestoreSync = true;
-                        applyPlayStateFromFirestorePayload(dat).then(function () {
-                            applyingRemoteFirestoreSync = false;
-                        }).catch(function () {
-                            applyingRemoteFirestoreSync = false;
-                        });
+                        enqueueFirestoreRemoteApply(dat);
                     });
                     setConnUi(true);
                     if (statusEl) statusEl.textContent = 'Room “' + rid + '” — you are P' + chosenSeat + ' · live sync';
@@ -5392,6 +5530,7 @@
             .then(function (rows) {
                 clearCardFaceUrlCache();
                 library = rows;
+                rebuildCardByIdIndex();
                 renderLibraryList();
                 restoreCommanderFromLibrary();
                 setStatus('Library: ' + library.length + ' from cache + ' + imported.length + ' imported.');
@@ -5402,6 +5541,7 @@
                 clearCardFaceUrlCache();
                 setStatus('Could not read card cache.');
                 library = [];
+                rebuildCardByIdIndex();
                 renderLibraryList();
                 restoreCommanderFromLibrary();
                 updateAllTreasureZoneBadges();
@@ -6150,6 +6290,7 @@
             });
             cpImportFile.value = '';
             clearCardFaceUrlCache();
+            rebuildCardByIdIndex();
             renderLibraryList();
             restoreCommanderFromLibrary();
             setStatus('Imported ' + added + ' file(s). Total library: ' + allCards().length + '.');

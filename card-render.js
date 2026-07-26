@@ -5,6 +5,18 @@
 (function () {
     var CANVAS_W = 2500;
     var CANVAS_H = 3500;
+    /** Cache font readiness so play/thumb renders do not re-hit document.fonts every call. */
+    var medievalFontReady = null;
+    function ensureMedievalFont() {
+        if (!medievalFontReady) {
+            try {
+                medievalFontReady = document.fonts.load('200px Medieval').catch(function () { return null; });
+            } catch (e) {
+                medievalFontReady = Promise.resolve(null);
+            }
+        }
+        return medievalFontReady;
+    }
 
     /**
      * Loads pixels in a way that keeps an offscreen canvas exportable (toDataURL).
@@ -155,16 +167,23 @@
         var artImg = await artPromise;
         if (!mainImg && !artImg) return null;
 
+        var maxOut = opts && typeof opts.maxOutputSide === 'number' ? opts.maxOutputSide : 0;
+        var renderScale = (maxOut > 0 && maxOut < CANVAS_W)
+            ? Math.min(maxOut / CANVAS_W, maxOut / CANVAS_H, 1)
+            : 1;
+        var outW = Math.max(1, Math.round(CANVAS_W * renderScale));
+        var outH = Math.max(1, Math.round(CANVAS_H * renderScale));
+
         var canvas = document.createElement('canvas');
-        canvas.width = CANVAS_W;
-        canvas.height = CANVAS_H;
+        canvas.width = outW;
+        canvas.height = outH;
         var ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+        ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
         ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
         ctx.fillStyle = 'black';
 
-        try {
-            await document.fonts.load('200px Medieval');
-        } catch (e) { /* ignore */ }
+        await ensureMedievalFont();
 
         var ExtraHightP = parseInt(f.ArtHightPos, 10) || 0;
         var ExtraWidthP = parseInt(f.ArtWidthPos, 10) || 0;
@@ -411,25 +430,12 @@
         }
 
         try {
-            var maxOut = opts && typeof opts.maxOutputSide === 'number' ? opts.maxOutputSide : 0;
-            if (maxOut > 0 && maxOut < CANVAS_W) {
-                var sc = Math.min(maxOut / CANVAS_W, maxOut / CANVAS_H, 1);
-                var tw = Math.max(1, Math.round(CANVAS_W * sc));
-                var th = Math.max(1, Math.round(CANVAS_H * sc));
-                var outCv = document.createElement('canvas');
-                outCv.width = tw;
-                outCv.height = th;
-                var octx = outCv.getContext('2d');
-                if (!octx) return null;
-                octx.imageSmoothingEnabled = true;
-                octx.imageSmoothingQuality = 'high';
-                octx.drawImage(canvas, 0, 0, CANVAS_W, CANVAS_H, 0, 0, tw, th);
-                var wantJpeg = !opts.outputMime || opts.outputMime === 'image/jpeg' || opts.outputMime === 'jpeg';
+            if (renderScale < 1) {
+                var wantJpeg = !opts || !opts.outputMime || opts.outputMime === 'image/jpeg' || opts.outputMime === 'jpeg';
                 if (wantJpeg) {
                     var q = typeof opts.outputQuality === 'number' ? opts.outputQuality : 0.82;
-                    return outCv.toDataURL('image/jpeg', q);
+                    return canvas.toDataURL('image/jpeg', q);
                 }
-                return outCv.toDataURL('image/png');
             }
             return canvas.toDataURL('image/png');
         } catch (e) {
