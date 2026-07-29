@@ -548,6 +548,72 @@ body.cm-page .top-drive-status-wrap {
     margin-bottom: 0;
 }
 
+.cm-page .cm-editor-panel .cm-field-options-manage-btn {
+    grid-column: 1 / -1;
+    justify-self: start;
+    margin-top: 2px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(102, 126, 234, 0.35);
+    background: rgba(255, 255, 255, 0.85);
+    color: #5b6fd8;
+    cursor: pointer;
+}
+
+.cm-page .cm-editor-panel .cm-field-options-manage-btn:hover {
+    background: rgba(102, 126, 234, 0.08);
+}
+
+.cm-field-options-panel {
+    max-width: 720px;
+}
+
+.cm-field-options-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+    margin-top: 8px;
+}
+
+@media (max-width: 640px) {
+    .cm-field-options-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.cm-field-options-col-title {
+    margin: 0 0 8px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #334155;
+}
+
+.cm-field-options-list {
+    width: 100%;
+    min-height: 160px;
+    height: auto;
+    margin-bottom: 8px;
+}
+
+.cm-field-options-row {
+    margin-bottom: 8px;
+}
+
+.cm-field-options-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.cm-field-options-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+
 .cm-page .cm-editor-panel .cm-images-file-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -709,6 +775,11 @@ body.cm-page .top-drive-status-wrap {
     gap: 6px 10px;
     align-items: start;
     min-width: 0;
+}
+
+.cm-field-options-manage-btn {
+    grid-column: 1 / -1;
+    justify-self: start;
 }
 
 .cm-type-sub-col .input-group {

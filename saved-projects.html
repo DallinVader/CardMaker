@@ -284,6 +284,23 @@
             box-sizing: border-box;
         }
 
+        .spm-field-options-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 16px;
+            margin-top: 8px;
+        }
+        @media (max-width: 640px) {
+            .spm-field-options-grid { grid-template-columns: 1fr; }
+        }
+        .spm-field-options-grid > div > label {
+            display: block;
+            font-weight: 800;
+            color: #e2e8f0;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
         .spm-bulk-bar {
             display: grid;
             grid-template-columns: 1fr auto;
@@ -929,6 +946,12 @@
                     <button type="button" class="spm-small-btn" id="spmEditNamedSetBtn">Edit set…</button>
                 </div>
 
+                <h3 class="spm-list-heading">Types &amp; subtypes</h3>
+                <p class="spm-muted" style="font-size:12px; line-height:1.45; margin:0 0 10px;">Customize the Type and Subtype dropdowns used in Card Maker and when editing saves. Syncs to Drive when signed in.</p>
+                <div class="spm-default-set-field">
+                    <button type="button" class="spm-small-btn" id="spmManageFieldOptionsBtn">Manage types…</button>
+                </div>
+
                 <h3 class="spm-list-heading">Counts by type</h3>
                 <div class="spm-list-box" id="spmTypeCounts"></div>
 
@@ -1198,6 +1221,43 @@
         </div>
     </div>
 
+    <div id="spmFieldOptionsModal" class="spm-modal" aria-hidden="true">
+        <div class="spm-modal-backdrop" data-spm-field-options-close></div>
+        <div class="spm-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="spmFieldOptionsTitle">
+            <div class="spm-modal-panel" style="max-width:720px;">
+                <button type="button" class="spm-modal-close" data-spm-field-options-close aria-label="Close">&times;</button>
+                <h2 id="spmFieldOptionsTitle">Manage types &amp; subtypes</h2>
+                <p class="spm-modal-hint">Built-in options start here; add, rename, or remove any entry. Syncs to Drive app data when signed in (<code style="color:#93c5fd">CardMaker.FieldOptions.v1.json</code>).</p>
+                <div class="spm-field-options-grid">
+                    <div>
+                        <label for="spmFieldOptionsTypeList">Types</label>
+                        <select id="spmFieldOptionsTypeList" class="spm-select" size="8" style="min-height:160px; width:100%;"></select>
+                        <input type="text" id="spmFieldOptionsTypeInput" class="spm-input" maxlength="40" placeholder="New or renamed type" autocomplete="off" style="margin-top:8px;" />
+                        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+                            <button type="button" class="spm-small-btn" id="spmFieldOptionsTypeAdd">Add</button>
+                            <button type="button" class="spm-small-btn" id="spmFieldOptionsTypeRename">Rename</button>
+                            <button type="button" class="spm-small-btn" id="spmFieldOptionsTypeRemove">Remove</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="spmFieldOptionsSubtypeList">Subtypes</label>
+                        <select id="spmFieldOptionsSubtypeList" class="spm-select" size="8" style="min-height:160px; width:100%;"></select>
+                        <input type="text" id="spmFieldOptionsSubtypeInput" class="spm-input" maxlength="40" placeholder="New or renamed subtype" autocomplete="off" style="margin-top:8px;" />
+                        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+                            <button type="button" class="spm-small-btn" id="spmFieldOptionsSubtypeAdd">Add</button>
+                            <button type="button" class="spm-small-btn" id="spmFieldOptionsSubtypeRename">Rename</button>
+                            <button type="button" class="spm-small-btn" id="spmFieldOptionsSubtypeRemove">Remove</button>
+                        </div>
+                    </div>
+                </div>
+                <p id="spmFieldOptionsMsg" class="spm-modal-suffix" style="margin-top:12px;" role="status" aria-live="polite"></p>
+                <div class="spm-modal-actions">
+                    <button type="button" class="spm-btn spm-primary" data-spm-field-options-close>Done</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="spmHoverPreview" class="spm-hover-preview" hidden aria-hidden="true">
         <img alt="" decoding="async" />
         <div class="spm-hover-preview-fallback">No preview available for this save.</div>
@@ -1209,6 +1269,8 @@
     <script src="cardmaker-cookie-consent.js"></script>
     <script src="cardmaker-sets.js"></script>
     <script src="cardmaker-sets-drive.js"></script>
+    <script src="cardmaker-field-options.js"></script>
+    <script src="cardmaker-field-options-drive.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
         const GOOGLE_CLIENT_ID = '984239146057-o6ujksfj9qk8tmqm9c8msrpidgm6492r.apps.googleusercontent.com';
@@ -1267,8 +1329,22 @@
             'Fantastical'
         ];
 
-        const TYPE_OPTIONS = ['Unit', 'Spell', 'Equipment', 'Holding', 'Wealth', 'Hero', 'Tactic', 'Commander'];
-        const SUBTYPE_OPTIONS = ['Army', 'Evocation', 'Divination', 'Necromancy', 'Enchantment', 'Transmutation', 'Weapon', 'Armor', 'Economy', 'Ritual', 'Vehicle', 'Tool', 'Ship'];
+        const TYPE_OPTIONS = (typeof CardMakerFieldOptions !== 'undefined')
+            ? CardMakerFieldOptions.DEFAULT_TYPES.slice()
+            : ['Unit', 'Spell', 'Equipment', 'Holding', 'Wealth', 'Hero', 'Tactic', 'Commander'];
+        const SUBTYPE_OPTIONS = (typeof CardMakerFieldOptions !== 'undefined')
+            ? CardMakerFieldOptions.DEFAULT_SUBTYPES.slice()
+            : ['Army', 'Evocation', 'Divination', 'Necromancy', 'Enchantment', 'Transmutation', 'Weapon', 'Armor', 'Economy', 'Ritual', 'Vehicle', 'Tool', 'Ship'];
+
+        function getTypeOptionsList() {
+            if (typeof CardMakerFieldOptions !== 'undefined') return CardMakerFieldOptions.getTypes();
+            return TYPE_OPTIONS.slice();
+        }
+
+        function getSubtypeOptionsList() {
+            if (typeof CardMakerFieldOptions !== 'undefined') return CardMakerFieldOptions.getSubtypes();
+            return SUBTYPE_OPTIONS.slice();
+        }
 
         function setMessage(text, isError) {
             if (!spmMessage) return;
@@ -1587,6 +1663,45 @@
             }
         }
 
+        let spmFieldOptionsDriveConfigured = false;
+        function configureSavedProjectsFieldOptionsDrive() {
+            if (spmFieldOptionsDriveConfigured || typeof CardMakerFieldOptionsDrive === 'undefined' || typeof CardMakerFieldOptions === 'undefined') {
+                return;
+            }
+            spmFieldOptionsDriveConfigured = true;
+            CardMakerFieldOptionsDrive.init({
+                getToken: function () { return driveAccessToken; },
+                authHeaders: function (extra) { return driveAuthHeaders(driveAccessToken, extra); },
+                parseDriveError: parseDriveError,
+                onAfterPull: function () {
+                    buildEditModalStaticSelects();
+                }
+            });
+            CardMakerFieldOptions.setMutateListener(function () {
+                if (driveAccessToken) {
+                    CardMakerFieldOptionsDrive.schedulePush();
+                }
+                buildEditModalStaticSelects();
+            });
+        }
+
+        async function syncFieldOptionsWithDriveIfPossibleSpm() {
+            configureSavedProjectsFieldOptionsDrive();
+            if (!driveAccessToken || typeof CardMakerFieldOptionsDrive === 'undefined') {
+                return;
+            }
+            try {
+                await CardMakerFieldOptionsDrive.pullMerge();
+            } catch (e) {
+                console.warn('Field options Drive sync:', e);
+            }
+        }
+
+        async function syncDriveAppDataRegistriesSpm() {
+            await syncNamedSetsWithDriveIfPossibleSpm();
+            await syncFieldOptionsWithDriveIfPossibleSpm();
+        }
+
         let gisTokenClient = null;
         let driveAccessToken = null;
 
@@ -1707,7 +1822,7 @@
                 if (signed) {
                     spmStatus.textContent = 'Signed in (saved on this device)';
                     (async function () {
-                        await syncNamedSetsWithDriveIfPossibleSpm();
+                        await syncDriveAppDataRegistriesSpm();
                         await refreshAll();
                     })().catch(function (e) { console.error(e); });
                 } else {
@@ -1723,7 +1838,7 @@
                     spmStatus.textContent = 'Signed in (saved on this device)';
                     updateButtons();
                     (async function () {
-                        await syncNamedSetsWithDriveIfPossibleSpm();
+                        await syncDriveAppDataRegistriesSpm();
                         await refreshAll();
                     })().catch(function (e) { console.error(e); });
                 } else {
@@ -3525,14 +3640,22 @@
             var subSel = document.getElementById('spmEditSubtype');
             var rarSel = document.getElementById('spmEditRarity');
             if (typeSel) {
-                typeSel.innerHTML = '<option value="">— None</option>' + TYPE_OPTIONS.map(function (t) {
-                    return '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>';
-                }).join('');
+                if (typeof CardMakerFieldOptions !== 'undefined') {
+                    CardMakerFieldOptions.fillSelect(typeSel, 'types', true, '— None', typeSel.value);
+                } else {
+                    typeSel.innerHTML = '<option value="">— None</option>' + TYPE_OPTIONS.map(function (t) {
+                        return '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>';
+                    }).join('');
+                }
             }
             if (subSel) {
-                subSel.innerHTML = '<option value="">— None</option>' + SUBTYPE_OPTIONS.map(function (t) {
-                    return '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>';
-                }).join('');
+                if (typeof CardMakerFieldOptions !== 'undefined') {
+                    CardMakerFieldOptions.fillSelect(subSel, 'subtypes', true, '— None', subSel.value);
+                } else {
+                    subSel.innerHTML = '<option value="">— None</option>' + SUBTYPE_OPTIONS.map(function (t) {
+                        return '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>';
+                    }).join('');
+                }
             }
             if (rarSel) {
                 rarSel.innerHTML = '<option value="">— None</option>' + RARITY_OPTIONS.filter(function (r) { return r !== ''; }).map(function (r) {
@@ -4054,8 +4177,140 @@
             spmEditNamedSetBtn.addEventListener('click', function () { openSpmEditSetModal(); });
         }
 
+        (function initSpmFieldOptionsUi() {
+            if (typeof CardMakerFieldOptions === 'undefined') return;
+            configureSavedProjectsFieldOptionsDrive();
+
+            var modal = document.getElementById('spmFieldOptionsModal');
+            var openBtn = document.getElementById('spmManageFieldOptionsBtn');
+            var msgEl = document.getElementById('spmFieldOptionsMsg');
+            var typeList = document.getElementById('spmFieldOptionsTypeList');
+            var subList = document.getElementById('spmFieldOptionsSubtypeList');
+            var typeInput = document.getElementById('spmFieldOptionsTypeInput');
+            var subInput = document.getElementById('spmFieldOptionsSubtypeInput');
+
+            function setMsg(text) {
+                if (msgEl) msgEl.textContent = text || '';
+            }
+
+            function fillManageList(selectEl, kind) {
+                if (!selectEl) return;
+                var prev = selectEl.value;
+                while (selectEl.firstChild) selectEl.removeChild(selectEl.firstChild);
+                CardMakerFieldOptions.getList(kind).forEach(function (name) {
+                    var o = document.createElement('option');
+                    o.value = name;
+                    o.textContent = name;
+                    selectEl.appendChild(o);
+                });
+                if (prev && Array.from(selectEl.options).some(function (x) { return x.value === prev; })) {
+                    selectEl.value = prev;
+                }
+            }
+
+            function refreshManageLists() {
+                fillManageList(typeList, 'types');
+                fillManageList(subList, 'subtypes');
+            }
+
+            function openModal() {
+                if (!modal) return;
+                setMsg('');
+                refreshManageLists();
+                modal.classList.add('is-open');
+                modal.setAttribute('aria-hidden', 'false');
+            }
+
+            function closeModal() {
+                if (!modal) return;
+                modal.classList.remove('is-open');
+                modal.setAttribute('aria-hidden', 'true');
+                buildEditModalStaticSelects();
+            }
+            window.closeSpmFieldOptionsModal = closeModal;
+
+            function bindListToInput(listEl, inputEl) {
+                if (!listEl || !inputEl) return;
+                listEl.addEventListener('change', function () {
+                    inputEl.value = listEl.value || '';
+                });
+            }
+            bindListToInput(typeList, typeInput);
+            bindListToInput(subList, subInput);
+
+            function doAdd(kind, inputEl, listEl) {
+                var added = CardMakerFieldOptions.add(kind, inputEl ? inputEl.value : '');
+                if (!added) {
+                    setMsg('Enter a unique non-empty name.');
+                    return;
+                }
+                setMsg('Added “' + added + '”.');
+                if (inputEl) inputEl.value = '';
+                refreshManageLists();
+                if (listEl) listEl.value = added;
+            }
+
+            function doRename(kind, listEl, inputEl) {
+                var from = listEl ? listEl.value : '';
+                if (!from) {
+                    setMsg('Select an item to rename.');
+                    return;
+                }
+                var renamed = CardMakerFieldOptions.rename(kind, from, inputEl ? inputEl.value : '');
+                if (!renamed) {
+                    setMsg('Rename failed (empty or duplicate name).');
+                    return;
+                }
+                setMsg('Renamed to “' + renamed + '”.');
+                if (inputEl) inputEl.value = renamed;
+                refreshManageLists();
+                if (listEl) listEl.value = renamed;
+            }
+
+            function doRemove(kind, listEl, inputEl) {
+                var from = listEl ? listEl.value : '';
+                if (!from) {
+                    setMsg('Select an item to remove.');
+                    return;
+                }
+                if (!confirm('Remove “' + from + '” from the list? Cards that already use it keep their value.')) return;
+                var removed = CardMakerFieldOptions.remove(kind, from);
+                if (!removed) {
+                    setMsg('Could not remove that item.');
+                    return;
+                }
+                setMsg('Removed “' + removed + '”.');
+                if (inputEl) inputEl.value = '';
+                refreshManageLists();
+            }
+
+            if (openBtn) openBtn.addEventListener('click', openModal);
+            if (modal) {
+                modal.querySelectorAll('[data-spm-field-options-close]').forEach(function (el) {
+                    el.addEventListener('click', closeModal);
+                });
+            }
+            var addType = document.getElementById('spmFieldOptionsTypeAdd');
+            var renType = document.getElementById('spmFieldOptionsTypeRename');
+            var remType = document.getElementById('spmFieldOptionsTypeRemove');
+            var addSub = document.getElementById('spmFieldOptionsSubtypeAdd');
+            var renSub = document.getElementById('spmFieldOptionsSubtypeRename');
+            var remSub = document.getElementById('spmFieldOptionsSubtypeRemove');
+            if (addType) addType.addEventListener('click', function () { doAdd('types', typeInput, typeList); });
+            if (renType) renType.addEventListener('click', function () { doRename('types', typeList, typeInput); });
+            if (remType) remType.addEventListener('click', function () { doRemove('types', typeList, typeInput); });
+            if (addSub) addSub.addEventListener('click', function () { doAdd('subtypes', subInput, subList); });
+            if (renSub) renSub.addEventListener('click', function () { doRename('subtypes', subList, subInput); });
+            if (remSub) remSub.addEventListener('click', function () { doRemove('subtypes', subList, subInput); });
+        })();
+
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
+            var foMo = document.getElementById('spmFieldOptionsModal');
+            if (foMo && foMo.classList.contains('is-open')) {
+                if (typeof window.closeSpmFieldOptionsModal === 'function') window.closeSpmFieldOptionsModal();
+                return;
+            }
             var editSetMo = document.getElementById('spmEditSetModal');
             if (editSetMo && editSetMo.classList.contains('is-open')) {
                 closeSpmEditSetModal();
@@ -4115,7 +4370,7 @@
             if (ok) {
                 spmStatus.textContent = 'Loading saved projects…';
                 spmRefreshBtn.disabled = false;
-                await syncNamedSetsWithDriveIfPossibleSpm();
+                await syncDriveAppDataRegistriesSpm();
                 await refreshAll();
             }
         })();

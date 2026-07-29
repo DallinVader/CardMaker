@@ -80,6 +80,45 @@
                 <p id="driveModalMessage" class="drive-modal-message" role="status" aria-live="polite"></p>
             </div>
         </div>
+
+        <div id="fieldOptionsModal" class="drive-modal" aria-hidden="true">
+            <div class="drive-modal-backdrop" data-cm-field-options-close aria-hidden="true"></div>
+            <div class="drive-modal-panel cm-field-options-panel" role="dialog" aria-modal="true" aria-labelledby="fieldOptionsModalTitle">
+                <button type="button" class="drive-modal-close" data-cm-field-options-close aria-label="Close">&times;</button>
+                <h2 id="fieldOptionsModalTitle" class="drive-modal-title">Manage types &amp; subtypes</h2>
+                <p class="drive-modal-hint">Built-in options start here; you can add, rename, or remove any entry. Changes save on this device and sync to Drive app data when signed in (<code class="drive-code">CardMaker.FieldOptions.v1.json</code>).</p>
+                <div class="cm-field-options-grid">
+                    <div class="cm-field-options-col">
+                        <h3 class="cm-field-options-col-title">Types</h3>
+                        <select id="cmFieldOptionsTypeList" class="drive-modal-input cm-field-options-list" size="8" aria-label="Types"></select>
+                        <div class="cm-field-options-row">
+                            <input type="text" id="cmFieldOptionsTypeInput" class="drive-modal-input" maxlength="40" placeholder="New or renamed type" autocomplete="off">
+                        </div>
+                        <div class="cm-field-options-actions">
+                            <button type="button" class="drive-modal-btn drive-modal-btn-ghost drive-modal-btn-small" id="cmFieldOptionsTypeAdd">Add</button>
+                            <button type="button" class="drive-modal-btn drive-modal-btn-ghost drive-modal-btn-small" id="cmFieldOptionsTypeRename">Rename</button>
+                            <button type="button" class="drive-modal-btn drive-modal-btn-ghost drive-modal-btn-small" id="cmFieldOptionsTypeRemove">Remove</button>
+                        </div>
+                    </div>
+                    <div class="cm-field-options-col">
+                        <h3 class="cm-field-options-col-title">Subtypes</h3>
+                        <select id="cmFieldOptionsSubtypeList" class="drive-modal-input cm-field-options-list" size="8" aria-label="Subtypes"></select>
+                        <div class="cm-field-options-row">
+                            <input type="text" id="cmFieldOptionsSubtypeInput" class="drive-modal-input" maxlength="40" placeholder="New or renamed subtype" autocomplete="off">
+                        </div>
+                        <div class="cm-field-options-actions">
+                            <button type="button" class="drive-modal-btn drive-modal-btn-ghost drive-modal-btn-small" id="cmFieldOptionsSubtypeAdd">Add</button>
+                            <button type="button" class="drive-modal-btn drive-modal-btn-ghost drive-modal-btn-small" id="cmFieldOptionsSubtypeRename">Rename</button>
+                            <button type="button" class="drive-modal-btn drive-modal-btn-ghost drive-modal-btn-small" id="cmFieldOptionsSubtypeRemove">Remove</button>
+                        </div>
+                    </div>
+                </div>
+                <p id="fieldOptionsModalMessage" class="drive-modal-message" role="status" aria-live="polite"></p>
+                <div class="cm-field-options-footer">
+                    <button type="button" class="drive-modal-btn drive-modal-btn-primary" data-cm-field-options-close>Done</button>
+                </div>
+            </div>
+        </div>
         
         <div class="cm-wrap">
         <div class="main-container">
@@ -103,35 +142,15 @@
                                     <label for="Type">Type</label>
                                     <select id="Type" onchange="redrawCanvas()">
                                         <option value="">—</option>
-                                        <option value="Unit">Unit</option>
-                                        <option value="Spell">Spell</option>
-                                        <option value="Equipment">Equipment</option>
-                                        <option value="Holding">Holding</option>
-                                        <option value="Wealth">Wealth</option>
-                                        <option value="Hero">Hero</option>
-                                        <option value="Tactic">Tactic</option>
-                                        <option value="Commander">Commander</option>
                                     </select>
                                 </div>
                                 <div class="input-group">
                                     <label for="Subtype">Subtype</label>
                                     <select id="Subtype" onchange="redrawCanvas()">
                                         <option value="">—</option>
-                                        <option value="Army">Army</option>
-                                        <option value="Evocation">Evocation</option>
-                                        <option value="Divination">Divination</option>
-                                        <option value="Necromancy">Necromancy</option>
-                                        <option value="Enchantment">Enchantment</option>
-                                        <option value="Transmutation">Transmutation</option>
-                                        <option value="Weapon">Weapon</option>
-                                        <option value="Armor">Armor</option>
-                                        <option value="Economy">Economy</option>
-                                        <option value="Ritual">Ritual</option>
-                                        <option value="Vehicle">Vehicle</option>
-                                        <option value="Tool">Tool</option>
-                                        <option value="Ship">Ship</option>
                                     </select>
                                 </div>
+                                <button type="button" class="cm-field-options-manage-btn" id="cmManageFieldOptionsBtn" title="Add, rename, or remove type and subtype options (syncs to Google Drive when signed in)">Manage types…</button>
                             </div>
                         </div>
                         <div class="cm-quick-toolbar" aria-label="Title layout">
@@ -365,6 +384,8 @@
     <script src="cardmaker-cookie-consent.js"></script>
     <script src="cardmaker-sets.js"></script>
     <script src="cardmaker-sets-drive.js"></script>
+    <script src="cardmaker-field-options.js"></script>
+    <script src="cardmaker-field-options-drive.js"></script>
     <script>
         // Optional: not used for Drive save/load (OAuth only). Restricted API keys often break gapi if passed to init.
         const GOOGLE_API_KEY = '';
@@ -1285,7 +1306,7 @@
                     return;
                 }
                 setDriveStatus('Signed in (saved on this device). Stay on the page and Drive will refresh automatically.');
-                syncNamedSetsWithDriveIfPossible().catch(function (e) { console.warn(e); });
+                syncDriveAppDataRegistries();
                 return;
             }
             applyDriveAccessToken(stored.access_token);
@@ -1301,7 +1322,7 @@
                 applyDriveAccessToken(after.access_token);
             }
             setDriveStatus('Signed in (saved on this device). Stay on the page and Drive will refresh automatically.');
-            syncNamedSetsWithDriveIfPossible().catch(function (e) { console.warn(e); });
+            syncDriveAppDataRegistries();
         }
 
         /** Re-attach token from localStorage if gapi was reset (e.g. first save after restore race). */
@@ -1367,7 +1388,7 @@
                     updateDriveButtons();
                     if (ok) {
                         setDriveStatus('Signed in (saved on this device). Stay on the page and Drive will refresh automatically.');
-                        syncNamedSetsWithDriveIfPossible().catch(function (e) { console.warn(e); });
+                        syncDriveAppDataRegistries();
                     } else {
                         setDriveStatus('Sign-in failed. Check OAuth origin settings.');
                         alert('Sign-in failed. Ensure this exact origin is in OAuth Authorized JavaScript origins:\n' + window.location.origin);
@@ -1379,7 +1400,7 @@
                         persistDriveToken(tokenResponse);
                         applyDriveAccessToken(tokenResponse.access_token);
                         setDriveStatus('Signed in (saved on this device). Stay on the page and Drive will refresh automatically.');
-                        syncNamedSetsWithDriveIfPossible().catch(function (e) { console.warn(e); });
+                        syncDriveAppDataRegistries();
                     } else {
                         console.error('Token response:', tokenResponse);
                         setDriveStatus('Sign-in failed. Check OAuth origin settings.');
@@ -1503,9 +1524,16 @@
                     cardRar.value = 'Common';
                 }
             }
-            setIfExists('Type', f.Type);
+            if (typeof CardMakerFieldOptions !== 'undefined') {
+                var typeElApply = document.getElementById('Type');
+                var subElApply = document.getElementById('Subtype');
+                CardMakerFieldOptions.fillSelect(typeElApply, 'types', true, '—', f.Type != null ? String(f.Type) : '');
+                CardMakerFieldOptions.fillSelect(subElApply, 'subtypes', true, '—', f.Subtype != null ? String(f.Subtype) : '');
+            } else {
+                setIfExists('Type', f.Type);
+                setIfExists('Subtype', f.Subtype);
+            }
             setIfExists('TypeFontSize', f.TypeFontSize);
-            setIfExists('Subtype', f.Subtype);
             setIfExists('SubtypeFontSize', f.SubtypeFontSize);
             var elSetN = document.getElementById('CardSetNumber');
             var elSetT = document.getElementById('CardSetTotal');
@@ -1652,6 +1680,51 @@
             } catch (e) {
                 console.warn('Named sets Drive sync:', e);
             }
+        }
+
+        let cardMakerIndexFieldOptionsDriveConfigured = false;
+        function refreshCardMakerTypeSubtypeSelects() {
+            if (typeof CardMakerFieldOptions === 'undefined') return;
+            var typeEl = document.getElementById('Type');
+            var subEl = document.getElementById('Subtype');
+            CardMakerFieldOptions.fillSelect(typeEl, 'types', true, '—', typeEl ? typeEl.value : '');
+            CardMakerFieldOptions.fillSelect(subEl, 'subtypes', true, '—', subEl ? subEl.value : '');
+        }
+
+        function configureCardMakerFieldOptionsDriveIndex() {
+            if (cardMakerIndexFieldOptionsDriveConfigured || typeof CardMakerFieldOptionsDrive === 'undefined' || typeof CardMakerFieldOptions === 'undefined') {
+                return;
+            }
+            cardMakerIndexFieldOptionsDriveConfigured = true;
+            CardMakerFieldOptionsDrive.init({
+                getToken: function () { return driveAccessToken; },
+                authHeaders: function (extra) { return driveAuthHeaders(extra); },
+                parseDriveError: parseDriveError,
+                onAfterPull: function () { refreshCardMakerTypeSubtypeSelects(); }
+            });
+            CardMakerFieldOptions.setMutateListener(function () {
+                if (driveAccessToken) {
+                    CardMakerFieldOptionsDrive.schedulePush();
+                }
+                refreshCardMakerTypeSubtypeSelects();
+            });
+        }
+
+        async function syncFieldOptionsWithDriveIfPossible() {
+            configureCardMakerFieldOptionsDriveIndex();
+            if (!driveAccessToken || typeof CardMakerFieldOptionsDrive === 'undefined') {
+                return;
+            }
+            try {
+                await CardMakerFieldOptionsDrive.pullMerge();
+            } catch (e) {
+                console.warn('Field options Drive sync:', e);
+            }
+        }
+
+        function syncDriveAppDataRegistries() {
+            syncNamedSetsWithDriveIfPossible().catch(function (e) { console.warn(e); });
+            syncFieldOptionsWithDriveIfPossible().catch(function (e) { console.warn(e); });
         }
 
         /** List appDataFolder files (same shape as official curl sample). */
@@ -2527,6 +2600,14 @@
 
         document.addEventListener('keydown', function (ev) {
             if (ev.key !== 'Escape') return;
+            const fieldOptionsModal = document.getElementById('fieldOptionsModal');
+            if (fieldOptionsModal && fieldOptionsModal.classList.contains('is-open')) {
+                fieldOptionsModal.classList.remove('is-open');
+                fieldOptionsModal.setAttribute('aria-hidden', 'true');
+                if (typeof refreshCardMakerTypeSubtypeSelects === 'function') refreshCardMakerTypeSubtypeSelects();
+                ev.preventDefault();
+                return;
+            }
             const driveModal = document.getElementById('driveProjectsModal');
             if (driveModal && driveModal.classList.contains('is-open')) {
                 closeDriveProjectsModal();
@@ -3204,6 +3285,136 @@
                 if (st) st.value = String(CardMakerSets.getDefaultCardSetTotal());
                 redrawCanvas();
             });
+        })();
+
+        (function initCardMakerFieldOptionsUi() {
+            if (typeof CardMakerFieldOptions === 'undefined') return;
+            configureCardMakerFieldOptionsDriveIndex();
+            refreshCardMakerTypeSubtypeSelects();
+
+            var modal = document.getElementById('fieldOptionsModal');
+            var openBtn = document.getElementById('cmManageFieldOptionsBtn');
+            var msgEl = document.getElementById('fieldOptionsModalMessage');
+            var typeList = document.getElementById('cmFieldOptionsTypeList');
+            var subList = document.getElementById('cmFieldOptionsSubtypeList');
+            var typeInput = document.getElementById('cmFieldOptionsTypeInput');
+            var subInput = document.getElementById('cmFieldOptionsSubtypeInput');
+
+            function setMsg(text) {
+                if (msgEl) msgEl.textContent = text || '';
+            }
+
+            function fillManageList(selectEl, kind) {
+                if (!selectEl) return;
+                var prev = selectEl.value;
+                while (selectEl.firstChild) selectEl.removeChild(selectEl.firstChild);
+                CardMakerFieldOptions.getList(kind).forEach(function (name) {
+                    var o = document.createElement('option');
+                    o.value = name;
+                    o.textContent = name;
+                    selectEl.appendChild(o);
+                });
+                if (prev && Array.from(selectEl.options).some(function (x) { return x.value === prev; })) {
+                    selectEl.value = prev;
+                }
+            }
+
+            function refreshManageLists() {
+                fillManageList(typeList, 'types');
+                fillManageList(subList, 'subtypes');
+            }
+
+            function openModal() {
+                if (!modal) return;
+                setMsg('');
+                refreshManageLists();
+                modal.classList.add('is-open');
+                modal.setAttribute('aria-hidden', 'false');
+            }
+
+            function closeModal() {
+                if (!modal) return;
+                modal.classList.remove('is-open');
+                modal.setAttribute('aria-hidden', 'true');
+                refreshCardMakerTypeSubtypeSelects();
+                if (typeof redrawCanvas === 'function') redrawCanvas();
+            }
+
+            function bindListToInput(listEl, inputEl) {
+                if (!listEl || !inputEl) return;
+                listEl.addEventListener('change', function () {
+                    inputEl.value = listEl.value || '';
+                });
+            }
+            bindListToInput(typeList, typeInput);
+            bindListToInput(subList, subInput);
+
+            function doAdd(kind, inputEl, listEl) {
+                var name = inputEl ? inputEl.value : '';
+                var added = CardMakerFieldOptions.add(kind, name);
+                if (!added) {
+                    setMsg('Enter a unique non-empty name.');
+                    return;
+                }
+                setMsg('Added “' + added + '”.');
+                if (inputEl) inputEl.value = '';
+                refreshManageLists();
+                if (listEl) listEl.value = added;
+            }
+
+            function doRename(kind, listEl, inputEl) {
+                var from = listEl ? listEl.value : '';
+                var to = inputEl ? inputEl.value : '';
+                if (!from) {
+                    setMsg('Select an item to rename.');
+                    return;
+                }
+                var renamed = CardMakerFieldOptions.rename(kind, from, to);
+                if (!renamed) {
+                    setMsg('Rename failed (empty or duplicate name).');
+                    return;
+                }
+                setMsg('Renamed to “' + renamed + '”.');
+                if (inputEl) inputEl.value = renamed;
+                refreshManageLists();
+                if (listEl) listEl.value = renamed;
+            }
+
+            function doRemove(kind, listEl, inputEl) {
+                var from = listEl ? listEl.value : '';
+                if (!from) {
+                    setMsg('Select an item to remove.');
+                    return;
+                }
+                if (!confirm('Remove “' + from + '” from the list? Cards that already use it keep their value.')) return;
+                var removed = CardMakerFieldOptions.remove(kind, from);
+                if (!removed) {
+                    setMsg('Could not remove that item.');
+                    return;
+                }
+                setMsg('Removed “' + removed + '”.');
+                if (inputEl) inputEl.value = '';
+                refreshManageLists();
+            }
+
+            if (openBtn) openBtn.addEventListener('click', openModal);
+            if (modal) {
+                modal.querySelectorAll('[data-cm-field-options-close]').forEach(function (el) {
+                    el.addEventListener('click', closeModal);
+                });
+            }
+            var addType = document.getElementById('cmFieldOptionsTypeAdd');
+            var renType = document.getElementById('cmFieldOptionsTypeRename');
+            var remType = document.getElementById('cmFieldOptionsTypeRemove');
+            var addSub = document.getElementById('cmFieldOptionsSubtypeAdd');
+            var renSub = document.getElementById('cmFieldOptionsSubtypeRename');
+            var remSub = document.getElementById('cmFieldOptionsSubtypeRemove');
+            if (addType) addType.addEventListener('click', function () { doAdd('types', typeInput, typeList); });
+            if (renType) renType.addEventListener('click', function () { doRename('types', typeList, typeInput); });
+            if (remType) remType.addEventListener('click', function () { doRemove('types', typeList, typeInput); });
+            if (addSub) addSub.addEventListener('click', function () { doAdd('subtypes', subInput, subList); });
+            if (renSub) renSub.addEventListener('click', function () { doRename('subtypes', subList, subInput); });
+            if (remSub) remSub.addEventListener('click', function () { doRemove('subtypes', subList, subInput); });
         })();
 
     </script>
