@@ -19,6 +19,13 @@
         outputQuality: 0.78
     };
 
+    /** Print grid / PDF faces — sharp enough at poker size, much faster than full 2500×3500 PNG. */
+    var PRINT_RENDER_OPTS = {
+        maxOutputSide: 1400,
+        outputMime: 'image/jpeg',
+        outputQuality: 0.9
+    };
+
     /** Max longest side for embedded art/frame when saving (keeps Drive JSON smaller). */
     var ART_EMBED_MAX_SIDE = 1600;
     var ART_EMBED_JPEG_QUALITY = 0.82;
@@ -311,6 +318,7 @@
 
     global.CardMakerPerf = {
         THUMB_RENDER_OPTS: THUMB_RENDER_OPTS,
+        PRINT_RENDER_OPTS: PRINT_RENDER_OPTS,
         PROJECT_EXT: PROJECT_EXT,
         EDITOR_DRAFT_KEY: EDITOR_DRAFT_KEY,
         ART_EMBED_MAX_SIDE: ART_EMBED_MAX_SIDE,

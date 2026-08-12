@@ -1056,6 +1056,7 @@
                         <p id="cpDeckLibEmptyFilter" class="cp-deck-lib-empty" hidden>No cards match. Try another search or turn off “Hide ×0”.</p>
                         <div class="cp-deck-apply-row">
                             <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="cpDeckApplyPlay">Apply to play deck</button>
+                            <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="cpDeckPrintAll" title="Open the print grid with every copy in this deck list (quantities × copies)">Print deck…</button>
                         </div>
                     </div>
                 </div>
@@ -6001,6 +6002,57 @@
     document.getElementById('cpDeckApplyPlay').addEventListener('click', function () {
         persistDeckBuilderPlayDeckAndDrive({ strictSave: false });
     });
+
+    var PRINT_IMPORT_STORAGE_KEY = 'cardmaker_print_import_v1';
+    var cpDeckPrintAllBtn = document.getElementById('cpDeckPrintAll');
+    if (cpDeckPrintAllBtn) {
+        cpDeckPrintAllBtn.addEventListener('click', function () {
+            var entries = collectDeckEntriesForSave();
+            if (!entries.length) {
+                setDeckModalMessage('Set at least one card quantity above 0, then print the deck.', true);
+                return;
+            }
+            var ids = [];
+            var skippedLocal = 0;
+            entries.forEach(function (ent) {
+                var id = String(ent.id || '').trim();
+                var qty = Math.max(0, Math.min(99, parseInt(ent.qty, 10) || 0));
+                if (!id || qty < 1) return;
+                if (!isCardIdFetchableFromDrive(id)) {
+                    skippedLocal += qty;
+                    return;
+                }
+                var k;
+                for (k = 0; k < qty; k++) ids.push(id);
+            });
+            if (!ids.length) {
+                setDeckModalMessage(
+                    skippedLocal
+                        ? 'This deck only has local/imported cards that are not on Drive. Save those cards to Drive first, then print.'
+                        : 'No printable Drive cards in this deck list.',
+                    true
+                );
+                return;
+            }
+            try {
+                localStorage.setItem(PRINT_IMPORT_STORAGE_KEY, JSON.stringify({
+                    v: 1,
+                    source: 'deck',
+                    fileIds: ids
+                }));
+            } catch (e) {
+                console.error(e);
+                setDeckModalMessage('Could not queue cards for print (storage blocked or full?).', true);
+                return;
+            }
+            window.open('card-grid.html', '_blank', 'noopener,noreferrer');
+            var msg = 'Opened print grid with ' + ids.length + ' card(s) from this deck.';
+            if (skippedLocal > 0) {
+                msg += ' Skipped ' + skippedLocal + ' local-only copy(ies) (not on Drive).';
+            }
+            setDeckModalMessage(msg, false);
+        });
+    }
 
     if (libraryListEl) {
         libraryListEl.addEventListener('input', function (e) {

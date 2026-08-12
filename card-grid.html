@@ -267,7 +267,7 @@
         <div class="cg-wrap">
             <header class="cg-header no-print">
                 <h1>Print 9-up sheet</h1>
-                <p class="cg-sub">Add images, open <strong>Print setup</strong> for size and bleed, then print or download a print-ready PDF. Load art from a <strong>Card Maker</strong> cloud save—or choose saves in <strong>Saved Projects Manager</strong> and use <strong>Open in print grid</strong> to queue them here (same Google sign-in).</p>
+                <p class="cg-sub">Add images, open <strong>Print setup</strong> for size and bleed, then print or download a print-ready PDF. Queue cards from <strong>Saved Projects</strong> or <strong>Print deck…</strong> in Card Player (same Google sign-in). Large queues fill multiple pages.</p>
             </header>
 
             <div class="cg-toolbar no-print">
@@ -421,7 +421,8 @@
         const gridLoadModalMessage = document.getElementById('gridLoadModalMessage');
         const printSetupModal = document.getElementById('printSetupModal');
 
-        const SLOTS = 9;
+        const DEFAULT_SLOTS = 9;
+        let slotCount = DEFAULT_SLOTS;
         const PRINT_IMPORT_STORAGE_KEY = 'cardmaker_print_import_v1';
         const PAGE_W_IN = 8.5;
         const PAGE_H_IN = 11;
@@ -828,16 +829,76 @@
             return null;
         }
 
-        async function compositeImageFromCardMakerSave(parsed) {
+        async function compositeImageFromCardMakerSave(parsed, renderOpts) {
             if (typeof window.renderCardMakerProjectToDataUrl === 'function' && parsed) {
                 try {
-                    const rendered = await window.renderCardMakerProjectToDataUrl(parsed);
+                    var opts = renderOpts;
+                    if (!opts && typeof CardMakerPerf !== 'undefined' && CardMakerPerf.PRINT_RENDER_OPTS) {
+                        opts = CardMakerPerf.PRINT_RENDER_OPTS;
+                    }
+                    const rendered = await window.renderCardMakerProjectToDataUrl(parsed, opts || undefined);
                     if (rendered && rendered.length > 32) return rendered;
                 } catch (e) {
                     console.error('Card render failed:', e);
                 }
             }
             return imageUrlFromCardMakerSave(parsed);
+        }
+
+        /** Run async work over items with limited concurrency; does not fail the batch on one error. */
+        function mapLimitSoft(items, limit, fn) {
+            return new Promise(function (resolve) {
+                if (!items || !items.length) {
+                    resolve([]);
+                    return;
+                }
+                var out = new Array(items.length);
+                var nextIndex = 0;
+                var active = 0;
+                var capped = Math.max(1, Math.min(limit || 1, items.length));
+
+                function drain() {
+                    if (nextIndex >= items.length && active === 0) {
+                        resolve(out);
+                        return;
+                    }
+                    while (active < capped && nextIndex < items.length) {
+                        var i = nextIndex++;
+                        active++;
+                        (function (idx) {
+                            Promise.resolve(fn(items[idx], idx)).then(function (v) {
+                                out[idx] = { ok: true, value: v };
+                            }, function (err) {
+                                out[idx] = { ok: false, error: err };
+                            }).then(function () {
+                                active--;
+                                drain();
+                            });
+                        })(i);
+                    }
+                }
+                drain();
+            });
+        }
+
+        async function loadPrintProjectState(token, fileId) {
+            if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.readSaveCache) {
+                try {
+                    var cached = await CardMakerPerf.readSaveCache(String(fileId));
+                    if (cached && cached.state && typeof cached.state === 'object') {
+                        return cached.state;
+                    }
+                } catch (e) { /* fall through to Drive */ }
+            }
+            return fetchDriveFileJson(token, fileId);
+        }
+
+        function setGridSlotImage(index, url) {
+            var items = gridContainer.querySelectorAll('.cg-grid-item');
+            var item = items[index];
+            if (!item || !url) return;
+            item.classList.remove('empty');
+            item.style.backgroundImage = urlForCssBackground(url);
         }
 
         function urlForCssBackground(url) {
@@ -848,7 +909,8 @@
 
         function setGridFromUrls(urls, repeat) {
             const items = gridContainer.querySelectorAll('.cg-grid-item');
-            for (let i = 0; i < SLOTS; i++) {
+            const n = items.length;
+            for (let i = 0; i < n; i++) {
                 const item = items[i];
                 if (repeat && urls.length > 0) {
                     const url = urls[i % urls.length];
@@ -870,20 +932,24 @@
                 setGridLoadModalMessage('Could not build an image from that save (missing images or invalid project).', true);
                 return;
             }
+            if (slotCount !== DEFAULT_SLOTS) {
+                ensureSlots(DEFAULT_SLOTS);
+            }
             const items = gridContainer.querySelectorAll('.cg-grid-item');
             const fillAll = fillMode === 'all';
             if (fillAll) {
-                for (let i = 0; i < SLOTS; i++) {
+                for (let i = 0; i < items.length; i++) {
                     items[i].classList.remove('empty');
                     items[i].style.backgroundImage = urlForCssBackground(imageUrl);
                 }
                 uploadedUrls = [imageUrl];
                 repeatBtn.disabled = false;
                 setGridLoadModalMessage('Filled all slots from save.', false);
+                updateFitInfo();
                 return;
             }
             let placed = false;
-            for (let i = 0; i < SLOTS; i++) {
+            for (let i = 0; i < items.length; i++) {
                 if (items[i].classList.contains('empty')) {
                     items[i].classList.remove('empty');
                     items[i].style.backgroundImage = urlForCssBackground(imageUrl);
@@ -898,6 +964,7 @@
             if (uploadedUrls.length === 0) uploadedUrls = [imageUrl];
             repeatBtn.disabled = uploadedUrls.length === 0;
             setGridLoadModalMessage('Placed save image in the first empty slot (or slot 1 if full).', false);
+            updateFitInfo();
         }
 
         function getNumericInputValue(inputEl, fallback, min, max) {
@@ -932,11 +999,12 @@
         }
 
         function updateFitInfo() {
-            const pages = Math.ceil(SLOTS / printableLayout.cardsPerPage);
+            const n = gridContainer.querySelectorAll('.cg-grid-item').length || slotCount;
+            const pages = Math.max(1, Math.ceil(n / printableLayout.cardsPerPage));
             fitInfo.textContent =
                 printableLayout.cols + ' × ' + printableLayout.rows + ' cards/page at ' +
                 cardWidthIn.toFixed(2) + ' × ' + cardHeightIn.toFixed(2) +
-                ' in (' + printableLayout.cardsPerPage + '/page, ~' + pages + ' page(s) for 9 cards)';
+                ' in (' + printableLayout.cardsPerPage + '/page, ' + n + ' slot(s), ~' + pages + ' page(s))';
         }
 
         function applyCardSize(widthIn, heightIn, syncPreset) {
@@ -978,14 +1046,18 @@
             });
         }
 
-        function ensureSlots() {
+        function ensureSlots(count) {
+            const n = Math.max(1, Math.min(500, count == null ? DEFAULT_SLOTS : Number(count) || DEFAULT_SLOTS));
+            slotCount = n;
             gridContainer.innerHTML = '';
-            for (let i = 0; i < SLOTS; i++) {
+            for (let i = 0; i < n; i++) {
                 const div = document.createElement('div');
                 div.className = 'cg-grid-item empty';
                 div.dataset.index = String(i + 1);
                 gridContainer.appendChild(div);
             }
+            updatePageBreakMarkers();
+            updateFitInfo();
         }
 
         function setQueueBanner(text, visible) {
@@ -1001,7 +1073,7 @@
         }
 
         async function consumePrintImportFromSavedProjects() {
-            /* localStorage: sessionStorage is per-tab, so a tab opened from Saved Projects Manager could not see the queue */
+            /* localStorage: sessionStorage is per-tab, so a tab opened from Saved Projects / Card Player could not see the queue */
             const raw = localStorage.getItem(PRINT_IMPORT_STORAGE_KEY);
             if (!raw) {
                 setQueueBanner('', false);
@@ -1022,45 +1094,96 @@
                 return;
             }
 
+            const sourceLabel = (data.source === 'deck')
+                ? 'Card Player deck'
+                : 'Saved Projects Manager';
+
             await maybeRefreshGridDriveTokenIfStale();
             const token = readStoredDriveToken();
             if (!token) {
                 setQueueBanner(
-                    'You have ' + ids.length + ' card(s) queued from Saved Projects Manager. Connect Google: open Print setup, use Browse Card Maker saves & sign in (same account), then refresh this page—or sign in there and return here.',
+                    'You have ' + ids.length + ' card(s) queued from ' + sourceLabel + '. Connect Google: open Print setup, use Browse Card Maker saves & sign in (same account), then refresh this page—or sign in there and return here.',
                     true
                 );
                 return;
             }
 
-            const nLoad = Math.min(ids.length, SLOTS);
-            setQueueBanner('Loading ' + nLoad + ' save(s) from Saved Projects Manager…', true);
+            setQueueBanner('Loading ' + ids.length + ' card(s) from ' + sourceLabel + '…', true);
 
-            const useIds = ids.slice(0, SLOTS);
-            const urls = [];
-            for (let i = 0; i < useIds.length; i++) {
-                try {
-                    const json = await fetchDriveFileJson(token, useIds[i]);
-                    const url = await compositeImageFromCardMakerSave(json);
-                    if (url) urls.push(url);
-                } catch (e) {
-                    console.error('Print import', useIds[i], e);
+            const uniqueIds = [];
+            const seen = Object.create(null);
+            ids.forEach(function (id) {
+                if (!seen[id]) {
+                    seen[id] = true;
+                    uniqueIds.push(id);
                 }
+            });
+
+            ensureSlots(ids.length);
+            uploadedUrls = new Array(ids.length);
+            const imageById = Object.create(null);
+            let doneUnique = 0;
+            let failed = 0;
+            const PRINT_LOAD_CONCURRENCY = 6;
+
+            function paintSlotsForId(id, url) {
+                for (var i = 0; i < ids.length; i++) {
+                    if (ids[i] === id) {
+                        uploadedUrls[i] = url;
+                        setGridSlotImage(i, url);
+                    }
+                }
+                updatePageBreakMarkers();
             }
+
+            await mapLimitSoft(uniqueIds, PRINT_LOAD_CONCURRENCY, async function (id) {
+                try {
+                    const json = await loadPrintProjectState(token, id);
+                    const url = await compositeImageFromCardMakerSave(json);
+                    if (!url) throw new Error('No image');
+                    imageById[id] = url;
+                    paintSlotsForId(id, url);
+                } catch (e) {
+                    failed++;
+                    console.error('Print import', id, e);
+                } finally {
+                    doneUnique++;
+                    setQueueBanner(
+                        'Loaded ' + doneUnique + '/' + uniqueIds.length + ' unique card(s) (' + ids.length + ' copies) from ' + sourceLabel + '…',
+                        true
+                    );
+                }
+            });
 
             localStorage.removeItem(PRINT_IMPORT_STORAGE_KEY);
 
+            const urls = [];
+            for (var u = 0; u < ids.length; u++) {
+                if (uploadedUrls[u]) urls.push(uploadedUrls[u]);
+            }
+
             if (urls.length === 0) {
-                setQueueBanner('Could not load the selected saves. Stay signed in and try again from Saved Projects Manager.', true);
+                ensureSlots(DEFAULT_SLOTS);
+                uploadedUrls = [];
+                repeatBtn.disabled = true;
+                setQueueBanner('Could not load the queued saves. Stay signed in and try again from ' + sourceLabel + '.', true);
                 updateFitInfo();
                 return;
             }
 
-            uploadedUrls = urls;
+            /* Compact away failed slots so the sheet/PDF has no holes */
+            if (urls.length !== ids.length) {
+                ensureSlots(urls.length);
+                uploadedUrls = urls;
+                setGridFromUrls(uploadedUrls, false);
+            } else {
+                uploadedUrls = urls;
+            }
             repeatBtn.disabled = uploadedUrls.length === 0;
-            setGridFromUrls(uploadedUrls, false);
             updateFitInfo();
-            let msg = 'Loaded ' + urls.length + ' full card image(s) from Saved Projects Manager (slots 1–' + urls.length + ').';
-            if (ids.length > SLOTS) msg += ' Only the first ' + SLOTS + ' of ' + ids.length + ' selected were used.';
+            let msg = 'Loaded ' + urls.length + ' card image(s) from ' + sourceLabel +
+                ' (' + uniqueIds.length + ' unique, ~' + Math.ceil(urls.length / printableLayout.cardsPerPage) + ' page(s)).';
+            if (failed > 0) msg += ' ' + failed + ' unique card(s) failed to load.';
             setQueueBanner(msg, true);
         }
 
@@ -1158,13 +1281,14 @@
         });
 
         fileUpload.addEventListener('change', function () {
-            const files = Array.from(this.files).slice(0, SLOTS);
+            const files = Array.from(this.files).slice(0, DEFAULT_SLOTS);
             if (files.length === 0) {
                 uploadedUrls = [];
                 repeatBtn.disabled = true;
                 return;
             }
             Promise.all(files.map(readFileAsDataURL)).then(function (urls) {
+                ensureSlots(DEFAULT_SLOTS);
                 uploadedUrls = urls;
                 repeatBtn.disabled = false;
                 setGridFromUrls(uploadedUrls, false);
@@ -1179,6 +1303,9 @@
             if (uploadedUrls.length === 0) {
                 alert('Add at least one image first (upload or load from save).');
                 return;
+            }
+            if (slotCount !== DEFAULT_SLOTS) {
+                ensureSlots(DEFAULT_SLOTS);
             }
             setGridFromUrls(uploadedUrls, true);
         });
@@ -1249,11 +1376,10 @@
         });
 
         downloadPdfBtn.addEventListener('click', function () {
-            const items = gridContainer.querySelectorAll('.cg-grid-item');
-            const hasAny = Array.from(items).some(function (el) {
-                return el.style.backgroundImage && el.style.backgroundImage !== 'none';
+            const items = Array.from(gridContainer.querySelectorAll('.cg-grid-item')).filter(function (el) {
+                return el.style.backgroundImage && el.style.backgroundImage !== 'none' && !el.classList.contains('empty');
             });
-            if (!hasAny) {
+            if (!items.length) {
                 alert('Add at least one card image first.');
                 return;
             }
@@ -1297,7 +1423,7 @@
                 });
             }
 
-            const promises = Array.from(items).map(captureCard);
+            const promises = items.map(captureCard);
             Promise.all(promises).then(function (images) {
                 const { jsPDF } = window.jspdf;
                 const pdf = new jsPDF({
