@@ -267,7 +267,7 @@
         <div class="cg-wrap">
             <header class="cg-header no-print">
                 <h1>Print 9-up sheet</h1>
-                <p class="cg-sub">Add images, open <strong>Print setup</strong> for size and bleed, then print or download a print-ready PDF. Queue cards from <strong>Saved Projects</strong> or <strong>Print deck…</strong> in Card Player (same Google sign-in). Large queues fill multiple pages.</p>
+                <p class="cg-sub">Add images, open <strong>Print setup</strong> for size and bleed, then <strong>Print</strong> or <strong>Download PDF</strong> (same letter layout, crop marks, and optional duplex backs). Queue cards from Saved Projects or Card Player’s <strong>Print deck…</strong>.</p>
             </header>
 
             <div class="cg-toolbar no-print">
@@ -275,7 +275,7 @@
                 <input type="file" id="fileUpload" accept="image/*" multiple>
                 <button type="button" class="cg-btn cg-btn-setup" id="openSetupBtn">Print setup</button>
                 <button type="button" class="cg-btn cg-btn-print" id="printBtn">Print</button>
-                <button type="button" class="cg-btn cg-btn-pdf" id="downloadPdfBtn">Print-ready PDF</button>
+                <button type="button" class="cg-btn cg-btn-pdf" id="downloadPdfBtn">Download PDF</button>
                 <button type="button" class="cg-btn cg-btn-back" onclick="window.location.href='index.html'">Card Maker</button>
             </div>
 
@@ -391,7 +391,6 @@
     <script src="cardmaker-perf.js"></script>
     <script src="cardmaker-drive-auth.js"></script>
     <script src="cardmaker-cookie-consent.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
         const GOOGLE_CLIENT_ID = '984239146057-o6ujksfj9qk8tmqm9c8msrpidgm6492r.apps.googleusercontent.com';
@@ -1033,10 +1032,6 @@
             }
         }
 
-        function getCardBackgroundSizeForCapture() {
-            return cardHasBleed ? '110% auto' : 'cover';
-        }
-
         function readFileAsDataURL(file) {
             return new Promise(function (resolve, reject) {
                 const reader = new FileReader();
@@ -1371,126 +1366,293 @@
             }
         });
 
+        function collectFilledCardUrls() {
+            if (uploadedUrls && uploadedUrls.length) {
+                return uploadedUrls.filter(function (u) { return !!u; });
+            }
+            var urls = [];
+            gridContainer.querySelectorAll('.cg-grid-item').forEach(function (el) {
+                if (el.classList.contains('empty')) return;
+                var bg = el.style.backgroundImage || '';
+                var m = /^url\((['"]?)(.+)\1\)$/.exec(bg.trim());
+                if (m && m[2] && m[2] !== 'none') urls.push(m[2]);
+            });
+            return urls;
+        }
+
+        function loadHtmlImage(url) {
+            return new Promise(function (resolve, reject) {
+                var img = new Image();
+                img.onload = function () { resolve(img); };
+                img.onerror = function () { reject(new Error('Could not load card image')); };
+                img.src = url;
+            });
+        }
+
+        /**
+         * Paint a card face into a JPEG matching on-screen bleed crop (110% / cover).
+         * Reuses one canvas per unique source URL.
+         */
+        function makeBleedCropJpegFactory(outW, outH) {
+            var cache = Object.create(null);
+            return function faceJpeg(sourceUrl) {
+                if (cache[sourceUrl]) return cache[sourceUrl];
+                cache[sourceUrl] = loadHtmlImage(sourceUrl).then(function (img) {
+                    var canvas = document.createElement('canvas');
+                    canvas.width = outW;
+                    canvas.height = outH;
+                    var ctx = canvas.getContext('2d');
+                    if (!ctx) throw new Error('Canvas unavailable');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, outW, outH);
+                    var iw = img.naturalWidth || img.width;
+                    var ih = img.naturalHeight || img.height;
+                    if (!iw || !ih) throw new Error('Empty image');
+                    if (cardHasBleed) {
+                        var drawW = outW * 1.1;
+                        var drawH = drawW * (ih / iw);
+                        ctx.drawImage(img, (outW - drawW) / 2, (outH - drawH) / 2, drawW, drawH);
+                    } else {
+                        var scale = Math.max(outW / iw, outH / ih);
+                        var dw = iw * scale;
+                        var dh = ih * scale;
+                        ctx.drawImage(img, (outW - dw) / 2, (outH - dh) / 2, dw, dh);
+                    }
+                    return canvas.toDataURL('image/jpeg', 0.88);
+                });
+                return cache[sourceUrl];
+            };
+        }
+
+        function mapLimitSoftLocal(items, limit, fn) {
+            return new Promise(function (resolve) {
+                if (!items || !items.length) {
+                    resolve([]);
+                    return;
+                }
+                var out = new Array(items.length);
+                var nextIndex = 0;
+                var active = 0;
+                var capped = Math.max(1, Math.min(limit || 1, items.length));
+                function drain() {
+                    if (nextIndex >= items.length && active === 0) {
+                        resolve(out);
+                        return;
+                    }
+                    while (active < capped && nextIndex < items.length) {
+                        var i = nextIndex++;
+                        active++;
+                        (function (idx) {
+                            Promise.resolve(fn(items[idx], idx)).then(function (v) {
+                                out[idx] = v;
+                            }, function () {
+                                out[idx] = null;
+                            }).then(function () {
+                                active--;
+                                drain();
+                            });
+                        })(i);
+                    }
+                }
+                drain();
+            });
+        }
+
+        /**
+         * Shared letter-sheet PDF used by Download PDF and Print.
+         * @param {{onProgress?: function(string): void}} [opts]
+         * @returns {Promise<import('jspdf').jsPDF>}
+         */
+        async function buildPrintReadyPdf(opts) {
+            var onProgress = opts && typeof opts.onProgress === 'function' ? opts.onProgress : function () {};
+            var sourceUrls = collectFilledCardUrls();
+            if (!sourceUrls.length) {
+                throw new Error('Add at least one card image first.');
+            }
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                throw new Error('PDF library not loaded. Refresh and try again.');
+            }
+
+            var CARD_W_IN = cardWidthIn;
+            var CARD_H_IN = cardHeightIn;
+            var COLS = printableLayout.cols;
+            var PER_PAGE = printableLayout.cardsPerPage;
+            var INCLUDE_BACKS = duplexBacksToggle.checked;
+            var TRIM_MARGIN = 0.125;
+            var DPI = 280;
+            var outW = Math.max(1, Math.round(CARD_W_IN * DPI));
+            var outH = Math.max(1, Math.round(CARD_H_IN * DPI));
+            var faceJpeg = makeBleedCropJpegFactory(outW, outH);
+
+            onProgress('Preparing ' + sourceUrls.length + ' card(s)…');
+            var unique = [];
+            var seen = Object.create(null);
+            sourceUrls.forEach(function (u) {
+                if (!seen[u]) {
+                    seen[u] = true;
+                    unique.push(u);
+                }
+            });
+
+            var done = 0;
+            await mapLimitSoftLocal(unique, 4, async function (u) {
+                await faceJpeg(u);
+                done++;
+                onProgress('Prepared ' + done + '/' + unique.length + ' unique card(s)…');
+            });
+
+            var images = [];
+            for (var i = 0; i < sourceUrls.length; i++) {
+                var jpeg = await faceJpeg(sourceUrls[i]);
+                if (jpeg) images.push(jpeg);
+            }
+            if (!images.length) {
+                throw new Error('Could not prepare any card images for PDF.');
+            }
+
+            onProgress('Building PDF pages…');
+            var jsPDF = window.jspdf.jsPDF;
+            var pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'in',
+                format: 'letter',
+                compress: true
+            });
+
+            function drawCropMarks(x, y, w, h) {
+                var m = TRIM_MARGIN;
+                var mk = 0.09;
+                pdf.setDrawColor(0, 0, 0);
+                pdf.setLineWidth(0.005);
+                pdf.line(x - m, y - m, x - m + mk, y - m);
+                pdf.line(x - m, y - m, x - m, y - m + mk);
+                pdf.line(x + w + m, y - m, x + w + m - mk, y - m);
+                pdf.line(x + w + m, y - m, x + w + m, y - m + mk);
+                pdf.line(x - m, y + h + m, x - m + mk, y + h + m);
+                pdf.line(x - m, y + h + m, x - m, y + h + m - mk);
+                pdf.line(x + w + m, y + h + m, x + w + m - mk, y + h + m);
+                pdf.line(x + w + m, y + h + m, x + w + m, y + h + m - mk);
+            }
+
+            var rowsPerPage = printableLayout.rows;
+            var pageUsedWidth = COLS * CARD_W_IN;
+            var pageUsedHeight = rowsPerPage * CARD_H_IN;
+            var pageOffsetX = Math.max(0, (PAGE_W_IN - pageUsedWidth) / 2);
+            var pageOffsetY = Math.max(0, (PAGE_H_IN - pageUsedHeight) / 2);
+
+            for (var pi = 0; pi < images.length; pi++) {
+                if (pi > 0 && pi % PER_PAGE === 0) {
+                    pdf.addPage('letter', 'portrait');
+                }
+                var indexInPage = pi % PER_PAGE;
+                var col = indexInPage % COLS;
+                var row = Math.floor(indexInPage / COLS);
+                var x = pageOffsetX + MARGIN_X + col * CARD_W_IN;
+                var y = pageOffsetY + MARGIN_Y + row * CARD_H_IN;
+                pdf.addImage(images[pi], 'JPEG', x, y, CARD_W_IN, CARD_H_IN, undefined, 'FAST');
+                drawCropMarks(x, y, CARD_W_IN, CARD_H_IN);
+                if (pi % 12 === 0 || pi === images.length - 1) {
+                    onProgress('Placing card ' + (pi + 1) + '/' + images.length + '…');
+                }
+            }
+
+            if (INCLUDE_BACKS) {
+                var backPages = Math.ceil(images.length / PER_PAGE);
+                for (var pageIdx = 0; pageIdx < backPages; pageIdx++) {
+                    pdf.addPage('letter', 'portrait');
+                    for (var k = 0; k < PER_PAGE; k++) {
+                        var absolute = pageIdx * PER_PAGE + k;
+                        if (absolute >= images.length) break;
+                        var bcol = (COLS - 1) - (k % COLS);
+                        var brow = Math.floor(k / COLS);
+                        var bx = pageOffsetX + MARGIN_X + bcol * CARD_W_IN;
+                        var by = pageOffsetY + MARGIN_Y + brow * CARD_H_IN;
+                        pdf.setFillColor(255, 255, 255);
+                        pdf.rect(bx, by, CARD_W_IN, CARD_H_IN, 'F');
+                        pdf.setDrawColor(160, 160, 160);
+                        pdf.rect(bx, by, CARD_W_IN, CARD_H_IN);
+                        pdf.setTextColor(100, 100, 100);
+                        pdf.setFontSize(10);
+                        pdf.text('BACK ' + (absolute + 1), bx + CARD_W_IN / 2, by + CARD_H_IN / 2, { align: 'center' });
+                        drawCropMarks(bx, by, CARD_W_IN, CARD_H_IN);
+                    }
+                }
+            }
+
+            return pdf;
+        }
+
+        function setPdfBusy(busy, label) {
+            printBtn.disabled = !!busy;
+            downloadPdfBtn.disabled = !!busy;
+            if (!busy) {
+                downloadPdfBtn.textContent = 'Download PDF';
+                printBtn.textContent = 'Print';
+            } else if (label) {
+                downloadPdfBtn.textContent = label;
+                printBtn.textContent = 'Working…';
+            }
+        }
+
+        function openPdfForPrint(pdf) {
+            try {
+                if (typeof pdf.autoPrint === 'function') {
+                    pdf.autoPrint();
+                }
+            } catch (e) { /* ignore */ }
+            var blobUrl = pdf.output('bloburl');
+            var win = window.open(blobUrl, '_blank');
+            if (!win) {
+                /* Popup blocked — hidden iframe print fallback */
+                var iframe = document.createElement('iframe');
+                iframe.setAttribute('title', 'Print cards');
+                iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+                iframe.src = blobUrl;
+                document.body.appendChild(iframe);
+                iframe.onload = function () {
+                    try {
+                        iframe.contentWindow.focus();
+                        iframe.contentWindow.print();
+                    } catch (err) {
+                        alert('Allow popups for this site to print, or use Download PDF.');
+                    }
+                    setTimeout(function () {
+                        try { document.body.removeChild(iframe); } catch (e2) { /* ignore */ }
+                        try { URL.revokeObjectURL(blobUrl); } catch (e3) { /* ignore */ }
+                    }, 60000);
+                };
+                return;
+            }
+            setTimeout(function () {
+                try { URL.revokeObjectURL(blobUrl); } catch (e) { /* ignore */ }
+            }, 120000);
+        }
+
         printBtn.addEventListener('click', function () {
-            window.print();
+            setPdfBusy(true, 'Preparing print…');
+            buildPrintReadyPdf({
+                onProgress: function (t) { downloadPdfBtn.textContent = t; }
+            }).then(function (pdf) {
+                setPdfBusy(false);
+                openPdfForPrint(pdf);
+            }).catch(function (err) {
+                console.error(err);
+                setPdfBusy(false);
+                alert((err && err.message) ? err.message : 'Could not prepare print PDF.');
+            });
         });
 
         downloadPdfBtn.addEventListener('click', function () {
-            const items = Array.from(gridContainer.querySelectorAll('.cg-grid-item')).filter(function (el) {
-                return el.style.backgroundImage && el.style.backgroundImage !== 'none' && !el.classList.contains('empty');
-            });
-            if (!items.length) {
-                alert('Add at least one card image first.');
-                return;
-            }
-            downloadPdfBtn.disabled = true;
-            downloadPdfBtn.textContent = 'Creating PDF…';
-
-            const CARD_W_IN = cardWidthIn;
-            const CARD_H_IN = cardHeightIn;
-            const COLS = printableLayout.cols;
-            const PER_PAGE = printableLayout.cardsPerPage;
-            const INCLUDE_BACKS = duplexBacksToggle.checked;
-            const TRIM_MARGIN = 0.125;
-
-            var DPI = 400;
-            function captureCard(el) {
-                var w = Math.round(CARD_W_IN * DPI);
-                var h = Math.round(CARD_H_IN * DPI);
-                var scale = 2;
-                var wrap = document.createElement('div');
-                wrap.style.cssText = 'position:absolute;left:-9999px;width:' + w + 'px;height:' + h + 'px;overflow:hidden;';
-                var clone = el.cloneNode(true);
-                clone.style.width = w + 'px';
-                clone.style.height = h + 'px';
-                clone.style.backgroundSize = getCardBackgroundSizeForCapture();
-                clone.style.backgroundPosition = 'center';
-                clone.style.overflow = 'hidden';
-                clone.style.borderRadius = '0';
-                wrap.appendChild(clone);
-                document.body.appendChild(wrap);
-                return html2canvas(clone, {
-                    scale: scale,
-                    useCORS: true,
-                    allowTaint: true,
-                    backgroundColor: '#ffffff',
-                    logging: false,
-                    width: w,
-                    height: h
-                }).then(function (canvas) {
-                    document.body.removeChild(wrap);
-                    return canvas.toDataURL('image/png');
-                });
-            }
-
-            const promises = items.map(captureCard);
-            Promise.all(promises).then(function (images) {
-                const { jsPDF } = window.jspdf;
-                const pdf = new jsPDF({
-                    orientation: 'portrait',
-                    unit: 'in',
-                    format: 'letter'
-                });
-                function drawCropMarks(x, y, w, h) {
-                    const m = TRIM_MARGIN;
-                    const mk = 0.09;
-                    pdf.setDrawColor(0, 0, 0);
-                    pdf.setLineWidth(0.005);
-                    pdf.line(x - m, y - m, x - m + mk, y - m);
-                    pdf.line(x - m, y - m, x - m, y - m + mk);
-                    pdf.line(x + w + m, y - m, x + w + m - mk, y - m);
-                    pdf.line(x + w + m, y - m, x + w + m, y - m + mk);
-                    pdf.line(x - m, y + h + m, x - m + mk, y + h + m);
-                    pdf.line(x - m, y + h + m, x - m, y + h + m - mk);
-                    pdf.line(x + w + m, y + h + m, x + w + m - mk, y + h + m);
-                    pdf.line(x + w + m, y + h + m, x + w + m, y + h + m - mk);
-                }
-                const rowsPerPage = printableLayout.rows;
-                const pageUsedWidth = COLS * CARD_W_IN;
-                const pageUsedHeight = rowsPerPage * CARD_H_IN;
-                const pageOffsetX = Math.max(0, (PAGE_W_IN - pageUsedWidth) / 2);
-                const pageOffsetY = Math.max(0, (PAGE_H_IN - pageUsedHeight) / 2);
-                for (let i = 0; i < images.length; i++) {
-                    if (i > 0 && i % PER_PAGE === 0) {
-                        pdf.addPage('letter', 'portrait');
-                    }
-                    const indexInPage = i % PER_PAGE;
-                    const col = indexInPage % COLS;
-                    const row = Math.floor(indexInPage / COLS);
-                    const x = pageOffsetX + MARGIN_X + col * CARD_W_IN;
-                    const y = pageOffsetY + MARGIN_Y + row * CARD_H_IN;
-                    pdf.addImage(images[i], 'PNG', x, y, CARD_W_IN, CARD_H_IN);
-                    drawCropMarks(x, y, CARD_W_IN, CARD_H_IN);
-                }
-                if (INCLUDE_BACKS) {
-                    const backPages = Math.ceil(images.length / PER_PAGE);
-                    for (let pageIdx = 0; pageIdx < backPages; pageIdx++) {
-                        pdf.addPage('letter', 'portrait');
-                        for (let k = 0; k < PER_PAGE; k++) {
-                            const absolute = pageIdx * PER_PAGE + k;
-                            if (absolute >= images.length) break;
-                            const col = (COLS - 1) - (k % COLS);
-                            const row = Math.floor(k / COLS);
-                            const x = pageOffsetX + MARGIN_X + col * CARD_W_IN;
-                            const y = pageOffsetY + MARGIN_Y + row * CARD_H_IN;
-                            pdf.setFillColor(255, 255, 255);
-                            pdf.rect(x, y, CARD_W_IN, CARD_H_IN, 'F');
-                            pdf.setDrawColor(160, 160, 160);
-                            pdf.rect(x, y, CARD_W_IN, CARD_H_IN);
-                            pdf.setTextColor(100, 100, 100);
-                            pdf.setFontSize(10);
-                            pdf.text('BACK ' + (absolute + 1), x + CARD_W_IN / 2, y + CARD_H_IN / 2, { align: 'center' });
-                            drawCropMarks(x, y, CARD_W_IN, CARD_H_IN);
-                        }
-                    }
-                }
+            setPdfBusy(true, 'Creating PDF…');
+            buildPrintReadyPdf({
+                onProgress: function (t) { downloadPdfBtn.textContent = t; }
+            }).then(function (pdf) {
                 pdf.save('card-grid.pdf');
-                downloadPdfBtn.disabled = false;
-                downloadPdfBtn.textContent = 'Print-ready PDF';
-            }).catch(function () {
-                alert('Could not create PDF. Try Print instead.');
-                downloadPdfBtn.disabled = false;
-                downloadPdfBtn.textContent = 'Print-ready PDF';
+                setPdfBusy(false);
+            }).catch(function (err) {
+                console.error(err);
+                setPdfBusy(false);
+                alert((err && err.message) ? err.message : 'Could not create PDF.');
             });
         });
 
