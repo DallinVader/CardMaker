@@ -132,6 +132,45 @@
         return idbGet(IDB_STORE_SAVES, fileId);
     }
 
+    /** All cached card projects (skips editor draft). */
+    function readAllSaveCache() {
+        return openIdb().then(function (db) {
+            if (!db) return [];
+            return new Promise(function (resolve, reject) {
+                var out = [];
+                try {
+                    var tx = db.transaction(IDB_STORE_SAVES, 'readonly');
+                    var req = tx.objectStore(IDB_STORE_SAVES).openCursor();
+                    req.onsuccess = function (e) {
+                        var cur = e.target.result;
+                        if (!cur) {
+                            resolve(out);
+                            return;
+                        }
+                        var key = String(cur.key);
+                        if (key.indexOf('__cardmaker_') === 0) {
+                            cur.continue();
+                            return;
+                        }
+                        var rec = cur.value;
+                        if (rec && rec.state && typeof rec.state === 'object' && rec.state.kind !== 'cardmaker-deck') {
+                            out.push({
+                                id: key,
+                                state: rec.state,
+                                modifiedTime: rec.modifiedTime != null ? String(rec.modifiedTime) : null,
+                                size: rec.size != null ? String(rec.size) : null
+                            });
+                        }
+                        cur.continue();
+                    };
+                    req.onerror = function () { reject(req.error); };
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        }).catch(function () { return []; });
+    }
+
     function writeSaveCache(fileId, fileMeta, state) {
         if (!fileId || !fileMeta) return Promise.resolve();
         return idbPut(IDB_STORE_SAVES, fileId, {
@@ -326,6 +365,7 @@
         driveFileMetaUnchanged: driveFileMetaUnchanged,
         isCardmakerProjectFileName: isCardmakerProjectFileName,
         readSaveCache: readSaveCache,
+        readAllSaveCache: readAllSaveCache,
         writeSaveCache: writeSaveCache,
         pruneSaveCache: pruneSaveCache,
         readThumbCache: readThumbCache,

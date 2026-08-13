@@ -267,16 +267,18 @@
         <div class="cg-wrap">
             <header class="cg-header no-print">
                 <h1>Print 9-up sheet</h1>
-                <p class="cg-sub">Add images, open <strong>Print setup</strong> for size and bleed, then <strong>Print</strong> or <strong>Download PDF</strong> for faces. Use <strong>Download backs PDF</strong> for a matching sheet of <code>Card Back.png</code> (columns mirrored for duplex). Queue cards from Saved Projects or Card Player’s <strong>Print deck…</strong>.</p>
+                <p class="cg-sub">Add images, open <strong>Print setup</strong> for size and bleed, then <strong>Print</strong> or <strong>Download PDF</strong> for faces. Use <strong>Download backs PDF</strong> for a matching sheet of <code>Card Back.png</code>. Load a saved deck here, or build one on the <a href="deck-builder.html" style="color:#a5b4fc;">deck builder</a>.</p>
             </header>
 
             <div class="cg-toolbar no-print">
                 <label class="cg-upload-label" for="fileUpload">Choose images</label>
                 <input type="file" id="fileUpload" accept="image/*" multiple>
                 <button type="button" class="cg-btn cg-btn-setup" id="openSetupBtn">Print setup</button>
+                <button type="button" class="cg-btn cg-btn-setup" id="openDeckLoadBtn">Load deck…</button>
                 <button type="button" class="cg-btn cg-btn-print" id="printBtn">Print</button>
                 <button type="button" class="cg-btn cg-btn-pdf" id="downloadPdfBtn">Download PDF</button>
                 <button type="button" class="cg-btn cg-btn-pdf" id="downloadBacksPdfBtn" title="PDF of Card Back.png matching your current card count">Download backs PDF</button>
+                <button type="button" class="cg-btn cg-btn-back" onclick="window.location.href='deck-builder.html'">Deck builder</button>
                 <button type="button" class="cg-btn cg-btn-back" onclick="window.location.href='index.html'">Card Maker</button>
             </div>
 
@@ -338,6 +340,12 @@
                 <p class="drive-modal-hint" style="margin-top:0;">Open your cloud saves in a list with preview (same as Card Maker). Full card image—frame, art, text, and stats—is applied to the print grid.</p>
                 <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="openGridDriveLoadModalBtn">Browse Card Maker saves…</button>
             </div>
+
+            <div class="cg-setup-section">
+                <h3>Load a saved deck</h3>
+                <p class="drive-modal-hint" style="margin-top:0;">Loads every copy from a Drive deck file onto this print grid (same as Card Player / deck builder).</p>
+                <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="openDeckLoadBtnSetup">Browse decks…</button>
+            </div>
         </div>
     </div>
 
@@ -383,6 +391,21 @@
         </div>
     </div>
 
+    <div id="gridDeckLoadModal" class="drive-modal no-print" aria-hidden="true">
+        <div class="drive-modal-backdrop" onclick="closeGridDeckLoadModal()" aria-hidden="true"></div>
+        <div class="drive-modal-panel" role="dialog" aria-modal="true" aria-labelledby="gridDeckLoadTitle" style="max-width:min(96vw,560px);">
+            <button type="button" class="drive-modal-close" onclick="closeGridDeckLoadModal()" aria-label="Close">&times;</button>
+            <h2 id="gridDeckLoadTitle" class="drive-modal-title">Load deck to print</h2>
+            <p class="drive-modal-hint">Saved decks live in your Drive app data (<code class="drive-code">name.cardmaker-deck.json</code>). Quantities become copies on the print sheet.</p>
+            <div class="cg-drive-row" style="margin-bottom:12px;">
+                <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="gridDeckSignInBtn">Connect Google</button>
+                <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="gridDeckRefreshBtn">Refresh list</button>
+            </div>
+            <div id="gridDeckLoadList" class="drive-modal-list" role="list" style="max-height:min(50vh,420px);"></div>
+            <p id="gridDeckLoadMessage" class="drive-modal-message" role="status" aria-live="polite"></p>
+        </div>
+    </div>
+
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="card-render.js"></script>
     <script src="cardmaker-perf.js"></script>
@@ -416,6 +439,10 @@
         const gridDriveLoadModal = document.getElementById('gridDriveLoadModal');
         const gridLoadModalMessage = document.getElementById('gridLoadModalMessage');
         const printSetupModal = document.getElementById('printSetupModal');
+        const gridDeckLoadModal = document.getElementById('gridDeckLoadModal');
+        const gridDeckLoadList = document.getElementById('gridDeckLoadList');
+        const gridDeckLoadMessage = document.getElementById('gridDeckLoadMessage');
+        const DECK_FILE_EXTENSION = '.cardmaker-deck.json';
         const CARD_BACK_SRC = 'Card Back.png';
 
         const DEFAULT_SLOTS = 9;
@@ -639,6 +666,52 @@
             if (!gridDriveLoadModal) return;
             gridDriveLoadModal.classList.remove('is-open');
             gridDriveLoadModal.setAttribute('aria-hidden', 'true');
+        }
+
+        function setGridDeckLoadMessage(text, isError) {
+            if (!gridDeckLoadMessage) return;
+            gridDeckLoadMessage.textContent = text || '';
+            gridDeckLoadMessage.classList.toggle('is-error', !!isError);
+        }
+
+        function openGridDeckLoadModal() {
+            if (!gridDeckLoadModal) return;
+            gridDeckLoadModal.classList.add('is-open');
+            gridDeckLoadModal.setAttribute('aria-hidden', 'false');
+            setGridDeckLoadMessage('');
+            refreshGridDeckLoadList();
+        }
+
+        function closeGridDeckLoadModal() {
+            if (!gridDeckLoadModal) return;
+            gridDeckLoadModal.classList.remove('is-open');
+            gridDeckLoadModal.setAttribute('aria-hidden', 'true');
+        }
+
+        function displayDeckSaveLabel(fileName) {
+            var n = String(fileName || '');
+            if (n.toLowerCase().endsWith(DECK_FILE_EXTENSION)) return n.slice(0, -DECK_FILE_EXTENSION.length);
+            return n;
+        }
+
+        function isCardIdFetchableFromDrive(id) {
+            var s = String(id == null ? '' : id).trim();
+            if (!s) return false;
+            if (s.indexOf('import_') === 0) return false;
+            return true;
+        }
+
+        function fileIdsFromDeckDocument(doc) {
+            var ids = [];
+            if (!doc || !Array.isArray(doc.entries)) return ids;
+            doc.entries.forEach(function (ent) {
+                var id = String(ent && ent.id != null ? ent.id : '').trim();
+                var qty = Math.max(0, Math.min(99, parseInt(ent && ent.qty, 10) || 0));
+                if (!id || qty < 1 || !isCardIdFetchableFromDrive(id)) return;
+                var k;
+                for (k = 0; k < qty; k++) ids.push(id);
+            });
+            return ids;
         }
 
         function clearGridLoadModalPreview() {
@@ -1065,6 +1138,103 @@
             }
         }
 
+        async function loadFileIdsOntoPrintGrid(ids, sourceLabel, options) {
+            const opts = options || {};
+            const keepQueueOnNeedSignIn = !!opts.keepQueueOnNeedSignIn;
+            ids = (ids || []).map(String).filter(Boolean);
+            if (!ids.length) {
+                setQueueBanner('That deck has no Drive cards to print.', true);
+                return;
+            }
+
+            await maybeRefreshGridDriveTokenIfStale();
+            const token = readStoredDriveToken();
+            if (!token) {
+                setQueueBanner(
+                    'You have ' + ids.length + ' card(s) queued from ' + sourceLabel + '. Connect Google: open Print setup or Load deck, sign in (same account), then try again.',
+                    true
+                );
+                return;
+            }
+
+            if (!keepQueueOnNeedSignIn) {
+                try { localStorage.removeItem(PRINT_IMPORT_STORAGE_KEY); } catch (e) { /* ignore */ }
+            }
+
+            setQueueBanner('Loading ' + ids.length + ' card(s) from ' + sourceLabel + '…', true);
+
+            const uniqueIds = [];
+            const seen = Object.create(null);
+            ids.forEach(function (id) {
+                if (!seen[id]) {
+                    seen[id] = true;
+                    uniqueIds.push(id);
+                }
+            });
+
+            ensureSlots(ids.length);
+            uploadedUrls = new Array(ids.length);
+            let doneUnique = 0;
+            let failed = 0;
+            const PRINT_LOAD_CONCURRENCY = 6;
+
+            function paintSlotsForId(id, url) {
+                for (var i = 0; i < ids.length; i++) {
+                    if (ids[i] === id) {
+                        uploadedUrls[i] = url;
+                        setGridSlotImage(i, url);
+                    }
+                }
+                updatePageBreakMarkers();
+            }
+
+            await mapLimitSoft(uniqueIds, PRINT_LOAD_CONCURRENCY, async function (id) {
+                try {
+                    const json = await loadPrintProjectState(token, id);
+                    const url = await compositeImageFromCardMakerSave(json);
+                    if (!url) throw new Error('No image');
+                    paintSlotsForId(id, url);
+                } catch (e) {
+                    failed++;
+                    console.error('Print import', id, e);
+                } finally {
+                    doneUnique++;
+                    setQueueBanner(
+                        'Loaded ' + doneUnique + '/' + uniqueIds.length + ' unique card(s) (' + ids.length + ' copies) from ' + sourceLabel + '…',
+                        true
+                    );
+                }
+            });
+
+            const urls = [];
+            for (var u = 0; u < ids.length; u++) {
+                if (uploadedUrls[u]) urls.push(uploadedUrls[u]);
+            }
+
+            if (urls.length === 0) {
+                ensureSlots(DEFAULT_SLOTS);
+                uploadedUrls = [];
+                repeatBtn.disabled = true;
+                setQueueBanner('Could not load the queued saves. Stay signed in and try again from ' + sourceLabel + '.', true);
+                updateFitInfo();
+                return;
+            }
+
+            if (urls.length !== ids.length) {
+                ensureSlots(urls.length);
+                uploadedUrls = urls;
+                setGridFromUrls(uploadedUrls, false);
+            } else {
+                uploadedUrls = urls;
+            }
+            repeatBtn.disabled = uploadedUrls.length === 0;
+            updateFitInfo();
+            let msg = 'Loaded ' + urls.length + ' card image(s) from ' + sourceLabel +
+                ' (' + uniqueIds.length + ' unique, ~' + Math.ceil(urls.length / printableLayout.cardsPerPage) + ' page(s)).';
+            if (failed > 0) msg += ' ' + failed + ' unique card(s) failed to load.';
+            setQueueBanner(msg, true);
+        }
+
         async function consumePrintImportFromSavedProjects() {
             /* localStorage: sessionStorage is per-tab, so a tab opened from Saved Projects / Card Player could not see the queue */
             const raw = localStorage.getItem(PRINT_IMPORT_STORAGE_KEY);
@@ -1088,96 +1258,90 @@
             }
 
             const sourceLabel = (data.source === 'deck')
-                ? 'Card Player deck'
+                ? (data.deckName ? ('deck “' + data.deckName + '”') : 'saved deck')
                 : 'Saved Projects Manager';
 
             await maybeRefreshGridDriveTokenIfStale();
-            const token = readStoredDriveToken();
-            if (!token) {
+            if (!readStoredDriveToken()) {
                 setQueueBanner(
                     'You have ' + ids.length + ' card(s) queued from ' + sourceLabel + '. Connect Google: open Print setup, use Browse Card Maker saves & sign in (same account), then refresh this page—or sign in there and return here.',
                     true
                 );
                 return;
             }
+            await loadFileIdsOntoPrintGrid(ids, sourceLabel);
+        }
 
-            setQueueBanner('Loading ' + ids.length + ' card(s) from ' + sourceLabel + '…', true);
-
-            const uniqueIds = [];
-            const seen = Object.create(null);
-            ids.forEach(function (id) {
-                if (!seen[id]) {
-                    seen[id] = true;
-                    uniqueIds.push(id);
-                }
+        function listDeckFiles(token) {
+            return listAppDataFolderFiles(token).then(function (files) {
+                return files.filter(function (f) {
+                    return f.name && String(f.name).toLowerCase().endsWith(DECK_FILE_EXTENSION);
+                }).sort(function (a, b) {
+                    return new Date(b.modifiedTime || 0) - new Date(a.modifiedTime || 0);
+                });
             });
+        }
 
-            ensureSlots(ids.length);
-            uploadedUrls = new Array(ids.length);
-            const imageById = Object.create(null);
-            let doneUnique = 0;
-            let failed = 0;
-            const PRINT_LOAD_CONCURRENCY = 6;
-
-            function paintSlotsForId(id, url) {
-                for (var i = 0; i < ids.length; i++) {
-                    if (ids[i] === id) {
-                        uploadedUrls[i] = url;
-                        setGridSlotImage(i, url);
-                    }
-                }
-                updatePageBreakMarkers();
-            }
-
-            await mapLimitSoft(uniqueIds, PRINT_LOAD_CONCURRENCY, async function (id) {
-                try {
-                    const json = await loadPrintProjectState(token, id);
-                    const url = await compositeImageFromCardMakerSave(json);
-                    if (!url) throw new Error('No image');
-                    imageById[id] = url;
-                    paintSlotsForId(id, url);
-                } catch (e) {
-                    failed++;
-                    console.error('Print import', id, e);
-                } finally {
-                    doneUnique++;
-                    setQueueBanner(
-                        'Loaded ' + doneUnique + '/' + uniqueIds.length + ' unique card(s) (' + ids.length + ' copies) from ' + sourceLabel + '…',
-                        true
-                    );
-                }
-            });
-
-            localStorage.removeItem(PRINT_IMPORT_STORAGE_KEY);
-
-            const urls = [];
-            for (var u = 0; u < ids.length; u++) {
-                if (uploadedUrls[u]) urls.push(uploadedUrls[u]);
-            }
-
-            if (urls.length === 0) {
-                ensureSlots(DEFAULT_SLOTS);
-                uploadedUrls = [];
-                repeatBtn.disabled = true;
-                setQueueBanner('Could not load the queued saves. Stay signed in and try again from ' + sourceLabel + '.', true);
-                updateFitInfo();
+        async function refreshGridDeckLoadList() {
+            await maybeRefreshGridDriveTokenIfStale();
+            const token = readStoredDriveToken();
+            if (!gridDeckLoadList) return;
+            if (!token) {
+                gridDeckLoadList.innerHTML = '<div class="drive-modal-empty">Connect Google to list your saved decks.</div>';
+                setGridDeckLoadMessage('Connect Google first.', true);
                 return;
             }
-
-            /* Compact away failed slots so the sheet/PDF has no holes */
-            if (urls.length !== ids.length) {
-                ensureSlots(urls.length);
-                uploadedUrls = urls;
-                setGridFromUrls(uploadedUrls, false);
-            } else {
-                uploadedUrls = urls;
+            gridDeckLoadList.innerHTML = '<div class="drive-modal-loading">Loading decks…</div>';
+            setGridDeckLoadMessage('');
+            try {
+                const files = await listDeckFiles(token);
+                if (!files.length) {
+                    gridDeckLoadList.innerHTML = '<div class="drive-modal-empty">No decks yet. Build one in the <strong>deck builder</strong>, then refresh.</div>';
+                    return;
+                }
+                gridDeckLoadList.innerHTML = files.map(function (f) {
+                    const label = escapeHtml(displayDeckSaveLabel(f.name));
+                    const when = f.modifiedTime ? new Date(f.modifiedTime).toLocaleString() : '';
+                    return '<div class="drive-modal-item">' +
+                        '<div class="drive-modal-item-info">' +
+                        '<span class="drive-modal-item-name">' + label + '</span>' +
+                        '<div class="drive-modal-item-meta"><span class="drive-modal-item-date">' + escapeHtml(when) + '</span></div>' +
+                        '</div>' +
+                        '<div class="drive-modal-item-actions">' +
+                        '<button type="button" class="drive-modal-btn drive-modal-btn-small drive-modal-btn-load" data-grid-deck-load="' + escapeHtml(f.id) + '">Load</button>' +
+                        '</div></div>';
+                }).join('');
+            } catch (e) {
+                gridDeckLoadList.innerHTML = '<div class="drive-modal-empty">Could not list decks.</div>';
+                setGridDeckLoadMessage((e && e.message) ? e.message : 'List failed.', true);
             }
-            repeatBtn.disabled = uploadedUrls.length === 0;
-            updateFitInfo();
-            let msg = 'Loaded ' + urls.length + ' card image(s) from ' + sourceLabel +
-                ' (' + uniqueIds.length + ' unique, ~' + Math.ceil(urls.length / printableLayout.cardsPerPage) + ' page(s)).';
-            if (failed > 0) msg += ' ' + failed + ' unique card(s) failed to load.';
-            setQueueBanner(msg, true);
+        }
+
+        async function loadDeckFileOntoPrintGrid(fileId) {
+            await maybeRefreshGridDriveTokenIfStale();
+            const token = readStoredDriveToken();
+            if (!token) {
+                setGridDeckLoadMessage('Connect Google first.', true);
+                return;
+            }
+            setGridDeckLoadMessage('Loading deck…', false);
+            try {
+                const doc = await fetchDriveFileJson(token, fileId);
+                if (!doc || doc.kind !== 'cardmaker-deck' || !Array.isArray(doc.entries)) {
+                    throw new Error('Not a valid Card Maker deck file.');
+                }
+                const ids = fileIdsFromDeckDocument(doc);
+                if (!ids.length) {
+                    setGridDeckLoadMessage('This deck has no Drive cards to print (local-only copies are skipped).', true);
+                    return;
+                }
+                closeGridDeckLoadModal();
+                closePrintSetupModal();
+                const name = doc.name || displayDeckSaveLabel((doc && doc.name) || 'Deck');
+                await loadFileIdsOntoPrintGrid(ids, 'deck “' + name + '”');
+            } catch (e) {
+                setGridDeckLoadMessage((e && e.message) ? e.message : 'Could not load that deck.', true);
+            }
         }
 
         async function refreshGridLoadModalList() {
@@ -1229,9 +1393,29 @@
         if (openGridDriveLoadModalBtn) {
             openGridDriveLoadModalBtn.addEventListener('click', openGridDriveLoadModal);
         }
+        var openDeckLoadBtn = document.getElementById('openDeckLoadBtn');
+        var openDeckLoadBtnSetup = document.getElementById('openDeckLoadBtnSetup');
+        if (openDeckLoadBtn) openDeckLoadBtn.addEventListener('click', openGridDeckLoadModal);
+        if (openDeckLoadBtnSetup) openDeckLoadBtnSetup.addEventListener('click', openGridDeckLoadModal);
+        var gridDeckSignInBtn = document.getElementById('gridDeckSignInBtn');
+        var gridDeckRefreshBtn = document.getElementById('gridDeckRefreshBtn');
+        if (gridDeckRefreshBtn) gridDeckRefreshBtn.addEventListener('click', refreshGridDeckLoadList);
+        if (gridDeckLoadList) {
+            gridDeckLoadList.addEventListener('click', function (e) {
+                var btn = e.target.closest && e.target.closest('[data-grid-deck-load]');
+                if (!btn) return;
+                var fid = btn.getAttribute('data-grid-deck-load');
+                if (fid) loadDeckFileOntoPrintGrid(fid);
+            });
+        }
         initGridLoadModalListUi();
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
+            if (gridDeckLoadModal && gridDeckLoadModal.classList.contains('is-open')) {
+                closeGridDeckLoadModal();
+                e.preventDefault();
+                return;
+            }
             if (gridDriveLoadModal && gridDriveLoadModal.classList.contains('is-open')) {
                 closeGridDriveLoadModal();
                 e.preventDefault();
@@ -1303,36 +1487,51 @@
             setGridFromUrls(uploadedUrls, true);
         });
 
-        gridDriveSignInBtn.addEventListener('click', async function () {
+        async function signInForPrintPage(statusFn) {
             const scriptsOk = await waitForGoogleScripts(8000);
             if (!scriptsOk || !ensureGridTokenClient()) {
-                setGridLoadModalMessage('Google scripts not ready. Use http://localhost, not file://.', true);
-                return;
+                statusFn('Google scripts not ready. Use http://localhost, not file://.', true);
+                return false;
             }
-            setGridLoadModalMessage('Opening Google sign-in…', false);
+            statusFn('Opening Google sign-in…', false);
             if (typeof CardMakerDriveAuth !== 'undefined') {
                 const signed = await CardMakerDriveAuth.signIn({ forceConsent: false });
                 if (signed) {
-                    setGridLoadModalMessage('Signed in.', false);
+                    statusFn('Signed in.', false);
                     refreshGridLoadModalList();
+                    refreshGridDeckLoadList();
                     consumePrintImportFromSavedProjects().catch(function (e) { console.error(e); });
-                } else {
-                    setGridLoadModalMessage('Sign-in failed.', true);
+                    return true;
                 }
-                return;
+                statusFn('Sign-in failed.', true);
+                return false;
             }
-            gisTokenClient.callback = function (tokenResponse) {
-                if (tokenResponse && tokenResponse.access_token) {
-                    persistDriveToken(tokenResponse);
-                    setGridLoadModalMessage('Signed in.', false);
-                    refreshGridLoadModalList();
-                    consumePrintImportFromSavedProjects().catch(function (e) { console.error(e); });
-                } else {
-                    setGridLoadModalMessage('Sign-in failed.', true);
-                }
-            };
-            gisTokenClient.requestAccessToken({ prompt: '' });
+            return new Promise(function (resolve) {
+                gisTokenClient.callback = function (tokenResponse) {
+                    if (tokenResponse && tokenResponse.access_token) {
+                        persistDriveToken(tokenResponse);
+                        statusFn('Signed in.', false);
+                        refreshGridLoadModalList();
+                        refreshGridDeckLoadList();
+                        consumePrintImportFromSavedProjects().catch(function (e) { console.error(e); });
+                        resolve(true);
+                    } else {
+                        statusFn('Sign-in failed.', true);
+                        resolve(false);
+                    }
+                };
+                gisTokenClient.requestAccessToken({ prompt: '' });
+            });
+        }
+
+        gridDriveSignInBtn.addEventListener('click', function () {
+            signInForPrintPage(setGridLoadModalMessage);
         });
+        if (gridDeckSignInBtn) {
+            gridDeckSignInBtn.addEventListener('click', function () {
+                signInForPrintPage(setGridDeckLoadMessage);
+            });
+        }
 
         gridDriveRefreshBtn.addEventListener('click', function () {
             refreshGridLoadModalList();

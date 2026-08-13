@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Deck builder – Card Maker</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        html, body { margin: 0; min-height: 100%; }
+        body.db-page {
+            background: linear-gradient(155deg, #0f172a 0%, #1e293b 50%, #0f3460 100%);
+            color: #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .db-wrap { max-width: 1280px; margin: 0 auto; padding: 16px 16px 40px; }
+        .db-top {
+            display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between;
+            gap: 12px; margin-bottom: 16px;
+        }
+        .db-top h1 { margin: 0 0 6px; font-size: 1.45rem; font-weight: 800; letter-spacing: -0.02em; }
+        .db-sub { margin: 0; color: #94a3b8; font-size: 0.92rem; line-height: 1.45; max-width: 44rem; }
+        .db-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+        .db-btn {
+            font-family: inherit; font-size: 13px; font-weight: 700; padding: 9px 14px;
+            border-radius: 8px; border: 1px solid rgba(255,255,255,0.14);
+            background: rgba(30, 41, 59, 0.75); color: #e2e8f0; cursor: pointer;
+            text-decoration: none; display: inline-flex; align-items: center;
+        }
+        .db-btn:hover { background: rgba(51, 65, 85, 0.9); }
+        .db-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .db-btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: transparent; color: #fff;
+        }
+        .db-btn-primary:hover:not(:disabled) { filter: brightness(1.06); }
+        .db-btn-print { background: #16a34a; border-color: transparent; color: #fff; }
+        .db-status {
+            margin: 0 0 14px; padding: 8px 12px; border-radius: 8px;
+            background: rgba(0,0,0,0.22); color: #cbd5e1; font-size: 13px;
+        }
+        .db-status.is-error { color: #fca5a5; }
+        .db-layout {
+            display: grid;
+            grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+            gap: 16px;
+            align-items: start;
+        }
+        @media (max-width: 860px) {
+            .db-layout { grid-template-columns: 1fr; }
+        }
+        .db-side {
+            position: sticky; top: 12px;
+            background: rgba(15, 23, 42, 0.72);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 14px; padding: 14px;
+        }
+        @media (max-width: 860px) { .db-side { position: static; } }
+        .db-side h2 { margin: 0 0 10px; font-size: 0.95rem; }
+        .db-summary {
+            font-variant-numeric: tabular-nums; font-weight: 800; color: #f8fafc;
+            margin-bottom: 12px; font-size: 15px;
+        }
+        .db-field { margin-bottom: 10px; }
+        .db-field label {
+            display: block; font-size: 11px; font-weight: 800; letter-spacing: 0.05em;
+            text-transform: uppercase; color: #93c5fd; margin-bottom: 6px;
+        }
+        .db-input, .db-select {
+            width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 8px;
+            border: 2px solid rgba(102, 126, 234, 0.28); background: #0f172a; color: #f1f5f9;
+            font: inherit;
+        }
+        .db-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #cbd5e1; margin: 8px 0 12px; }
+        .db-side-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        .db-deck-list {
+            max-height: 180px; overflow: auto; margin-top: 8px;
+            border: 1px solid rgba(148,163,184,0.18); border-radius: 8px;
+        }
+        .db-deck-item {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            padding: 8px 10px; border-bottom: 1px solid rgba(148,163,184,0.12); font-size: 13px;
+        }
+        .db-deck-item:last-child { border-bottom: 0; }
+        .db-deck-item button { font-size: 12px; padding: 5px 10px; }
+        .db-main-toolbar {
+            display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 12px;
+        }
+        .db-main-toolbar .db-field { margin: 0; flex: 1 1 180px; min-width: 140px; }
+        .db-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+        }
+        @media (max-width: 1100px) { .db-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media (max-width: 720px) { .db-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        .db-card {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px; overflow: hidden; display: flex; flex-direction: column;
+        }
+        .db-card[data-in-deck="1"] { border-color: rgba(129, 140, 248, 0.65); box-shadow: 0 0 0 1px rgba(129,140,248,0.25); }
+        .db-card-art {
+            position: relative; aspect-ratio: 2.5 / 3.5; background: #1e293b;
+            cursor: zoom-in;
+        }
+        .db-card-art img {
+            width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0;
+            transition: opacity 0.15s ease;
+        }
+        .db-card-art img.is-loaded { opacity: 1; }
+        .db-card-ph {
+            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            color: #64748b; font-size: 12px;
+        }
+        .db-card-art img.is-loaded + .db-card-ph { display: none; }
+        .db-card-meta { padding: 8px 10px 6px; min-height: 3.1rem; }
+        .db-card-title { font-weight: 800; font-size: 13px; color: #f8fafc; line-height: 1.25; }
+        .db-card-sub { display: block; margin-top: 3px; font-size: 11px; color: #94a3b8; }
+        .db-qty {
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 0 10px 10px;
+        }
+        .db-qty-btn {
+            width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgba(129,140,248,0.35);
+            background: rgba(30,41,59,0.9); color: #e2e8f0; font-size: 18px; font-weight: 800; cursor: pointer;
+        }
+        .db-qty-btn:hover { background: rgba(79,70,229,0.35); }
+        .db-qty input {
+            width: 48px; text-align: center; padding: 7px 4px; border-radius: 8px;
+            border: 2px solid rgba(102,126,234,0.3); background: #0f172a; color: #f8fafc; font: inherit; font-weight: 800;
+        }
+        .db-empty { padding: 28px 16px; text-align: center; color: #94a3b8; }
+        .db-zoom {
+            display: none; position: fixed; inset: 0; z-index: 80;
+            background: rgba(2, 6, 23, 0.82); align-items: center; justify-content: center;
+            padding: 16px; cursor: zoom-out;
+        }
+        .db-zoom.is-open { display: flex; }
+        .db-zoom img {
+            max-width: min(92vw, 720px); max-height: 92vh;
+            width: auto; height: auto; border-radius: 12px;
+            box-shadow: 0 18px 50px rgba(0,0,0,0.55);
+            background: #0f172a;
+        }
+        .db-zoom-hint {
+            position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+            color: #cbd5e1; font-size: 12px; pointer-events: none;
+        }
+    </style>
+</head>
+<body class="db-page">
+    <div class="db-wrap">
+        <header class="db-top">
+            <div>
+                <h1>Deck builder</h1>
+                <p class="db-sub">Browse your library as a 4-wide grid, filter, and set copies. Save to Drive, then print from here or the print page.</p>
+            </div>
+            <nav class="db-nav" aria-label="App sections">
+                <a class="db-btn" href="index.html">Card Maker</a>
+                <a class="db-btn" href="saved-projects.html">Saved projects</a>
+                <a class="db-btn" href="card-player.html">Play</a>
+                <a class="db-btn" href="card-grid.html">Print</a>
+            </nav>
+        </header>
+        <p class="db-status" id="dbStatus" role="status">Loading library…</p>
+
+        <div class="db-layout">
+            <aside class="db-side">
+                <h2>This deck</h2>
+                <div class="db-summary" id="dbSummary">0 types · 0 cards</div>
+                <div class="db-field">
+                    <label for="dbDeckName">Deck name</label>
+                    <input class="db-input" id="dbDeckName" maxlength="80" placeholder="e.g. main-deck" autocomplete="off">
+                </div>
+                <div class="db-side-actions">
+                    <button type="button" class="db-btn db-btn-primary" id="dbSaveBtn">Save to Drive</button>
+                    <button type="button" class="db-btn db-btn-print" id="dbPrintBtn">Print deck…</button>
+                </div>
+                <div class="db-side-actions">
+                    <button type="button" class="db-btn" id="dbSignInBtn">Connect Google</button>
+                    <button type="button" class="db-btn" id="dbRefreshLibBtn">Refresh library</button>
+                </div>
+                <div class="db-side-actions">
+                    <button type="button" class="db-btn" id="dbAllOneBtn" title="Set every visible card to 1">All ×1</button>
+                    <button type="button" class="db-btn" id="dbClearBtn" title="Set every quantity to 0">Clear</button>
+                </div>
+                <div class="db-field" style="margin-top:14px;">
+                    <label>Saved decks</label>
+                    <div class="db-deck-list" id="dbDeckList"><div class="db-empty" style="padding:12px;">Sign in to list decks.</div></div>
+                </div>
+            </aside>
+
+            <main>
+                <div class="db-main-toolbar">
+                    <div class="db-field">
+                        <label for="dbSearch">Search</label>
+                        <input class="db-input" id="dbSearch" type="search" placeholder="Name, type, rarity…" autocomplete="off">
+                    </div>
+                    <div class="db-field">
+                        <label for="dbFilterType">Type</label>
+                        <select class="db-select" id="dbFilterType"><option value="">All types</option></select>
+                    </div>
+                    <div class="db-field">
+                        <label for="dbFilterSubtype">Subtype</label>
+                        <select class="db-select" id="dbFilterSubtype"><option value="">All subtypes</option></select>
+                    </div>
+                    <div class="db-field">
+                        <label for="dbFilterRarity">Rarity</label>
+                        <select class="db-select" id="dbFilterRarity"><option value="">All rarities</option></select>
+                    </div>
+                    <div class="db-field">
+                        <label for="dbFilterSet">Set</label>
+                        <select class="db-select" id="dbFilterSet"><option value="">All sets</option></select>
+                    </div>
+                    <div class="db-field">
+                        <label for="dbSort">Sort</label>
+                        <select class="db-select" id="dbSort">
+                            <option value="set" selected>Set</option>
+                            <option value="name">Name</option>
+                            <option value="type">Type</option>
+                            <option value="qty">Quantity</option>
+                        </select>
+                    </div>
+                    <label class="db-check"><input type="checkbox" id="dbHideZero"> Hide ×0</label>
+                </div>
+                <div class="db-grid" id="dbGrid"></div>
+                <p class="db-empty" id="dbEmpty" hidden>No cards match these filters.</p>
+            </main>
+        </div>
+    </div>
+
+    <div class="db-zoom" id="dbZoom" hidden aria-hidden="true">
+        <img id="dbZoomImg" alt="Card preview">
+        <div class="db-zoom-hint">Click or press Esc to close</div>
+    </div>
+
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="card-render.js"></script>
+    <script src="cardmaker-perf.js"></script>
+    <script src="cardmaker-drive-auth.js"></script>
+    <script src="cardmaker-cookie-consent.js"></script>
+    <script src="cardmaker-field-options.js"></script>
+    <script src="cardmaker-sets.js"></script>
+    <script src="card-player-decks-drive.js"></script>
+    <script>
+(function () {
+    var PRINT_IMPORT_STORAGE_KEY = 'cardmaker_print_import_v1';
+    var DECK_NAME_STORAGE_KEY = 'cardmaker_cp_deck_name_v1';
+    var DEFAULT_SET_NAME = 'Wizards of Whimsy';
+    var RARITY_OPTIONS = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic', 'Fantastical'];
+    var setFilterDefaultPending = true;
+
+    var cards = [];
+    var qtyById = Object.create(null);
+    var thumbIo = null;
+
+    var statusEl = document.getElementById('dbStatus');
+    var gridEl = document.getElementById('dbGrid');
+    var emptyEl = document.getElementById('dbEmpty');
+    var summaryEl = document.getElementById('dbSummary');
+    var nameEl = document.getElementById('dbDeckName');
+    var searchEl = document.getElementById('dbSearch');
+    var typeEl = document.getElementById('dbFilterType');
+    var subEl = document.getElementById('dbFilterSubtype');
+    var rarEl = document.getElementById('dbFilterRarity');
+    var setEl = document.getElementById('dbFilterSet');
+    var sortEl = document.getElementById('dbSort');
+    var hideZeroEl = document.getElementById('dbHideZero');
+    var deckListEl = document.getElementById('dbDeckList');
+
+    function setStatus(text, isError) {
+        statusEl.textContent = text || '';
+        statusEl.classList.toggle('is-error', !!isError);
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    }
+
+    function escapeAttr(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+
+    function titleOf(state) {
+        var t = state && state.fields && state.fields.Title != null ? String(state.fields.Title).trim() : '';
+        return t || '(untitled)';
+    }
+
+    function fieldOf(state, key) {
+        var f = state && state.fields;
+        return f && f[key] != null ? String(f[key]).trim() : '';
+    }
+
+    function setLabelOf(state) {
+        var name = fieldOf(state, 'CardMakerSetName');
+        if (name) return name;
+        var sid = fieldOf(state, 'CardMakerSetId');
+        if (sid && typeof CardMakerSets !== 'undefined') {
+            var rec = CardMakerSets.getNamedSetById(sid);
+            if (rec && rec.name) return String(rec.name).trim();
+        }
+        return '';
+    }
+
+    function qtyOf(id) {
+        var n = parseInt(qtyById[id], 10);
+        return isFinite(n) && n > 0 ? n : 0;
+    }
+
+    function setQty(id, n) {
+        n = Math.max(0, Math.min(99, parseInt(n, 10) || 0));
+        if (n <= 0) delete qtyById[id];
+        else qtyById[id] = n;
+        updateSummary();
+        if (hideZeroEl.checked) {
+            applyFilters();
+            return;
+        }
+        var card = null;
+        gridEl.querySelectorAll('.db-card').forEach(function (el) {
+            if (el.getAttribute('data-id') === id) card = el;
+        });
+        if (card) {
+            var inp = card.querySelector('input[data-qty]');
+            if (inp && inp.value !== String(n)) inp.value = String(n);
+            card.setAttribute('data-in-deck', n > 0 ? '1' : '0');
+        }
+    }
+
+    function collectEntries() {
+        var arr = [];
+        Object.keys(qtyById).forEach(function (id) {
+            var n = qtyOf(id);
+            if (n > 0) arr.push({ id: id, qty: n });
+        });
+        return arr;
+    }
+
+    function updateSummary() {
+        var entries = collectEntries();
+        var copies = 0;
+        entries.forEach(function (e) { copies += e.qty; });
+        summaryEl.textContent = entries.length + ' types · ' + copies + ' cards';
+    }
+
+    function isDriveId(id) {
+        var s = String(id || '').trim();
+        return !!s && s.indexOf('import_') !== 0;
+    }
+
+    function fillFilterSelect(sel, values, allLabel) {
+        var prev = sel.value;
+        sel.innerHTML = '<option value="">' + escapeHtml(allLabel) + '</option>';
+        values.forEach(function (v) {
+            if (!v) return;
+            var o = document.createElement('option');
+            o.value = v;
+            o.textContent = v;
+            sel.appendChild(o);
+        });
+        if (prev && Array.from(sel.options).some(function (o) { return o.value === prev; })) sel.value = prev;
+    }
+
+    function rebuildFilterOptions() {
+        var types = {};
+        var subs = {};
+        var rars = {};
+        var sets = {};
+        sets[DEFAULT_SET_NAME] = true;
+        if (typeof CardMakerFieldOptions !== 'undefined') {
+            CardMakerFieldOptions.getTypes().forEach(function (t) { types[t] = true; });
+            CardMakerFieldOptions.getSubtypes().forEach(function (t) { subs[t] = true; });
+        }
+        if (typeof CardMakerSets !== 'undefined') {
+            CardMakerSets.readNamedSets().forEach(function (s) {
+                if (s && s.name) sets[String(s.name).trim()] = true;
+            });
+        }
+        RARITY_OPTIONS.forEach(function (r) { rars[r] = true; });
+        cards.forEach(function (c) {
+            var t = fieldOf(c.state, 'Type');
+            var s = fieldOf(c.state, 'Subtype');
+            var r = fieldOf(c.state, 'Rarity');
+            var setName = setLabelOf(c.state);
+            if (t) types[t] = true;
+            if (s) subs[s] = true;
+            if (r) rars[r] = true;
+            if (setName) sets[setName] = true;
+        });
+        fillFilterSelect(typeEl, Object.keys(types).sort(), 'All types');
+        fillFilterSelect(subEl, Object.keys(subs).sort(), 'All subtypes');
+        fillFilterSelect(rarEl, Object.keys(rars).sort(), 'All rarities');
+        fillFilterSelect(setEl, Object.keys(sets).sort(function (a, b) {
+            return a.localeCompare(b, undefined, { sensitivity: 'base' });
+        }), 'All sets');
+        if (setFilterDefaultPending) {
+            var want = DEFAULT_SET_NAME.toLowerCase();
+            var match = Array.from(setEl.options).filter(function (o) {
+                return o.value && o.value.toLowerCase() === want;
+            })[0];
+            if (match) {
+                setEl.value = match.value;
+                setFilterDefaultPending = false;
+            }
+        }
+    }
+
+    function matchesFilters(c) {
+        var q = (searchEl.value || '').trim().toLowerCase();
+        var ft = typeEl.value;
+        var fs = subEl.value;
+        var fr = rarEl.value;
+        var fset = setEl.value;
+        var title = titleOf(c.state).toLowerCase();
+        var type = fieldOf(c.state, 'Type');
+        var sub = fieldOf(c.state, 'Subtype');
+        var rar = fieldOf(c.state, 'Rarity');
+        var setName = setLabelOf(c.state);
+        if (ft && type !== ft) return false;
+        if (fs && sub !== fs) return false;
+        if (fr && rar !== fr) return false;
+        if (fset && setName.toLowerCase() !== fset.toLowerCase()) return false;
+        if (hideZeroEl.checked && qtyOf(c.id) === 0) return false;
+        if (q) {
+            var blob = (title + ' ' + type + ' ' + sub + ' ' + rar + ' ' + setName).toLowerCase();
+            if (blob.indexOf(q) < 0) return false;
+        }
+        return true;
+    }
+
+    function sortedCards() {
+        var list = cards.slice();
+        var mode = sortEl.value;
+        list.sort(function (a, b) {
+            if (mode === 'qty') return qtyOf(b.id) - qtyOf(a.id) || titleOf(a.state).localeCompare(titleOf(b.state));
+            if (mode === 'set') {
+                var ds = setLabelOf(a.state).localeCompare(setLabelOf(b.state), undefined, { sensitivity: 'base' });
+                return ds || titleOf(a.state).localeCompare(titleOf(b.state), undefined, { sensitivity: 'base' });
+            }
+            if (mode === 'type') {
+                var dt = fieldOf(a.state, 'Type').localeCompare(fieldOf(b.state, 'Type'));
+                return dt || titleOf(a.state).localeCompare(titleOf(b.state));
+            }
+            return titleOf(a.state).localeCompare(titleOf(b.state), undefined, { sensitivity: 'base' });
+        });
+        return list;
+    }
+
+    function loadThumb(img) {
+        var id = img.getAttribute('data-id');
+        var card = cards.filter(function (c) { return c.id === id; })[0];
+        if (!card || !card.state) return;
+        var opts = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.THUMB_RENDER_OPTS)
+            ? CardMakerPerf.THUMB_RENDER_OPTS
+            : { maxOutputSide: 400, outputMime: 'image/jpeg', outputQuality: 0.78 };
+        var fromCache = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.readThumbCache)
+            ? CardMakerPerf.readThumbCache(id, card.modifiedTime)
+            : Promise.resolve(null);
+        fromCache.then(function (hit) {
+            if (hit && hit.dataUrl) {
+                img.src = hit.dataUrl;
+                img.classList.add('is-loaded');
+                return null;
+            }
+            if (typeof window.renderCardMakerProjectToDataUrl !== 'function') return null;
+            return window.renderCardMakerProjectToDataUrl(card.state, opts).then(function (url) {
+                if (!url) return;
+                img.src = url;
+                img.classList.add('is-loaded');
+                if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.writeThumbCache) {
+                    CardMakerPerf.writeThumbCache(id, card.modifiedTime, url);
+                }
+            });
+        }).catch(function () { /* ignore */ });
+    }
+
+    function setupLazyThumbs() {
+        if (thumbIo) {
+            try { thumbIo.disconnect(); } catch (e) { /* ignore */ }
+            thumbIo = null;
+        }
+        var imgs = gridEl.querySelectorAll('img.db-thumb');
+        if (!imgs.length) return;
+        if (typeof IntersectionObserver === 'undefined') {
+            Array.prototype.forEach.call(imgs, loadThumb);
+            return;
+        }
+        thumbIo = new IntersectionObserver(function (entries) {
+            entries.forEach(function (en) {
+                if (!en.isIntersecting) return;
+                try { thumbIo.unobserve(en.target); } catch (e2) { /* ignore */ }
+                loadThumb(en.target);
+            });
+        }, { rootMargin: '160px 0px' });
+        Array.prototype.forEach.call(imgs, function (im) { thumbIo.observe(im); });
+    }
+
+    function renderGrid() {
+        var list = sortedCards();
+        var shown = 0;
+        gridEl.innerHTML = '';
+        list.forEach(function (c) {
+            if (!matchesFilters(c)) return;
+            shown++;
+            var n = qtyOf(c.id);
+            var tile = document.createElement('article');
+            tile.className = 'db-card';
+            tile.setAttribute('data-id', c.id);
+            tile.setAttribute('data-in-deck', n > 0 ? '1' : '0');
+            var type = fieldOf(c.state, 'Type');
+            var sub = fieldOf(c.state, 'Subtype');
+            var rar = fieldOf(c.state, 'Rarity');
+            var setName = setLabelOf(c.state);
+            var subLine = [setName, type, sub, rar].filter(Boolean).join(' · ');
+            tile.innerHTML =
+                '<div class="db-card-art" data-zoom-id="' + escapeAttr(c.id) + '" title="Click to enlarge">' +
+                    '<img class="db-thumb" alt="" data-id="' + escapeAttr(c.id) + '" decoding="async">' +
+                    '<span class="db-card-ph">…</span>' +
+                '</div>' +
+                '<div class="db-card-meta">' +
+                    '<div class="db-card-title"></div>' +
+                    '<span class="db-card-sub"></span>' +
+                '</div>' +
+                '<div class="db-qty">' +
+                    '<button type="button" class="db-qty-btn" data-d="-1" aria-label="Decrease">−</button>' +
+                    '<input type="number" min="0" max="99" value="' + n + '" data-qty inputmode="numeric" aria-label="Copies">' +
+                    '<button type="button" class="db-qty-btn" data-d="1" aria-label="Increase">+</button>' +
+                '</div>';
+            tile.querySelector('.db-card-title').textContent = titleOf(c.state);
+            tile.querySelector('.db-card-sub').textContent = subLine || '—';
+            gridEl.appendChild(tile);
+        });
+        emptyEl.hidden = shown > 0 || cards.length === 0;
+        if (cards.length === 0) {
+            emptyEl.hidden = false;
+            emptyEl.textContent = 'No cards in the local library yet. Sign in and click Refresh library (or open Saved projects once) to cache cards.';
+        } else if (!shown) {
+            emptyEl.textContent = 'No cards match these filters.';
+        }
+        setupLazyThumbs();
+        updateSummary();
+    }
+
+    function applyFilters() {
+        renderGrid();
+    }
+
+    function loadLibrary() {
+        if (typeof CardMakerPerf === 'undefined' || !CardMakerPerf.readAllSaveCache) {
+            setStatus('Card cache unavailable.', true);
+            return Promise.resolve();
+        }
+        return CardMakerPerf.readAllSaveCache().then(function (rows) {
+            cards = (rows || []).filter(function (r) {
+                return r && r.id && r.state && r.state.fields;
+            });
+            rebuildFilterOptions();
+            renderGrid();
+            setStatus('Library: ' + cards.length + ' cached card(s). Sign in to save/load decks and refresh from Drive.');
+        }).catch(function () {
+            cards = [];
+            renderGrid();
+            setStatus('Could not read card cache.', true);
+        });
+    }
+
+    function hydrateFromDrive() {
+        if (!window.CPDrive || !CPDrive.isSignedIn()) {
+            setStatus('Connect Google first.', true);
+            return Promise.resolve();
+        }
+        setStatus('Refreshing cards from Drive…');
+        return CPDrive.ensureDriveTokenBeforeDriveOp().then(function (ok) {
+            if (!ok) throw new Error('Not signed in.');
+            var token = CPDrive.getAccessToken();
+            var u = new URL('https://www.googleapis.com/drive/v3/files');
+            u.searchParams.set('spaces', 'appDataFolder');
+            u.searchParams.set('fields', 'files(id,name,modifiedTime,size)');
+            u.searchParams.set('pageSize', '100');
+            return fetch(u.toString(), { headers: { Authorization: 'Bearer ' + token } }).then(function (res) {
+                return res.text().then(function (text) {
+                    if (!res.ok) throw new Error(text || ('HTTP ' + res.status));
+                    return JSON.parse(text).files || [];
+                });
+            });
+        }).then(function (files) {
+            var ids = files.filter(function (f) {
+                return f.name && String(f.name).toLowerCase().endsWith('.cardmaker.json');
+            }).map(function (f) { return f.id; });
+            if (!ids.length) {
+                setStatus('No Card Maker saves on Drive.');
+                return loadLibrary();
+            }
+            var done = 0;
+            function mapLimit(items, limit, fn) {
+                return new Promise(function (resolve) {
+                    var i = 0, active = 0;
+                    function drain() {
+                        if (i >= items.length && active === 0) { resolve(); return; }
+                        while (active < limit && i < items.length) {
+                            active++;
+                            fn(items[i++]).then(function () { active--; drain(); }, function () { active--; drain(); });
+                        }
+                    }
+                    drain();
+                });
+            }
+            return mapLimit(ids, 6, function (id) {
+                return CPDrive.fetchDriveFileMetadata(id).catch(function () {
+                    return { modifiedTime: null, size: null };
+                }).then(function (meta) {
+                    return CardMakerPerf.readSaveCache(id).then(function (cached) {
+                        var unchanged = cached && cached.state && meta && meta.modifiedTime &&
+                            CardMakerPerf.driveFileMetaUnchanged(
+                                { modifiedTime: cached.modifiedTime, size: cached.size },
+                                meta
+                            );
+                        if (unchanged) {
+                            done++;
+                            setStatus('Cached ' + done + '/' + ids.length + '…');
+                            return;
+                        }
+                        return CPDrive.fetchDriveFileMedia(id).then(function (text) {
+                            var state = JSON.parse(text);
+                            if (!state || !state.fields) return;
+                            return CardMakerPerf.writeSaveCache(id, meta, state).then(function () {
+                                done++;
+                                setStatus('Cached ' + done + '/' + ids.length + '…');
+                            });
+                        });
+                    });
+                });
+            }).then(function () {
+                return loadLibrary().then(function () {
+                    setStatus('Library refreshed: ' + cards.length + ' card(s).');
+                    refreshDeckList();
+                });
+            });
+        }).catch(function (err) {
+            setStatus((err && err.message) ? err.message : 'Drive refresh failed.', true);
+        });
+    }
+
+    function sanitizeDeckName(base) {
+        var s = String(base || '').trim();
+        var ext = '.cardmaker-deck.json';
+        if (s.toLowerCase().endsWith(ext)) s = s.slice(0, -ext.length);
+        s = s.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
+        if (s.length > 80) s = s.slice(0, 80);
+        return s;
+    }
+
+    function buildDeckJson() {
+        var name = sanitizeDeckName(nameEl.value) || 'Deck';
+        return JSON.stringify({
+            version: 1,
+            kind: 'cardmaker-deck',
+            name: name,
+            updatedAt: new Date().toISOString(),
+            entries: collectEntries()
+        });
+    }
+
+    function applyDeckDoc(doc) {
+        if (!doc || doc.kind !== 'cardmaker-deck' || !Array.isArray(doc.entries)) {
+            throw new Error('Not a valid deck file.');
+        }
+        qtyById = Object.create(null);
+        doc.entries.forEach(function (ent) {
+            var id = String(ent && ent.id || '').trim();
+            var n = parseInt(ent && ent.qty, 10) || 0;
+            if (id && n > 0) qtyById[id] = Math.min(99, n);
+        });
+        if (doc.name) nameEl.value = sanitizeDeckName(doc.name);
+        try { localStorage.setItem(DECK_NAME_STORAGE_KEY, nameEl.value); } catch (e) { /* ignore */ }
+        renderGrid();
+    }
+
+    function saveDeck() {
+        if (!window.CPDrive || !CPDrive.isSignedIn()) {
+            setStatus('Connect Google to save this deck.', true);
+            return;
+        }
+        var base = sanitizeDeckName(nameEl.value);
+        if (!base) {
+            setStatus('Enter a deck name.', true);
+            return;
+        }
+        if (!collectEntries().length) {
+            setStatus('Add at least one card (quantity > 0).', true);
+            return;
+        }
+        var fileName = base + '.cardmaker-deck.json';
+        setStatus('Saving “' + base + '”…');
+        CPDrive.ensureDriveTokenBeforeDriveOp().then(function (ok) {
+            if (!ok) throw new Error('Not signed in.');
+            return CPDrive.saveDeckToDrive(fileName, buildDeckJson());
+        }).then(function () {
+            try { localStorage.setItem(DECK_NAME_STORAGE_KEY, base); } catch (e) { /* ignore */ }
+            setStatus('Saved “' + base + '” to Drive.');
+            refreshDeckList();
+        }).catch(function (err) {
+            setStatus((err && err.message) ? err.message : 'Save failed.', true);
+        });
+    }
+
+    function printDeck() {
+        var ids = [];
+        var skipped = 0;
+        collectEntries().forEach(function (ent) {
+            if (!isDriveId(ent.id)) {
+                skipped += ent.qty;
+                return;
+            }
+            var k;
+            for (k = 0; k < ent.qty; k++) ids.push(ent.id);
+        });
+        if (!ids.length) {
+            setStatus(skipped ? 'This deck only has local cards. Save those cards to Drive first.' : 'Set some quantities above 0 first.', true);
+            return;
+        }
+        try {
+            localStorage.setItem(PRINT_IMPORT_STORAGE_KEY, JSON.stringify({
+                v: 1,
+                source: 'deck',
+                deckName: sanitizeDeckName(nameEl.value) || 'Deck',
+                fileIds: ids
+            }));
+        } catch (e) {
+            setStatus('Could not queue print (storage blocked?).', true);
+            return;
+        }
+        window.open('card-grid.html', '_blank', 'noopener,noreferrer');
+        setStatus('Opened print with ' + ids.length + ' card(s).' + (skipped ? ' Skipped ' + skipped + ' local-only.' : ''));
+    }
+
+    function refreshDeckList() {
+        if (!window.CPDrive || !CPDrive.isSignedIn()) {
+            deckListEl.innerHTML = '<div class="db-empty" style="padding:12px;">Sign in to list decks.</div>';
+            return;
+        }
+        deckListEl.innerHTML = '<div class="db-empty" style="padding:12px;">Loading…</div>';
+        CPDrive.ensureDriveTokenBeforeDriveOp().then(function (ok) {
+            if (!ok) throw new Error('Not signed in.');
+            return CPDrive.listDeckFiles();
+        }).then(function (files) {
+            if (!files.length) {
+                deckListEl.innerHTML = '<div class="db-empty" style="padding:12px;">No saved decks yet.</div>';
+                return;
+            }
+            deckListEl.innerHTML = files.map(function (f) {
+                var label = String(f.name || '').replace(/\.cardmaker-deck\.json$/i, '');
+                return '<div class="db-deck-item"><span>' + escapeHtml(label) + '</span>' +
+                    '<button type="button" class="db-btn" data-load="' + escapeAttr(f.id) + '">Load</button></div>';
+            }).join('');
+        }).catch(function (err) {
+            deckListEl.innerHTML = '<div class="db-empty" style="padding:12px;">Could not list decks.</div>';
+            setStatus((err && err.message) ? err.message : 'List failed.', true);
+        });
+    }
+
+    function loadDeckById(fileId) {
+        setStatus('Loading deck…');
+        CPDrive.ensureDriveTokenBeforeDriveOp().then(function (ok) {
+            if (!ok) throw new Error('Not signed in.');
+            return CPDrive.fetchDriveFileMedia(fileId);
+        }).then(function (text) {
+            applyDeckDoc(JSON.parse(text));
+            setStatus('Loaded deck.');
+        }).catch(function (err) {
+            setStatus((err && err.message) ? err.message : 'Could not load deck.', true);
+        });
+    }
+
+    var zoomEl = document.getElementById('dbZoom');
+    var zoomImg = document.getElementById('dbZoomImg');
+    var ZOOM_RENDER_OPTS = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.PRINT_RENDER_OPTS)
+        ? CardMakerPerf.PRINT_RENDER_OPTS
+        : { maxOutputSide: 1400, outputMime: 'image/jpeg', outputQuality: 0.9 };
+
+    function closeZoom() {
+        if (!zoomEl) return;
+        zoomEl.classList.remove('is-open');
+        zoomEl.hidden = true;
+        zoomEl.setAttribute('aria-hidden', 'true');
+        if (zoomImg) {
+            zoomImg.removeAttribute('src');
+            zoomImg.alt = '';
+        }
+    }
+
+    function openZoom(cardId) {
+        var card = cards.filter(function (c) { return c.id === cardId; })[0];
+        if (!card || !card.state || !zoomEl || !zoomImg) return;
+        zoomImg.alt = titleOf(card.state);
+        zoomImg.removeAttribute('src');
+        zoomEl.hidden = false;
+        zoomEl.classList.add('is-open');
+        zoomEl.setAttribute('aria-hidden', 'false');
+        var thumb = gridEl.querySelector('img.db-thumb[data-id="' + cardId.replace(/"/g, '') + '"]');
+        if (thumb && thumb.src) zoomImg.src = thumb.src;
+        if (typeof window.renderCardMakerProjectToDataUrl !== 'function') return;
+        window.renderCardMakerProjectToDataUrl(card.state, ZOOM_RENDER_OPTS).then(function (url) {
+            if (!url || !zoomEl.classList.contains('is-open')) return;
+            zoomImg.src = url;
+        }).catch(function () { /* keep thumb */ });
+    }
+
+    gridEl.addEventListener('click', function (e) {
+        var art = e.target.closest && e.target.closest('.db-card-art');
+        if (art) {
+            e.preventDefault();
+            openZoom(art.getAttribute('data-zoom-id'));
+            return;
+        }
+        var btn = e.target.closest && e.target.closest('.db-qty-btn');
+        if (!btn) return;
+        var tile = btn.closest('.db-card');
+        if (!tile) return;
+        var id = tile.getAttribute('data-id');
+        var d = parseInt(btn.getAttribute('data-d'), 10) || 0;
+        setQty(id, qtyOf(id) + d);
+    });
+    if (zoomEl) {
+        zoomEl.addEventListener('click', closeZoom);
+    }
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && zoomEl && zoomEl.classList.contains('is-open')) {
+            closeZoom();
+            e.preventDefault();
+        }
+    });
+    gridEl.addEventListener('input', function (e) {
+        if (!e.target.matches || !e.target.matches('input[data-qty]')) return;
+        var tile = e.target.closest('.db-card');
+        if (!tile) return;
+        setQty(tile.getAttribute('data-id'), e.target.value);
+    });
+
+    [searchEl, typeEl, subEl, rarEl, setEl, sortEl, hideZeroEl].forEach(function (el) {
+        el.addEventListener('input', applyFilters);
+        el.addEventListener('change', applyFilters);
+    });
+
+    document.getElementById('dbSaveBtn').addEventListener('click', saveDeck);
+    document.getElementById('dbPrintBtn').addEventListener('click', printDeck);
+    document.getElementById('dbRefreshLibBtn').addEventListener('click', function () {
+        if (window.CPDrive && CPDrive.isSignedIn()) hydrateFromDrive();
+        else loadLibrary();
+    });
+    document.getElementById('dbAllOneBtn').addEventListener('click', function () {
+        sortedCards().forEach(function (c) {
+            if (matchesFilters(c)) qtyById[c.id] = 1;
+        });
+        renderGrid();
+    });
+    document.getElementById('dbClearBtn').addEventListener('click', function () {
+        qtyById = Object.create(null);
+        renderGrid();
+    });
+    document.getElementById('dbSignInBtn').addEventListener('click', function () {
+        if (!window.CPDrive) {
+            setStatus('Drive helper not loaded.', true);
+            return;
+        }
+        setStatus('Opening Google sign-in…');
+        CPDrive.signIn().then(function (ok) {
+            if (!ok) {
+                setStatus('Sign-in failed.', true);
+                return;
+            }
+            document.getElementById('dbSignInBtn').textContent = 'Signed in';
+            setStatus('Signed in.');
+            refreshDeckList();
+            hydrateFromDrive();
+        });
+    });
+    deckListEl.addEventListener('click', function (e) {
+        var btn = e.target.closest && e.target.closest('[data-load]');
+        if (!btn) return;
+        loadDeckById(btn.getAttribute('data-load'));
+    });
+
+    try {
+        var savedName = localStorage.getItem(DECK_NAME_STORAGE_KEY);
+        if (savedName) nameEl.value = savedName;
+    } catch (e) { /* ignore */ }
+
+    loadLibrary().then(function () {
+        if (window.CPDrive) {
+            CPDrive.tryRestoreSession().then(function (ok) {
+                if (ok) {
+                    document.getElementById('dbSignInBtn').textContent = 'Signed in';
+                    refreshDeckList();
+                }
+            });
+        }
+    });
+})();
+    </script>
+</body>
+</html>
