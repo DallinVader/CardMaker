@@ -267,9 +267,36 @@
         return file;
     }
 
+    function sourceLooksAlphaCapable(src, hintMime) {
+        var mime = String(hintMime || '').toLowerCase();
+        if (mime.indexOf('png') !== -1 || mime.indexOf('webp') !== -1 || mime.indexOf('gif') !== -1) return true;
+        if (typeof src === 'string') {
+            var head = src.slice(0, 32).toLowerCase();
+            if (head.indexOf('image/png') !== -1 || head.indexOf('image/webp') !== -1 || head.indexOf('image/gif') !== -1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** JPEG has no alpha — encoding a PNG onto JPEG fills transparent pixels with black. */
+    function canvasHasTransparency(cx, w, h) {
+        try {
+            var data = cx.getImageData(0, 0, w, h).data;
+            var i;
+            for (i = 3; i < data.length; i += 4) {
+                if (data[i] < 255) return true;
+            }
+            return false;
+        } catch (e) {
+            return null;
+        }
+    }
+
     /**
      * Downscale / recompress a data URL or File for embedding in project JSON.
      * Skips non-data relative paths (e.g. CardFrame.png).
+     * Opaque images become JPEG; images with transparency stay PNG.
      */
     function compressImageToDataUrl(src, maxSide, quality) {
         maxSide = maxSide || ART_EMBED_MAX_SIDE;
@@ -283,6 +310,8 @@
                 resolve(src);
                 return;
             }
+
+            var hintMime = (typeof Blob !== 'undefined' && src instanceof Blob) ? (src.type || '') : '';
 
             function fromObjectUrlOrData(url) {
                 var img = new Image();
@@ -302,9 +331,19 @@
                         var c = document.createElement('canvas');
                         c.width = outW;
                         c.height = outH;
-                        var cx = c.getContext('2d');
+                        var cx = c.getContext('2d', { alpha: true });
+                        if (!cx) {
+                            resolve(typeof src === 'string' ? src : url);
+                            return;
+                        }
+                        cx.clearRect(0, 0, outW, outH);
                         cx.drawImage(img, 0, 0, outW, outH);
-                        var out = c.toDataURL('image/jpeg', quality);
+                        var hasAlpha = canvasHasTransparency(cx, outW, outH);
+                        var keepAlpha = hasAlpha === true ||
+                            (hasAlpha == null && sourceLooksAlphaCapable(url, hintMime));
+                        var out = keepAlpha
+                            ? c.toDataURL('image/png')
+                            : c.toDataURL('image/jpeg', quality);
                         resolve(out);
                     } catch (e) {
                         console.warn('CardMakerPerf compress', e);
