@@ -131,25 +131,6 @@
     text-shadow: 0 1px 10px rgba(0, 0, 0, 0.75);
 }
 
-.top-bar-btn {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #2d5a27 0%, #1e3d1a 100%);
-    color: white;
-    padding: 10px 18px;
-    border-radius: 8px;
-    text-decoration: none;
-    font-weight: 600;
-    font-size: 0.95rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.top-bar-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
 h1{
     font-family: Medieval;
     text-align: center;
@@ -1426,41 +1407,14 @@ body.cm-page .top-drive-status-wrap {
 
 .quick-buttons button {
     flex: 1;
-    padding: 8px 12px;
-    font-size: 12px;
-    cursor: pointer;
-    border: 2px solid rgba(102, 126, 234, 0.3);
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.8);
-    color: #667eea;
-    font-weight: 600;
-    transition: all 0.2s ease;
-    text-transform: none;
-    letter-spacing: 0;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.quick-buttons button:hover {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-color: transparent;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+    /* appearance → cardmaker-buttons.css */
 }
 
 canvas{
     background-color: white;
 }
 
-/* Google Drive saves modal */
-.top-drive-btn-primary {
-    background: linear-gradient(135deg, #5b4ba2 0%, #667eea 100%);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.top-drive-btn-primary:hover:not(:disabled) {
-    box-shadow: 0 4px 14px rgba(102, 126, 234, 0.45);
-}
+/* Google Drive saves modal — button appearance in cardmaker-buttons.css */
 
 .drive-modal {
     display: none;
@@ -1810,71 +1764,7 @@ canvas{
     gap: 8px;
 }
 
-.drive-modal-btn {
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 10px 16px;
-    border-radius: 8px;
-    border: none;
-    cursor: pointer;
-    transition: transform 0.12s ease, box-shadow 0.12s ease;
-    text-transform: none;
-    letter-spacing: 0;
-}
-
-.drive-modal-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.drive-modal-btn-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: #fff;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.35);
-}
-
-.drive-modal-btn-primary:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.45);
-}
-
-.drive-modal-btn-ghost {
-    background: rgba(255, 255, 255, 0.9);
-    color: #667eea;
-    border: 2px solid rgba(102, 126, 234, 0.35);
-    padding: 8px 12px;
-    font-size: 12px;
-}
-
-.drive-modal-btn-ghost:hover:not(:disabled) {
-    background: rgba(102, 126, 234, 0.08);
-}
-
-.drive-modal-btn-small {
-    padding: 7px 12px;
-    font-size: 12px;
-}
-
-.drive-modal-btn-load {
-    background: linear-gradient(135deg, #2d5a27 0%, #1e3d1a 100%);
-    color: #fff;
-    box-shadow: 0 2px 6px rgba(30, 61, 26, 0.25);
-}
-
-.drive-modal-btn-load:hover:not(:disabled) {
-    transform: translateY(-1px);
-}
-
-.drive-modal-btn-danger {
-    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-    color: #fff;
-    box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
-}
-
-.drive-modal-btn-danger:hover:not(:disabled) {
-    transform: translateY(-1px);
-}
+/* .drive-modal-btn* appearance → cardmaker-buttons.css */
 
 .drive-modal-empty,
 .drive-modal-loading {

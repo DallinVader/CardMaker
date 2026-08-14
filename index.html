@@ -5,18 +5,12 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
         <title>Card Maker</title>
         <link rel="stylesheet" href="style.css">
+        <link rel="stylesheet" href="cardmaker-nav.css">
+        <link rel="stylesheet" href="cardmaker-buttons.css">
+        <script src="cardmaker-nav.js" defer></script>
     </head>
     <body class="cm-page">
-        <div class="top-bar">
-            <h1>Card Maker</h1>
-        </div>
         <div class="top-bar-under">
-            <div class="top-bar-nav-links">
-                <a href="card-grid.html" class="top-bar-btn">Print the cards</a>
-                <a href="saved-projects.html" class="top-bar-btn">View all saved cards</a>
-                <a href="deck-builder.html" class="top-bar-btn">Deck builder</a>
-                <a href="card-player.html" class="top-bar-btn">Play cards</a>
-            </div>
             <div class="top-drive-controls">
                 <button type="button" id="googleSignInBtn" class="top-bar-btn top-drive-btn" onclick="handleGoogleDriveAuthClick()">Sign in with Google</button>
                 <button type="button" id="driveQuickSaveBtn" class="top-bar-btn top-drive-btn top-drive-btn-primary" onclick="quickSaveCurrentCard()" disabled title="Save this card to Google Drive (Ctrl+S)">Save</button>
@@ -438,7 +432,7 @@
                         <div class="cm-export-actions" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
                             <button onclick="downloadCard()" title="Ctrl+D">Download Card</button>
                             <button onclick="openFullscreen()" title="Ctrl+F">Fullscreen Card</button>
-                            <button onclick="resetEverything()" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: white;" title="Ctrl+R">Reset All</button>
+                            <button onclick="resetEverything()" title="Ctrl+R">Reset All</button>
                         </div>
                         <div class="cm-export-shortcuts" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(200, 200, 220, 0.3); font-size: 11px; color: #718096;">
                             <strong>Keyboard Shortcuts:</strong><br>

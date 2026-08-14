@@ -5,33 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Card Player – Card Maker</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="cardmaker-nav.css">
+    <link rel="stylesheet" href="cardmaker-buttons.css">
+    <script src="cardmaker-nav.js" defer></script>
     <style>
         html { height: 100%; }
-        body { margin: 0; background: #0b1220; color: #e2e8f0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; min-height: 100dvh; height: 100%; }
+        body {
+            margin: 0;
+            background: #0b1220;
+            color: #e2e8f0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+            min-height: 100dvh;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
         .cp-wrap {
             max-width: min(1600px, calc(100vw - 24px)); margin: 0 auto; padding: 12px 16px 16px;
-            min-height: 100dvh; max-height: 100dvh; box-sizing: border-box;
+            flex: 1 1 auto;
+            min-height: 0;
+            max-height: none;
+            box-sizing: border-box;
             display: flex; flex-direction: column;
+            width: 100%;
         }
-        .cp-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 12px; flex-shrink: 0; }
-        .cp-top h1 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; }
-        .cp-nav { display: flex; flex-wrap: wrap; gap: 10px; }
-        .cp-btn {
-            padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14);
-            background: rgba(255,255,255,0.07); color: #e2e8f0; cursor: pointer; font-weight: 700;
-            font-size: 13px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center;
-        }
-        .cp-btn:hover { filter: brightness(1.08); }
-        .cp-btn:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
-        .cp-btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-color: rgba(255,255,255,0.2);
-        }
+        /* cp-btn variants → cardmaker-buttons.css */
         .cp-main {
             display: grid; grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); gap: 16px;
             align-items: stretch;
             flex: 1 1 auto; min-height: 0;
-            max-height: calc(100dvh - 96px);
         }
         .cp-main.cp-sidebar-collapsed {
             grid-template-columns: 44px minmax(0, 1fr);
@@ -723,28 +726,7 @@
             align-items: center;
             gap: 4px;
         }
-        #cpDeckModal .cp-deck-qty-btn {
-            width: 34px;
-            height: 36px;
-            padding: 0;
-            border-radius: 8px;
-            border: 1px solid rgba(148, 163, 184, 0.28);
-            background: rgba(15, 23, 42, 0.75);
-            color: #e2e8f0;
-            font-size: 18px;
-            font-weight: 700;
-            line-height: 1;
-            cursor: pointer;
-        }
-        #cpDeckModal .cp-deck-qty-btn:hover {
-            background: rgba(99, 102, 241, 0.25);
-            border-color: rgba(129, 140, 248, 0.45);
-            color: #fff;
-        }
-        #cpDeckModal .cp-deck-qty-btn:focus-visible {
-            outline: 2px solid rgba(129, 140, 248, 0.6);
-            outline-offset: 2px;
-        }
+        /* cp-deck-qty-btn → cardmaker-buttons.css */
         #cpDeckModal .cp-deck-lib-qty input[type="number"] {
             width: 44px;
             padding: 8px 4px;
@@ -868,16 +850,6 @@
 </head>
 <body>
     <div class="cp-wrap">
-        <header class="cp-top">
-            <h1>Card player</h1>
-            <nav class="cp-nav" aria-label="App sections">
-                <a class="cp-btn" href="index.html">Card Maker</a>
-                <a class="cp-btn" href="saved-projects.html">Saved projects</a>
-                <a class="cp-btn" href="deck-builder.html">Deck builder</a>
-                <a class="cp-btn" href="card-grid.html">Print</a>
-            </nav>
-        </header>
-
         <div class="cp-main" id="cpMain">
             <div class="cp-sidebar-shell">
                 <button type="button" class="cp-sidebar-toggle" id="cpSidebarToggle"

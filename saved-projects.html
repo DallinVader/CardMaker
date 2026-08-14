@@ -5,36 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Saved Projects Manager – Card Maker</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="cardmaker-nav.css">
+    <link rel="stylesheet" href="cardmaker-buttons.css">
+    <script src="cardmaker-nav.js" defer></script>
     <style>
         body { background: #0b1220; color: #e2e8f0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
         .spm-wrap { max-width: min(1960px, calc(100vw - 24px)); margin: 0 auto; padding: 22px max(18px, env(safe-area-inset-right)) 40px max(18px, env(safe-area-inset-left)); }
         .spm-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 16px; margin-bottom: 22px; }
 
         .spm-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: flex-end; }
-        .spm-btn { padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #e2e8f0; cursor: pointer; font-weight: 700; }
-        a.spm-btn {
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            box-sizing: border-box;
-        }
-        .spm-btn:disabled { opacity: .5; cursor: not-allowed; }
-        .spm-nav-print {
-            background: linear-gradient(135deg, rgba(22,163,74,0.35), rgba(21,128,61,0.4));
-            border-color: rgba(34,197,94,0.4);
-            color: #bbf7d0;
-        }
-        .spm-nav-print:hover { filter: brightness(1.08); }
-        .spm-new-card {
-            background: linear-gradient(135deg, rgba(34,197,94,0.28), rgba(21,128,61,0.35));
-            border-color: rgba(34,197,94,0.45);
-            color: #bbf7d0;
-        }
-        .spm-new-card:hover { filter: brightness(1.08); }
-        .spm-new-card:disabled { opacity: .5; filter: none; cursor: not-allowed; }
-        .spm-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-color: rgba(255,255,255,0.18); }
-        .spm-ghost { background: rgba(255,255,255,0.06); }
 
         .spm-row { display: grid; grid-template-columns: minmax(280px, 320px) minmax(0, 1fr); gap: 24px; align-items: start; }
         .spm-row > .spm-panel:first-child,
@@ -261,15 +240,7 @@
         .spm-message.is-error { color: #fca5a5; font-weight: 800; }
         .spm-progress { color: #93c5fd; font-weight: 900; }
 
-        .spm-small-btn {
-            padding: 8px 10px; border-radius: 10px;
-            border: 1px solid rgba(255,255,255,0.16);
-            background: rgba(255,255,255,0.06);
-            color: #e2e8f0;
-            cursor: pointer;
-            font-weight: 800;
-        }
-        .spm-small-btn:disabled { opacity: .5; cursor: not-allowed; }
+        /* spm-small-btn, spm-link-btn, variants → cardmaker-buttons.css */
 
         .spm-filter-row { display: flex; flex-wrap: wrap; gap: 16px 18px; align-items: flex-end; margin-bottom: 18px; }
         .spm-filter-row label { font-weight: 800; color: #e2e8f0; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; display: flex; flex-direction: column; gap: 8px; }
@@ -366,25 +337,7 @@
         }
         .spm-bulk-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
         .spm-bulk-inline .spm-select { min-width: 148px; margin: 0; }
-        .spm-bulk-apply-btn {
-            padding: 10px 16px !important;
-            border-radius: 10px !important;
-            background: linear-gradient(135deg, rgba(99,102,241,0.85), rgba(79,70,229,0.9)) !important;
-            border: 1px solid rgba(165,180,252,0.45) !important;
-            color: #fff !important;
-            font-weight: 800 !important;
-        }
-        .spm-bulk-apply-btn:disabled {
-            opacity: .45 !important;
-            cursor: not-allowed !important;
-            filter: none;
-        }
-        .spm-bulk-clear-btn {
-            padding: 10px 14px !important;
-            border-radius: 10px !important;
-            border: 1px solid rgba(148,163,184,0.35) !important;
-            background: rgba(255,255,255,0.05) !important;
-        }
+        /* spm-bulk-apply-btn, spm-bulk-clear-btn → cardmaker-buttons.css */
         .spm-bulk-meta {
             grid-column: 1 / -1;
             margin: 0;
@@ -442,20 +395,6 @@
             margin-bottom: 0;
         }
 
-        .spm-link-btn {
-            display: inline-flex; align-items: center; justify-content: center;
-            padding: 8px 10px; border-radius: 10px;
-            border: 1px solid rgba(102,126,234,0.45);
-            background: rgba(102,126,234,0.18);
-            color: #c7d2fe; font-weight: 800; font-size: 12px;
-            text-decoration: none; cursor: pointer;
-        }
-        .spm-link-btn:hover { filter: brightness(1.12); }
-        .spm-danger {
-            border-color: rgba(248,113,113,0.5);
-            background: rgba(239,68,68,0.12);
-            color: #fecaca;
-        }
         .spm-actions {
             display: flex;
             flex-direction: row;
@@ -700,21 +639,7 @@
             color: #fca5a5;
             font-weight: 700;
         }
-        .spm-btn-edit {
-            border: 1px solid rgba(251,191,36,0.45) !important;
-            background: rgba(245,158,11,0.14) !important;
-            color: #fde68a !important;
-        }
-        .spm-bulk-print-btn {
-            border: 1px solid rgba(34,197,94,0.45) !important;
-            background: linear-gradient(135deg, rgba(22,163,74,0.35), rgba(21,128,61,0.4)) !important;
-            color: #bbf7d0 !important;
-            font-weight: 800 !important;
-        }
-        .spm-bulk-print-btn:disabled {
-            opacity: 0.45 !important;
-            cursor: not-allowed !important;
-        }
+        /* spm-btn-edit, spm-bulk-print-btn → cardmaker-buttons.css */
 
         .spm-search-wrap { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1 1 340px; }
         .spm-search-wrap .spm-input { width: 100%; min-width: 0; max-width: 100%; }
@@ -824,10 +749,6 @@
     <div class="spm-wrap">
         <div class="spm-top">
             <div class="spm-controls">
-                <a href="index.html" class="spm-btn spm-ghost">Card Maker</a>
-                <a href="card-player.html" class="spm-btn spm-ghost">Play cards</a>
-                <a href="deck-builder.html" class="spm-btn spm-ghost">Deck builder</a>
-                <a href="card-grid.html" class="spm-btn spm-nav-print">Print</a>
                 <button type="button" class="spm-btn spm-primary" id="spmSignInBtn">Connect Google</button>
                 <button type="button" class="spm-btn spm-ghost" id="spmSignOutBtn" disabled>Sign out</button>
                 <button type="button" class="spm-btn spm-ghost" id="spmRefreshBtn" disabled>Refresh</button>
@@ -2628,6 +2549,12 @@
         }
 
         var saveCacheMapPromise = null;
+        function reloadSaveCacheMap() {
+            spmLocalCacheReady = false;
+            saveCacheMapPromise = null;
+            saveCacheById = new Map();
+            return ensureSaveCacheMap();
+        }
         function ensureSaveCacheMap() {
             if (spmLocalCacheReady) return Promise.resolve(saveCacheById);
             if (saveCacheMapPromise) return saveCacheMapPromise;
@@ -2937,16 +2864,81 @@
             img.classList.add('is-loaded');
         }
 
+        function projectStateForRender(project) {
+            if (!project || !project.file) return null;
+            if (project.state && typeof project.state === 'object') return project.state;
+            var cached = saveCacheById.get(project.file.id);
+            if (cached && cached.state && driveFileMetaUnchanged(
+                { modifiedTime: cached.modifiedTime, size: cached.size },
+                project.file
+            )) {
+                return cached.state;
+            }
+            return null;
+        }
+
+        var spmHydrateGen = 0;
+        async function hydrateProjectsInBackground(fileIds) {
+            if (!fileIds || !fileIds.length || !driveAccessToken) return;
+            var gen = ++spmHydrateGen;
+            var unique = [];
+            var seen = Object.create(null);
+            fileIds.forEach(function (id) {
+                if (!id || seen[id]) return;
+                seen[id] = true;
+                unique.push(id);
+            });
+            if (!unique.length) return;
+
+            var done = 0;
+            spmStatus.textContent = 'Updating cards from Drive… 0/' + unique.length;
+
+            await mapLimit(unique, SPM_PROJECT_FETCH_CONCURRENCY, async function (fileId) {
+                if (gen !== spmHydrateGen) return;
+                try {
+                    var project = projects.find(function (p) { return p.file && p.file.id === fileId; });
+                    if (!project || !project.file) return;
+                    var state = await fetchDriveProjectJson(fileId);
+                    if (gen !== spmHydrateGen) return;
+                    replaceProjectInList(project.file, state);
+                } catch (e) {
+                    console.warn('SPM hydrate', fileId, e);
+                } finally {
+                    done++;
+                    if (gen === spmHydrateGen) {
+                        spmStatus.textContent = 'Updating cards from Drive… ' + done + '/' + unique.length;
+                        scheduleProjectsProgressRender();
+                    }
+                }
+            });
+
+            if (gen === spmHydrateGen) {
+                recalculateSummaryFromProjects();
+                spmStatus.textContent = 'Ready';
+            }
+        }
+
         function loadSpmThumb(img) {
             var id = img.getAttribute('data-id');
             if (!id) return;
             var project = projects.find(function (p) { return p.file && p.file.id === id; });
             if (!project || !project.file) return;
             var mt = project.file.modifiedTime;
-            var state = (project.state && typeof project.state === 'object')
-                ? project.state
-                : (saveCacheById.get(id) && saveCacheById.get(id).state);
-            var opts = editorPreviewOpts();
+
+            function renderFromState(state) {
+                if (!state || typeof window.renderCardMakerProjectToDataUrl !== 'function') return Promise.resolve();
+                var opts = editorPreviewOpts();
+                var variant = editorPreviewVariant();
+                return window.renderCardMakerProjectToDataUrl(stateForCardPreviewRender(state), opts).then(function (url) {
+                    if (!url) return;
+                    applySpmThumbUrl(img, id, url);
+                    if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.writeThumbCache) {
+                        CardMakerPerf.writeThumbCache(id, mt, url, variant);
+                    }
+                });
+            }
+
+            var state = projectStateForRender(project);
             var variant = editorPreviewVariant();
             var fromCache = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.readThumbCache)
                 ? CardMakerPerf.readThumbCache(id, mt, variant)
@@ -2956,13 +2948,10 @@
                     applySpmThumbUrl(img, id, hit.dataUrl);
                     return null;
                 }
-                if (!state || typeof window.renderCardMakerProjectToDataUrl !== 'function') return null;
-                return window.renderCardMakerProjectToDataUrl(stateForCardPreviewRender(state), opts).then(function (url) {
-                    if (!url) return;
-                    applySpmThumbUrl(img, id, url);
-                    if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.writeThumbCache) {
-                        CardMakerPerf.writeThumbCache(id, mt, url, variant);
-                    }
+                if (state) return renderFromState(state);
+                return ensureProjectHydrated(id).then(function (updated) {
+                    if (!updated || !updated.state) return null;
+                    return renderFromState(updated.state);
                 });
             }).catch(function () { /* ignore */ });
         }
@@ -3153,6 +3142,7 @@
                 spmSelectAll.indeterminate = false;
             }
 
+            spmRefreshBtn.disabled = true;
             try {
                 if (!await ensureSignedIn()) {
                     spmStatus.textContent = 'Not connected';
@@ -3164,35 +3154,44 @@
                     ? 'Refreshing from Drive…'
                     : 'Loading saved projects…';
 
-                await ensureSaveCacheMap();
+                await reloadSaveCacheMap();
 
                 const files = await listCardMakerProjects();
                 var previousById = new Map();
                 projects.forEach(function (p) {
-                    if (p && p.file && p.file.id && p.state && typeof p.state === 'object') {
+                    if (p && p.file && p.file.id) {
                         previousById.set(p.file.id, p);
                     }
                 });
 
+                var toHydrate = [];
                 projects = files.map(function (file) {
                     var prev = previousById.get(file.id);
-                    if (prev && driveFileMetaUnchanged(prev.file, file)) {
-                        prev.file = file;
-                        return prev;
+                    var metaChanged = !!(prev && prev.file && !driveFileMetaUnchanged(prev.file, file));
+                    var p = projectFromDriveFile(file);
+                    if (metaChanged || p._lite) {
+                        toHydrate.push(file.id);
                     }
-                    return projectFromDriveFile(file);
+                    return p;
                 });
                 spmTablePage = 0;
                 paintSummaryFromProjects(
-                    'Loaded ' + projects.length + ' project(s).',
-                    'Loaded ' + projects.length + ' saves.'
+                    toHydrate.length ? 'Refreshing from Drive…' : 'Loaded ' + projects.length + ' project(s).',
+                    toHydrate.length ? '' : 'Loaded ' + projects.length + ' saves.'
                 );
                 var keepIds = new Set(files.map(function (f) { return f.id; }));
-                spmPruneSaveCache(keepIds);
+                await spmPruneSaveCache(keepIds);
+                if (toHydrate.length) {
+                    await hydrateProjectsInBackground(toHydrate);
+                } else {
+                    spmStatus.textContent = 'Ready';
+                }
             } catch (e) {
                 console.error(e);
                 spmStatus.textContent = 'Load failed';
                 setMessage('Could not load saves: ' + (e && e.message ? e.message : String(e)), true);
+            } finally {
+                updateButtons();
             }
         }
 

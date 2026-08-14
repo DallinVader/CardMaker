@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Deck builder – Card Maker</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="cardmaker-nav.css">
+    <link rel="stylesheet" href="cardmaker-buttons.css">
+    <script src="cardmaker-nav.js" defer></script>
     <style>
         html, body { margin: 0; min-height: 100%; }
         body.db-page {
@@ -13,27 +16,8 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
         .db-wrap { max-width: 1280px; margin: 0 auto; padding: 16px 16px 40px; }
-        .db-top {
-            display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between;
-            gap: 12px; margin-bottom: 16px;
-        }
-        .db-top h1 { margin: 0 0 6px; font-size: 1.45rem; font-weight: 800; letter-spacing: -0.02em; }
-        .db-sub { margin: 0; color: #94a3b8; font-size: 0.92rem; line-height: 1.45; max-width: 44rem; }
-        .db-nav { display: flex; flex-wrap: wrap; gap: 8px; }
-        .db-btn {
-            font-family: inherit; font-size: 13px; font-weight: 700; padding: 9px 14px;
-            border-radius: 8px; border: 1px solid rgba(255,255,255,0.14);
-            background: rgba(30, 41, 59, 0.75); color: #e2e8f0; cursor: pointer;
-            text-decoration: none; display: inline-flex; align-items: center;
-        }
-        .db-btn:hover { background: rgba(51, 65, 85, 0.9); }
-        .db-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-        .db-btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-color: transparent; color: #fff;
-        }
-        .db-btn-primary:hover:not(:disabled) { filter: brightness(1.06); }
-        .db-btn-print { background: #16a34a; border-color: transparent; color: #fff; }
+        /* db-btn variants → cardmaker-buttons.css */
+        .db-status { margin: 0 0 12px; font-size: 13px; color: #94a3b8; }
         .db-status {
             margin: 0 0 14px; padding: 8px 12px; border-radius: 8px;
             background: rgba(0,0,0,0.22); color: #cbd5e1; font-size: 13px;
@@ -81,7 +65,6 @@
             padding: 8px 10px; border-bottom: 1px solid rgba(148,163,184,0.12); font-size: 13px;
         }
         .db-deck-item:last-child { border-bottom: 0; }
-        .db-deck-item button { font-size: 12px; padding: 5px 10px; }
         .db-main-toolbar {
             display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 12px;
         }
@@ -120,11 +103,7 @@
             display: flex; align-items: center; justify-content: center; gap: 6px;
             padding: 0 10px 10px;
         }
-        .db-qty-btn {
-            width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgba(129,140,248,0.35);
-            background: rgba(30,41,59,0.9); color: #e2e8f0; font-size: 18px; font-weight: 800; cursor: pointer;
-        }
-        .db-qty-btn:hover { background: rgba(79,70,229,0.35); }
+        /* db-qty-btn → cardmaker-buttons.css */
         .db-qty input {
             width: 48px; text-align: center; padding: 7px 4px; border-radius: 8px;
             border: 2px solid rgba(102,126,234,0.3); background: #0f172a; color: #f8fafc; font: inherit; font-weight: 800;
@@ -154,18 +133,6 @@
 </head>
 <body class="db-page">
     <div class="db-wrap">
-        <header class="db-top">
-            <div>
-                <h1>Deck builder</h1>
-                <p class="db-sub">Browse your library as a 4-wide grid, filter, and set copies. Save to Drive, then print from here or the print page.</p>
-            </div>
-            <nav class="db-nav" aria-label="App sections">
-                <a class="db-btn" href="index.html">Card Maker</a>
-                <a class="db-btn" href="saved-projects.html">Saved projects</a>
-                <a class="db-btn" href="card-player.html">Play</a>
-                <a class="db-btn" href="card-grid.html">Print</a>
-            </nav>
-        </header>
         <p class="db-status" id="dbStatus" role="status">Loading library…</p>
 
         <div class="db-layout">

@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Print cards – Card Maker</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="cardmaker-nav.css">
+    <link rel="stylesheet" href="cardmaker-buttons.css">
+    <script src="cardmaker-nav.js" defer></script>
     <style>
         .cg-page {
             min-height: 100vh;
@@ -18,27 +21,6 @@
             max-width: 980px;
             margin: 0 auto;
             padding: 20px 18px 0;
-        }
-        .cg-header {
-            text-align: center;
-            margin-bottom: 18px;
-        }
-        .cg-header h1 {
-            font-family: Medieval, serif;
-            font-size: clamp(1.6rem, 4vw, 2.1rem);
-            letter-spacing: 0.06em;
-            margin: 0 0 8px;
-            color: #f8fafc;
-            text-shadow: 0 2px 12px rgba(0,0,0,0.35);
-        }
-        .cg-sub {
-            margin: 0;
-            font-size: 0.95rem;
-            color: #94a3b8;
-            line-height: 1.45;
-            max-width: 42rem;
-            margin-left: auto;
-            margin-right: auto;
         }
         .cg-toolbar {
             display: flex;
@@ -60,30 +42,7 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
         .cg-toolbar input[type="file"] { display: none; }
-        .cg-btn {
-            padding: 10px 16px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.92rem;
-            font-family: inherit;
-            transition: transform 0.12s, box-shadow 0.12s;
-        }
-        .cg-btn:hover { transform: translateY(-1px); }
-        .cg-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
-	    .cg-btn-setup {
-            background: linear-gradient(135deg, #5b4ba2 0%, #667eea 100%);
-            color: #fff;
-            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.35);
-        }
-        .cg-btn-print { background: #16a34a; color: #fff; }
-        .cg-btn-pdf { background: #0284c7; color: #fff; }
-        .cg-btn-back {
-            background: #334155;
-            color: #fff;
-        }
-        .cg-btn-back::before { content: '← '; }
+        /* cg-btn variants → cardmaker-buttons.css */
         .cg-summary {
             text-align: center;
             font-size: 0.82rem;
@@ -163,11 +122,15 @@
             .cg-wrap { max-width: none; padding: 0; }
             .cg-grid-wrap { background: transparent; border: none; box-shadow: none; padding: 0; border-radius: 0; }
             .cg-grid-container {
-                gap: 0;
+                gap: var(--cut-gap, 0.0243in);
                 padding: 0;
                 margin: 0;
                 border-radius: 0;
-                width: calc(var(--print-cols, 3) * var(--card-w, 2.5in));
+                background: #000;
+                width: calc(
+                    var(--print-cols, 3) * var(--card-w, 2.5in)
+                    + max(0, var(--print-cols, 3) - 1) * var(--cut-gap, 0.0243in)
+                );
                 grid-template-columns: repeat(var(--print-cols, 3), var(--card-w, 2.5in));
                 grid-auto-rows: var(--card-h, 3.5in);
             }
@@ -260,37 +223,124 @@
             border-radius: 8px;
             border: 2px solid rgba(102, 126, 234, 0.25);
         }
+        .cg-choose-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 16px 0 8px;
+        }
+        .cg-choose-actions .drive-modal-btn {
+            width: 100%;
+            justify-content: center;
+            min-height: 48px;
+            font-size: 14px;
+        }
+        #cgChooseCardModal .drive-modal-panel {
+            max-width: min(96vw, 440px);
+        }
+        .cg-pdf-dropdown {
+            position: relative;
+            display: inline-flex;
+        }
+        .cg-pdf-dropdown-toggle {
+            gap: 4px;
+            padding-right: 12px;
+        }
+        .cg-pdf-caret {
+            font-size: 11px;
+            opacity: 0.85;
+            line-height: 1;
+        }
+        .cg-pdf-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            z-index: 50;
+            min-width: 168px;
+            padding: 6px;
+            border-radius: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            background: rgba(15, 23, 42, 0.98);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42);
+        }
+        .cg-pdf-dropdown-menu[hidden] {
+            display: none;
+        }
+        .cg-pdf-dropdown-item {
+            display: block;
+            width: 100%;
+            margin: 0;
+            padding: 9px 12px;
+            border: none;
+            border-radius: 8px;
+            background: transparent;
+            color: #e2e8f0;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 700;
+            text-align: left;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .cg-pdf-dropdown-item:hover:not(:disabled) {
+            background: rgba(99, 102, 241, 0.22);
+            color: #fff;
+        }
+        .cg-pdf-dropdown-item:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+        .cg-pdf-dropdown-item + .cg-pdf-dropdown-item {
+            margin-top: 2px;
+        }
     </style>
 </head>
 <body class="cg-print-body">
     <div class="cg-page">
         <div class="cg-wrap">
-            <header class="cg-header no-print">
-                <h1>Print 9-up sheet</h1>
-                <p class="cg-sub">Add images, open <strong>Print setup</strong> for size and bleed, then <strong>Print</strong> or <strong>Download PDF</strong> for faces. Use <strong>Download backs PDF</strong> for a matching sheet of <code>Card Back.png</code>. Load a saved deck here, or build one on the <a href="deck-builder.html" style="color:#a5b4fc;">deck builder</a>.</p>
-            </header>
-
             <div class="cg-toolbar no-print">
-                <label class="cg-upload-label" for="fileUpload">Choose images</label>
-                <input type="file" id="fileUpload" accept="image/*" multiple>
+                <button type="button" class="cg-btn cg-btn-setup" id="openChooseCardModalBtn">Choose Card or Image</button>
+                <input type="file" id="fileUpload" accept="image/*" multiple hidden>
                 <button type="button" class="cg-btn cg-btn-setup" id="openSetupBtn">Print setup</button>
                 <button type="button" class="cg-btn cg-btn-setup" id="openDeckLoadBtn">Load deck…</button>
                 <button type="button" class="cg-btn cg-btn-print" id="printBtn">Print</button>
-                <button type="button" class="cg-btn cg-btn-pdf" id="downloadPdfBtn">Download PDF</button>
-                <button type="button" class="cg-btn cg-btn-pdf" id="downloadBacksPdfBtn" title="PDF of Card Back.png matching your current card count">Download backs PDF</button>
-                <button type="button" class="cg-btn cg-btn-back" onclick="window.location.href='deck-builder.html'">Deck builder</button>
-                <button type="button" class="cg-btn cg-btn-back" onclick="window.location.href='index.html'">Card Maker</button>
+                <button type="button" class="cg-btn cg-btn-print" id="printBacksBtn" title="Print a 9-up sheet of Card Back.png">Print backs</button>
+                <div class="cg-pdf-dropdown" id="cgPdfDropdown">
+                    <button type="button" class="cg-btn cg-btn-pdf cg-pdf-dropdown-toggle" id="cgPdfDropdownToggle" aria-haspopup="menu" aria-expanded="false" aria-controls="cgPdfDropdownMenu">
+                        Download PDF <span class="cg-pdf-caret" aria-hidden="true">▾</span>
+                    </button>
+                    <div class="cg-pdf-dropdown-menu" id="cgPdfDropdownMenu" role="menu" hidden>
+                        <button type="button" class="cg-pdf-dropdown-item" id="downloadPdfBtn" role="menuitem">Card faces PDF</button>
+                        <button type="button" class="cg-pdf-dropdown-item" id="downloadBacksPdfBtn" role="menuitem" title="PDF of Card Back.png matching your current card count">Card backs PDF</button>
+                    </div>
+                </div>
             </div>
 
             <p class="cg-summary no-print" id="fitInfo" aria-live="polite"></p>
             <p class="cg-queue-banner no-print" id="cgQueueBanner" hidden role="status"></p>
 
             <div class="cg-grid-wrap">
-                <div class="cg-grid-container trim-bleed" id="gridContainer"></div>
+                <div class="cg-grid-container no-bleed" id="gridContainer"></div>
             </div>
         </div>
 
         <!-- Same grid for print-only (duplicate id avoided: print uses gridContainer inside visible wrap) -->
+    </div>
+
+    <div id="cgChooseCardModal" class="drive-modal no-print" aria-hidden="true">
+        <div class="drive-modal-backdrop" id="cgChooseCardBackdrop" aria-hidden="true"></div>
+        <div class="drive-modal-panel" role="dialog" aria-modal="true" aria-labelledby="cgChooseCardTitle">
+            <button type="button" class="drive-modal-close" id="cgChooseCardCloseBtn" aria-label="Close">&times;</button>
+            <h2 id="cgChooseCardTitle" class="drive-modal-title">Choose card or image</h2>
+            <p class="drive-modal-hint">Load a rendered card from your Google Drive saves, or upload image file(s) from your device. Up to 9 images fill the print grid.</p>
+            <div class="cg-choose-actions">
+                <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="cgChooseSavedCardBtn">Saved card from Google Drive…</button>
+                <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="cgChooseUploadBtn">Upload image from device…</button>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+                <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="cgChooseCancelBtn">Cancel</button>
+            </div>
+        </div>
     </div>
 
     <div id="printSetupModal" class="drive-modal" aria-hidden="true">
@@ -324,15 +374,15 @@
             <div class="cg-setup-section">
                 <h3>Layout</h3>
                 <div class="cg-toggle-row">
-                    <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="bleedToggleBtn" aria-pressed="true">Bleed crop: on</button>
+                    <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="bleedToggleBtn" aria-pressed="false">Bleed crop: off</button>
                 </div>
-                <p class="drive-modal-hint" style="margin-bottom:0;">Bleed on matches Card Maker exports with extra margin (2.75×3.75″ art cropped to card size). Card backs use <strong>Download backs PDF</strong> (separate file).</p>
+                <p class="drive-modal-hint" style="margin-bottom:0;">Bleed on matches Card Maker exports with extra margin (2.75×3.75″ art cropped to card size). Card backs: use <strong>Print backs</strong> or <strong>Download backs PDF</strong> (mirrored for duplex).</p>
             </div>
 
             <div class="cg-setup-section">
                 <h3>Grid fill</h3>
                 <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="repeatBtn" disabled>Repeat images across all 9 slots</button>
-                <p class="drive-modal-hint" style="margin:8px 0 0;">Uses the images you picked with <strong>Choose images</strong>.</p>
+                <p class="drive-modal-hint" style="margin:8px 0 0;">Uses images from <strong>Choose Card or Image</strong> on the toolbar (saved card or upload).</p>
             </div>
 
             <div class="cg-setup-section">
@@ -425,10 +475,21 @@
         const DRIVE_FILES_API = 'https://www.googleapis.com/drive/v3/files';
 
         const fileUpload = document.getElementById('fileUpload');
+        const openChooseCardModalBtn = document.getElementById('openChooseCardModalBtn');
+        const cgChooseCardModal = document.getElementById('cgChooseCardModal');
+        const cgChooseSavedCardBtn = document.getElementById('cgChooseSavedCardBtn');
+        const cgChooseUploadBtn = document.getElementById('cgChooseUploadBtn');
+        const cgChooseCancelBtn = document.getElementById('cgChooseCancelBtn');
+        const cgChooseCardCloseBtn = document.getElementById('cgChooseCardCloseBtn');
+        const cgChooseCardBackdrop = document.getElementById('cgChooseCardBackdrop');
         const gridContainer = document.getElementById('gridContainer');
         const printBtn = document.getElementById('printBtn');
+        const printBacksBtn = document.getElementById('printBacksBtn');
         const downloadPdfBtn = document.getElementById('downloadPdfBtn');
         const downloadBacksPdfBtn = document.getElementById('downloadBacksPdfBtn');
+        const cgPdfDropdown = document.getElementById('cgPdfDropdown');
+        const cgPdfDropdownToggle = document.getElementById('cgPdfDropdownToggle');
+        const cgPdfDropdownMenu = document.getElementById('cgPdfDropdownMenu');
         const repeatBtn = document.getElementById('repeatBtn');
         const bleedToggleBtn = document.getElementById('bleedToggleBtn');
         const sizePreset = document.getElementById('sizePreset');
@@ -458,8 +519,10 @@
         const MARGIN_Y = 0;
         const PRINTABLE_W_IN = PAGE_W_IN - (MARGIN_X * 2);
         const PRINTABLE_H_IN = PAGE_H_IN - (MARGIN_Y * 2);
+        /** Black gutter between cards on PDF/print (~1.75 pt cut lane). */
+        const CUT_GAP_IN = 1.75 / 72;
 
-        let cardHasBleed = true;
+        let cardHasBleed = false;
         let uploadedUrls = [];
         let cardWidthIn = 2.5;
         let cardHeightIn = 3.5;
@@ -654,6 +717,18 @@
             if (!printSetupModal) return;
             printSetupModal.classList.remove('is-open');
             printSetupModal.setAttribute('aria-hidden', 'true');
+        }
+
+        function openChooseCardModal() {
+            if (!cgChooseCardModal) return;
+            cgChooseCardModal.classList.add('is-open');
+            cgChooseCardModal.setAttribute('aria-hidden', 'false');
+        }
+
+        function closeChooseCardModal() {
+            if (!cgChooseCardModal) return;
+            cgChooseCardModal.classList.remove('is-open');
+            cgChooseCardModal.setAttribute('aria-hidden', 'true');
         }
 
         function openGridDriveLoadModal() {
@@ -1049,9 +1124,69 @@
         }
 
         function getPrintableLayout(widthIn, heightIn) {
-            const cols = Math.max(1, Math.floor(PRINTABLE_W_IN / widthIn));
-            const rows = Math.max(1, Math.floor(PRINTABLE_H_IN / heightIn));
+            const gap = CUT_GAP_IN;
+            const cols = Math.max(1, Math.floor((PRINTABLE_W_IN + gap) / (widthIn + gap)));
+            const rows = Math.max(1, Math.floor((PRINTABLE_H_IN + gap) / (heightIn + gap)));
             return { cols, rows, cardsPerPage: cols * rows };
+        }
+
+        function getPdfSheetLayout(cols, rows, cardW, cardH) {
+            var gap = CUT_GAP_IN;
+            var gridW = cols * cardW + Math.max(0, cols - 1) * gap;
+            var gridH = rows * cardH + Math.max(0, rows - 1) * gap;
+            return {
+                gap: gap,
+                gridW: gridW,
+                gridH: gridH,
+                offsetX: Math.max(0, (PAGE_W_IN - gridW) / 2),
+                offsetY: Math.max(0, (PAGE_H_IN - gridH) / 2)
+            };
+        }
+
+        function pdfCardXY(layout, col, row, cardW, cardH) {
+            return {
+                x: layout.offsetX + MARGIN_X + col * (cardW + layout.gap),
+                y: layout.offsetY + MARGIN_Y + row * (cardH + layout.gap)
+            };
+        }
+
+        /** Black gutters + center cut line (PDF / print). */
+        function drawCutGuidesOnPdfPage(pdf, layout, cols, rows, cardW, cardH) {
+            if (layout.gap <= 0 || cols < 1 || rows < 1) return;
+            var ox = layout.offsetX + MARGIN_X;
+            var oy = layout.offsetY + MARGIN_Y;
+            var gap = layout.gap;
+            var gridW = layout.gridW;
+            var gridH = layout.gridH;
+
+            pdf.setFillColor(0, 0, 0);
+
+            var c;
+            for (c = 0; c < cols - 1; c++) {
+                var gx = ox + (c + 1) * cardW + c * gap;
+                pdf.rect(gx, oy, gap, gridH, 'F');
+            }
+            var r;
+            for (r = 0; r < rows - 1; r++) {
+                var gy = oy + (r + 1) * cardH + r * gap;
+                pdf.rect(ox, gy, gridW, gap, 'F');
+            }
+        }
+
+        function drawPdfCropMarks(pdf, x, y, w, h, trimMargin) {
+            var m = trimMargin;
+            var mk = 0.09;
+            pdf.setDrawColor(0, 0, 0);
+            pdf.setLineWidth(0.005);
+            pdf.setLineDashPattern([], 0);
+            pdf.line(x - m, y - m, x - m + mk, y - m);
+            pdf.line(x - m, y - m, x - m, y - m + mk);
+            pdf.line(x + w + m, y - m, x + w + m - mk, y - m);
+            pdf.line(x + w + m, y - m, x + w + m, y - m + mk);
+            pdf.line(x - m, y + h + m, x - m + mk, y + h + m);
+            pdf.line(x - m, y + h + m, x - m, y + h + m - mk);
+            pdf.line(x + w + m, y + h + m, x + w + m - mk, y + h + m);
+            pdf.line(x + w + m, y + h + m, x + w + m, y + h + m - mk);
         }
 
         function updatePrintLayoutStyles() {
@@ -1060,6 +1195,7 @@
             root.style.setProperty('--card-h', cardHeightIn + 'in');
             root.style.setProperty('--card-ratio', String(cardWidthIn / cardHeightIn));
             root.style.setProperty('--print-cols', String(printableLayout.cols));
+            root.style.setProperty('--cut-gap', CUT_GAP_IN + 'in');
         }
 
         function updatePageBreakMarkers() {
@@ -1387,12 +1523,69 @@
             } catch (e) { /* ignore */ }
         }
 
+        function closePdfDropdown() {
+            if (!cgPdfDropdownMenu || !cgPdfDropdownToggle) return;
+            cgPdfDropdownMenu.hidden = true;
+            cgPdfDropdownToggle.setAttribute('aria-expanded', 'false');
+        }
+
+        function togglePdfDropdown() {
+            if (!cgPdfDropdownMenu || !cgPdfDropdownToggle || cgPdfDropdownToggle.disabled) return;
+            var open = cgPdfDropdownMenu.hidden;
+            if (open) {
+                cgPdfDropdownMenu.hidden = false;
+                cgPdfDropdownToggle.setAttribute('aria-expanded', 'true');
+            } else {
+                closePdfDropdown();
+            }
+        }
+
+        function setPdfDropdownToggleLabel(text) {
+            if (!cgPdfDropdownToggle) return;
+            cgPdfDropdownToggle.innerHTML = escapeHtml(text) + ' <span class="cg-pdf-caret" aria-hidden="true">▾</span>';
+        }
+
+        if (cgPdfDropdownToggle && cgPdfDropdownMenu) {
+            cgPdfDropdownToggle.addEventListener('click', function (e) {
+                e.stopPropagation();
+                togglePdfDropdown();
+            });
+            document.addEventListener('click', function (e) {
+                if (!cgPdfDropdown || cgPdfDropdownMenu.hidden) return;
+                if (cgPdfDropdown.contains(e.target)) return;
+                closePdfDropdown();
+            });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && cgPdfDropdownMenu && !cgPdfDropdownMenu.hidden) {
+                    closePdfDropdown();
+                }
+            });
+        }
+
         ensureSlots();
         syncBleedMode();
         applyCardSize(cardWidthIn, cardHeightIn, true);
 
         if (openSetupBtn) {
             openSetupBtn.addEventListener('click', openPrintSetupModal);
+        }
+        if (openChooseCardModalBtn) {
+            openChooseCardModalBtn.addEventListener('click', openChooseCardModal);
+        }
+        if (cgChooseCardCloseBtn) cgChooseCardCloseBtn.addEventListener('click', closeChooseCardModal);
+        if (cgChooseCancelBtn) cgChooseCancelBtn.addEventListener('click', closeChooseCardModal);
+        if (cgChooseCardBackdrop) cgChooseCardBackdrop.addEventListener('click', closeChooseCardModal);
+        if (cgChooseSavedCardBtn) {
+            cgChooseSavedCardBtn.addEventListener('click', function () {
+                closeChooseCardModal();
+                openGridDriveLoadModal();
+            });
+        }
+        if (cgChooseUploadBtn && fileUpload) {
+            cgChooseUploadBtn.addEventListener('click', function () {
+                closeChooseCardModal();
+                fileUpload.click();
+            });
         }
         if (openGridDriveLoadModalBtn) {
             openGridDriveLoadModalBtn.addEventListener('click', openGridDriveLoadModal);
@@ -1422,6 +1615,11 @@
             }
             if (gridDriveLoadModal && gridDriveLoadModal.classList.contains('is-open')) {
                 closeGridDriveLoadModal();
+                e.preventDefault();
+                return;
+            }
+            if (cgChooseCardModal && cgChooseCardModal.classList.contains('is-open')) {
+                closeChooseCardModal();
                 e.preventDefault();
                 return;
             }
@@ -1461,14 +1659,14 @@
             updatePageBreakMarkers();
         });
 
-        fileUpload.addEventListener('change', function () {
-            const files = Array.from(this.files).slice(0, DEFAULT_SLOTS);
-            if (files.length === 0) {
+        function applyUploadedImageFiles(files) {
+            const picked = Array.from(files || []).slice(0, DEFAULT_SLOTS);
+            if (picked.length === 0) {
                 uploadedUrls = [];
                 repeatBtn.disabled = true;
                 return;
             }
-            Promise.all(files.map(readFileAsDataURL)).then(function (urls) {
+            Promise.all(picked.map(readFileAsDataURL)).then(function (urls) {
                 ensureSlots(DEFAULT_SLOTS);
                 uploadedUrls = urls;
                 repeatBtn.disabled = false;
@@ -1478,6 +1676,11 @@
                 repeatBtn.disabled = true;
                 alert('Could not read one or more files.');
             });
+        }
+
+        fileUpload.addEventListener('change', function () {
+            applyUploadedImageFiles(this.files);
+            this.value = '';
         });
 
         repeatBtn.addEventListener('click', function () {
@@ -1720,37 +1923,28 @@
             });
 
             function drawCropMarks(x, y, w, h) {
-                var m = TRIM_MARGIN;
-                var mk = 0.09;
-                pdf.setDrawColor(0, 0, 0);
-                pdf.setLineWidth(0.005);
-                pdf.line(x - m, y - m, x - m + mk, y - m);
-                pdf.line(x - m, y - m, x - m, y - m + mk);
-                pdf.line(x + w + m, y - m, x + w + m - mk, y - m);
-                pdf.line(x + w + m, y - m, x + w + m, y - m + mk);
-                pdf.line(x - m, y + h + m, x - m + mk, y + h + m);
-                pdf.line(x - m, y + h + m, x - m, y + h + m - mk);
-                pdf.line(x + w + m, y + h + m, x + w + m - mk, y + h + m);
-                pdf.line(x + w + m, y + h + m, x + w + m, y + h + m - mk);
+                drawPdfCropMarks(pdf, x, y, w, h, TRIM_MARGIN);
             }
 
             var rowsPerPage = printableLayout.rows;
-            var pageUsedWidth = COLS * CARD_W_IN;
-            var pageUsedHeight = rowsPerPage * CARD_H_IN;
-            var pageOffsetX = Math.max(0, (PAGE_W_IN - pageUsedWidth) / 2);
-            var pageOffsetY = Math.max(0, (PAGE_H_IN - pageUsedHeight) / 2);
+            var sheetLayout = getPdfSheetLayout(COLS, rowsPerPage, CARD_W_IN, CARD_H_IN);
+            var cutGuidesDrawnForPage = false;
 
             for (var pi = 0; pi < images.length; pi++) {
                 if (pi > 0 && pi % PER_PAGE === 0) {
                     pdf.addPage('letter', 'portrait');
+                    cutGuidesDrawnForPage = false;
+                }
+                if (!cutGuidesDrawnForPage) {
+                    drawCutGuidesOnPdfPage(pdf, sheetLayout, COLS, rowsPerPage, CARD_W_IN, CARD_H_IN);
+                    cutGuidesDrawnForPage = true;
                 }
                 var indexInPage = pi % PER_PAGE;
                 var col = indexInPage % COLS;
                 var row = Math.floor(indexInPage / COLS);
-                var x = pageOffsetX + MARGIN_X + col * CARD_W_IN;
-                var y = pageOffsetY + MARGIN_Y + row * CARD_H_IN;
-                pdf.addImage(images[pi], 'JPEG', x, y, CARD_W_IN, CARD_H_IN, undefined, 'FAST');
-                drawCropMarks(x, y, CARD_W_IN, CARD_H_IN);
+                var pos = pdfCardXY(sheetLayout, col, row, CARD_W_IN, CARD_H_IN);
+                pdf.addImage(images[pi], 'JPEG', pos.x, pos.y, CARD_W_IN, CARD_H_IN, undefined, 'FAST');
+                drawCropMarks(pos.x, pos.y, CARD_W_IN, CARD_H_IN);
                 if (pi % 12 === 0 || pi === images.length - 1) {
                     onProgress('Placing card ' + (pi + 1) + '/' + images.length + '…');
                 }
@@ -1770,15 +1964,17 @@
             }
 
             var faceCount = collectFilledCardUrls().length;
+            var PER_PAGE = printableLayout.cardsPerPage;
+            var count = opts && opts.backCount != null
+                ? Math.max(1, Number(opts.backCount) || PER_PAGE)
+                : (faceCount > 0 ? faceCount : PER_PAGE);
             var CARD_W_IN = cardWidthIn;
             var CARD_H_IN = cardHeightIn;
             var COLS = printableLayout.cols;
-            var PER_PAGE = printableLayout.cardsPerPage;
             var TRIM_MARGIN = 0.125;
             var DPI = 280;
             var outW = Math.max(1, Math.round(CARD_W_IN * DPI));
             var outH = Math.max(1, Math.round(CARD_H_IN * DPI));
-            var count = faceCount > 0 ? faceCount : PER_PAGE;
 
             onProgress('Loading card back art…');
             var backUrl;
@@ -1816,38 +2012,24 @@
             });
 
             function drawCropMarks(x, y, w, h) {
-                var m = TRIM_MARGIN;
-                var mk = 0.09;
-                pdf.setDrawColor(0, 0, 0);
-                pdf.setLineWidth(0.005);
-                pdf.line(x - m, y - m, x - m + mk, y - m);
-                pdf.line(x - m, y - m, x - m, y - m + mk);
-                pdf.line(x + w + m, y - m, x + w + m - mk, y - m);
-                pdf.line(x + w + m, y - m, x + w + m, y - m + mk);
-                pdf.line(x - m, y + h + m, x - m + mk, y + h + m);
-                pdf.line(x - m, y + h + m, x - m, y + h + m - mk);
-                pdf.line(x + w + m, y + h + m, x + w + m - mk, y + h + m);
-                pdf.line(x + w + m, y + h + m, x + w + m, y + h + m - mk);
+                drawPdfCropMarks(pdf, x, y, w, h, TRIM_MARGIN);
             }
 
             var rowsPerPage = printableLayout.rows;
-            var pageUsedWidth = COLS * CARD_W_IN;
-            var pageUsedHeight = rowsPerPage * CARD_H_IN;
-            var pageOffsetX = Math.max(0, (PAGE_W_IN - pageUsedWidth) / 2);
-            var pageOffsetY = Math.max(0, (PAGE_H_IN - pageUsedHeight) / 2);
+            var sheetLayout = getPdfSheetLayout(COLS, rowsPerPage, CARD_W_IN, CARD_H_IN);
             var pages = Math.ceil(count / PER_PAGE);
 
             for (var pageIdx = 0; pageIdx < pages; pageIdx++) {
                 if (pageIdx > 0) pdf.addPage('letter', 'portrait');
+                drawCutGuidesOnPdfPage(pdf, sheetLayout, COLS, rowsPerPage, CARD_W_IN, CARD_H_IN);
                 var onPage = Math.min(PER_PAGE, count - pageIdx * PER_PAGE);
                 for (var k = 0; k < onPage; k++) {
                     /* Mirror columns so reverse-side duplex aligns with face sheets */
                     var col = (COLS - 1) - (k % COLS);
                     var row = Math.floor(k / COLS);
-                    var x = pageOffsetX + MARGIN_X + col * CARD_W_IN;
-                    var y = pageOffsetY + MARGIN_Y + row * CARD_H_IN;
-                    pdf.addImage(backJpeg, 'JPEG', x, y, CARD_W_IN, CARD_H_IN, undefined, 'FAST');
-                    drawCropMarks(x, y, CARD_W_IN, CARD_H_IN);
+                    var pos = pdfCardXY(sheetLayout, col, row, CARD_W_IN, CARD_H_IN);
+                    pdf.addImage(backJpeg, 'JPEG', pos.x, pos.y, CARD_W_IN, CARD_H_IN, undefined, 'FAST');
+                    drawCropMarks(pos.x, pos.y, CARD_W_IN, CARD_H_IN);
                 }
             }
 
@@ -1856,16 +2038,19 @@
 
         function setPdfBusy(busy, label) {
             printBtn.disabled = !!busy;
-            downloadPdfBtn.disabled = !!busy;
+            if (printBacksBtn) printBacksBtn.disabled = !!busy;
+            if (cgPdfDropdownToggle) cgPdfDropdownToggle.disabled = !!busy;
+            if (downloadPdfBtn) downloadPdfBtn.disabled = !!busy;
             if (downloadBacksPdfBtn) downloadBacksPdfBtn.disabled = !!busy;
+            if (busy) closePdfDropdown();
             if (!busy) {
-                downloadPdfBtn.textContent = 'Download PDF';
+                setPdfDropdownToggleLabel('Download PDF');
                 printBtn.textContent = 'Print';
-                if (downloadBacksPdfBtn) downloadBacksPdfBtn.textContent = 'Download backs PDF';
+                if (printBacksBtn) printBacksBtn.textContent = 'Print backs';
             } else if (label) {
-                downloadPdfBtn.textContent = label;
+                setPdfDropdownToggleLabel(label);
                 printBtn.textContent = 'Working…';
-                if (downloadBacksPdfBtn) downloadBacksPdfBtn.textContent = 'Working…';
+                if (printBacksBtn) printBacksBtn.textContent = 'Working…';
             }
         }
 
@@ -1906,7 +2091,7 @@
         printBtn.addEventListener('click', function () {
             setPdfBusy(true, 'Preparing print…');
             buildPrintReadyPdf({
-                onProgress: function (t) { downloadPdfBtn.textContent = t; }
+                onProgress: function (t) { printBtn.textContent = t; }
             }).then(function (pdf) {
                 setPdfBusy(false);
                 openPdfForPrint(pdf);
@@ -1917,10 +2102,28 @@
             });
         });
 
+        if (printBacksBtn) {
+            printBacksBtn.addEventListener('click', function () {
+                setPdfBusy(true, 'Preparing backs…');
+                buildCardBacksPdf({
+                    backCount: DEFAULT_SLOTS,
+                    onProgress: function (t) { printBacksBtn.textContent = t; }
+                }).then(function (pdf) {
+                    setPdfBusy(false);
+                    openPdfForPrint(pdf);
+                }).catch(function (err) {
+                    console.error(err);
+                    setPdfBusy(false);
+                    alert((err && err.message) ? err.message : 'Could not prepare backs for print. Is Card Back.png next to this page?');
+                });
+            });
+        }
+
         downloadPdfBtn.addEventListener('click', function () {
+            closePdfDropdown();
             setPdfBusy(true, 'Creating PDF…');
             buildPrintReadyPdf({
-                onProgress: function (t) { downloadPdfBtn.textContent = t; }
+                onProgress: function (t) { setPdfDropdownToggleLabel(t); }
             }).then(function (pdf) {
                 pdf.save('card-grid.pdf');
                 setPdfBusy(false);
@@ -1933,9 +2136,10 @@
 
         if (downloadBacksPdfBtn) {
             downloadBacksPdfBtn.addEventListener('click', function () {
+                closePdfDropdown();
                 setPdfBusy(true, 'Creating backs PDF…');
                 buildCardBacksPdf({
-                    onProgress: function (t) { downloadBacksPdfBtn.textContent = t; }
+                    onProgress: function (t) { setPdfDropdownToggleLabel(t); }
                 }).then(function (pdf) {
                     pdf.save('card-backs.pdf');
                     setPdfBusy(false);
