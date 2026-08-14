@@ -236,6 +236,7 @@
 
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="cardmaker-fonts.js"></script>
     <script src="card-render.js"></script>
     <script src="cardmaker-perf.js"></script>
     <script src="cardmaker-drive-auth.js"></script>
@@ -245,6 +246,9 @@
     <script src="card-player-decks-drive.js"></script>
     <script>
 (function () {
+    if (typeof CardMakerFonts !== 'undefined') {
+        CardMakerFonts.ensureAllUploadedLoaded();
+    }
     var PRINT_IMPORT_STORAGE_KEY = 'cardmaker_print_import_v1';
     var DECK_NAME_STORAGE_KEY = 'cardmaker_cp_deck_name_v1';
     var DEFAULT_SET_NAME = 'Wizards of Whimsy';

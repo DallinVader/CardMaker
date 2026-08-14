@@ -567,6 +567,25 @@ body.cm-page .top-drive-status-wrap {
     background: rgba(102, 126, 234, 0.08);
 }
 
+.cm-fonts-panel {
+    max-width: 560px;
+}
+
+.cm-fonts-preview {
+    margin: 10px 0 0;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.06);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    font-size: 22px;
+    line-height: 1.35;
+    color: #1e293b;
+}
+
+#cmFontsSelect {
+    min-height: 160px;
+}
+
 .cm-field-options-panel {
     max-width: 720px;
 }

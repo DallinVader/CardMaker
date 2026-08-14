@@ -407,12 +407,16 @@
     </div>
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="cardmaker-fonts.js"></script>
     <script src="card-render.js"></script>
     <script src="cardmaker-perf.js"></script>
     <script src="cardmaker-drive-auth.js"></script>
     <script src="cardmaker-cookie-consent.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
+        if (typeof CardMakerFonts !== 'undefined') {
+            CardMakerFonts.ensureAllUploadedLoaded();
+        }
         const GOOGLE_CLIENT_ID = '984239146057-o6ujksfj9qk8tmqm9c8msrpidgm6492r.apps.googleusercontent.com';
         const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
         const DRIVE_TOKEN_STORAGE_KEY = 'cardmaker_drive_session_v1';

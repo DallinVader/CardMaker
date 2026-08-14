@@ -5,17 +5,32 @@
 (function () {
     var CANVAS_W = 2500;
     var CANVAS_H = 3500;
-    /** Cache font readiness so play/thumb renders do not re-hit document.fonts every call. */
-    var medievalFontReady = null;
-    function ensureMedievalFont() {
-        if (!medievalFontReady) {
-            try {
-                medievalFontReady = document.fonts.load('200px Medieval').catch(function () { return null; });
-            } catch (e) {
-                medievalFontReady = Promise.resolve(null);
-            }
+
+    function cardFontFamilyName(f) {
+        var fam = f && f.CardFontFamily != null ? String(f.CardFontFamily).trim() : '';
+        if (!fam) fam = 'Medieval';
+        return fam;
+    }
+
+    function cardFontCss(px, f) {
+        var fam = cardFontFamilyName(f);
+        if (typeof CardMakerFonts !== 'undefined') {
+            return px + 'px ' + CardMakerFonts.cssStack(fam);
         }
-        return medievalFontReady;
+        if (/\s/.test(fam)) return px + 'px "' + fam.replace(/"/g, '') + '", Medieval, serif';
+        return px + 'px ' + fam + ', Medieval, serif';
+    }
+
+    function ensureCardFont(f) {
+        var fam = cardFontFamilyName(f);
+        if (typeof CardMakerFonts !== 'undefined') {
+            return CardMakerFonts.ensureLoaded(fam);
+        }
+        try {
+            return document.fonts.load('200px Medieval').catch(function () { return null; });
+        } catch (e) {
+            return Promise.resolve(null);
+        }
     }
 
     /**
@@ -104,20 +119,20 @@
     }
 
     /** Right-aligned set title: shrink font to fit, then up to 3 wrapped lines (no early “…” unless still impossible). */
-    function drawSetNameBottomRight(ctx, rawName, rightX, centerY, maxWidth) {
+    function drawSetNameBottomRight(ctx, rawName, rightX, centerY, maxWidth, f) {
         var name = String(rawName || '').trim();
         if (!name) return;
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
         var px;
         for (px = 64; px >= 28; px -= 2) {
-            ctx.font = px + 'px Medieval';
+            ctx.font = cardFontCss(px, f);
             if (ctx.measureText(name).width <= maxWidth) {
                 ctx.fillText(name, rightX, centerY);
                 return;
             }
         }
-        ctx.font = '28px Medieval';
+        ctx.font = cardFontCss(28, f);
         var lines = wrapTextLines(ctx, name, maxWidth);
         var maxLines = 3;
         if (lines.length > maxLines) {
@@ -183,7 +198,7 @@
         ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
         ctx.fillStyle = 'black';
 
-        await ensureMedievalFont();
+        await ensureCardFont(f);
 
         var ExtraHightP = parseInt(f.ArtHightPos, 10) || 0;
         var ExtraWidthP = parseInt(f.ArtWidthPos, 10) || 0;
@@ -318,7 +333,7 @@
             if (dw) {
                 ctx.drawImage(damageImg, dImgX, dImgY, DimgWidth, DimgHeight);
             }
-            ctx.font = '175px Medieval';
+            ctx.font = cardFontCss(175, f);
             ctx.textAlign = 'center';
             ctx.fillStyle = 'black';
             ctx.textBaseline = 'middle';
@@ -341,23 +356,23 @@
         ctx.textBaseline = 'middle';
         ctx.fillStyle = 'black';
 
-        ctx.font = (parseInt(f.TitleFontSize, 10) || 200) + 'px Medieval';
+        ctx.font = cardFontCss(parseInt(f.TitleFontSize, 10) || 200, f);
         ctx.textAlign = f.TitleCenterAlign ? 'center' : 'left';
         var titleX = f.TitleCenterAlign ? (CANVAS_W / 2) : (CANVAS_W / 10);
         ctx.fillText(String(f.Title != null ? f.Title : ''), titleX, CANVAS_H / 12.5);
 
-        ctx.font = (parseInt(f.TypeFontSize, 10) || 100) + 'px Medieval';
+        ctx.font = cardFontCss(parseInt(f.TypeFontSize, 10) || 100, f);
         ctx.textAlign = 'center';
         ctx.fillText(String(f.Type != null ? f.Type : ''), (CANVAS_W / 5), CANVAS_H / 7.3);
 
-        ctx.font = (parseInt(f.SubtypeFontSize, 10) || 80) + 'px Medieval';
+        ctx.font = cardFontCss(parseInt(f.SubtypeFontSize, 10) || 80, f);
         ctx.fillText(String(f.Subtype != null ? f.Subtype : ''), CANVAS_W - (CANVAS_W / 5), CANVAS_H / 7.3);
 
-        ctx.font = (parseInt(f.TreasureFontSize, 10) || 150) + 'px Medieval';
+        ctx.font = cardFontCss(parseInt(f.TreasureFontSize, 10) || 150, f);
         ctx.fillText(String(f.TreasureCost != null ? f.TreasureCost : ''), CANVAS_W - (CANVAS_W / 6.9), CANVAS_H / 1.99);
 
         var quoteFontPx = parseInt(f.QoteDiscriptionFontSize, 10) || 60;
-        ctx.font = quoteFontPx + 'px Medieval';
+        ctx.font = cardFontCss(quoteFontPx, f);
         ctx.textAlign = f.QuoteCenterAlign ? 'center' : 'left';
         var quoteX = f.QuoteCenterAlign ? (CANVAS_W / 2) : (CANVAS_W / 10);
         ctx.fillText(String(f.QoteDiscription != null ? f.QoteDiscription : ''), quoteX, CANVAS_H - (CANVAS_H / 13));
@@ -386,13 +401,13 @@
                 var sx = leftPadX;
                 var sLeft = String(setNum);
                 var sRight = String(setTot);
-                ctx.font = setDigitFontPx + 'px Medieval';
+                ctx.font = cardFontCss(setDigitFontPx, f);
                 ctx.fillText(sLeft, sx, rarityY);
                 sx += ctx.measureText(sLeft).width + ctx.measureText(' ').width / 2;
-                ctx.font = setSlashFontPx + 'px Medieval';
+                ctx.font = cardFontCss(setSlashFontPx, f);
                 ctx.fillText('/', sx, rarityY);
                 sx += ctx.measureText('/').width;
-                ctx.font = setDigitFontPx + 'px Medieval';
+                ctx.font = cardFontCss(setDigitFontPx, f);
                 sx += ctx.measureText(' ').width / 2;
                 ctx.fillText(sRight, sx, rarityY);
                 sx += ctx.measureText(sRight).width;
@@ -400,18 +415,18 @@
             }
             if (rarShown) {
                 ctx.textAlign = 'left';
-                ctx.font = '70px Medieval';
+                ctx.font = cardFontCss(70, f);
                 ctx.fillText(rarShown, rarityX, rarityY);
             }
             if (setNameStr) {
                 var rightPadX = CANVAS_W - (CANVAS_W / 10);
                 var maxNameW = CANVAS_W * 0.52;
-                drawSetNameBottomRight(ctx, setNameStr, rightPadX, rarityY, maxNameW);
+                drawSetNameBottomRight(ctx, setNameStr, rightPadX, rarityY, maxNameW, f);
             }
             ctx.fillStyle = 'black';
         }
 
-        ctx.font = (parseInt(f.MainDisciptionFontSize, 10) || 125) + 'px Medieval';
+        ctx.font = cardFontCss(parseInt(f.MainDisciptionFontSize, 10) || 125, f);
         ctx.textAlign = f.MainDescriptionCenterAlign ? 'center' : 'left';
         var descriptionX = f.MainDescriptionCenterAlign ? (CANVAS_W / 2) : (CANVAS_W / 10);
         var maxW = CANVAS_W - (CANVAS_W / 4.75);
@@ -421,7 +436,7 @@
             ctx.fillText(mainLines[i], descriptionX, (CANVAS_H / 1.6) + (125 * (i + 1)));
         }
 
-        ctx.font = (parseInt(f.SubDisciptionFontSize, 10) || 70) + 'px Medieval';
+        ctx.font = cardFontCss(parseInt(f.SubDisciptionFontSize, 10) || 70, f);
         ctx.textAlign = f.SubDescriptionCenterAlign ? 'center' : 'left';
         var subDescriptionX = f.SubDescriptionCenterAlign ? (CANVAS_W / 2) : (CANVAS_W / 10);
         var subLines = wrapTextLines(ctx, f.SubDisciption || '', maxW);

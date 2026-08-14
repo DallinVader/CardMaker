@@ -1146,6 +1146,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
+    <script src="cardmaker-fonts.js"></script>
     <script src="card-render.js"></script>
     <script src="cardmaker-perf.js"></script>
     <script src="cardmaker-drive-auth.js"></script>
@@ -1154,6 +1155,9 @@
     <script src="card-player-decks-drive.js"></script>
     <script>
 (function () {
+    if (typeof CardMakerFonts !== 'undefined') {
+        CardMakerFonts.ensureAllUploadedLoaded();
+    }
     var SPM_IDB_NAME = 'cardmaker-spm-saves';
     var SPM_IDB_STORE = 'byFileId';
     var SPM_IDB_VERSION = 2;

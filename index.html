@@ -19,7 +19,8 @@
             </div>
             <div class="top-drive-controls">
                 <button type="button" id="googleSignInBtn" class="top-bar-btn top-drive-btn" onclick="handleGoogleDriveAuthClick()">Sign in with Google</button>
-                <button type="button" id="driveManageBtn" class="top-bar-btn top-drive-btn top-drive-btn-primary" onclick="openDriveProjectsModal()" disabled>Saved projects…</button>
+                <button type="button" id="driveQuickSaveBtn" class="top-bar-btn top-drive-btn top-drive-btn-primary" onclick="quickSaveCurrentCard()" disabled title="Save this card to Google Drive (Ctrl+S)">Save</button>
+                <button type="button" id="driveManageBtn" class="top-bar-btn top-drive-btn" onclick="openDriveProjectsModal()" disabled>Saved projects…</button>
             </div>
         </div>
         <div class="top-drive-status-wrap">
@@ -120,6 +121,53 @@
                 </div>
             </div>
         </div>
+
+        <div id="cmFontsModal" class="drive-modal" aria-hidden="true">
+            <div class="drive-modal-backdrop" data-cm-fonts-close aria-hidden="true"></div>
+            <div class="drive-modal-panel cm-fonts-panel" role="dialog" aria-modal="true" aria-labelledby="cmFontsModalTitle">
+                <button type="button" class="drive-modal-close" data-cm-fonts-close aria-label="Close">&times;</button>
+                <h2 id="cmFontsModalTitle" class="drive-modal-title">Font manager</h2>
+                <p class="drive-modal-hint">Choose a font for this card, upload <code class="drive-code">.ttf</code> / <code class="drive-code">.otf</code> / <code class="drive-code">.woff</code> files, and set the default for new cards. Uploads sync to Drive app data when you are signed in.</p>
+                <div class="drive-modal-section">
+                    <label class="drive-modal-label" for="cmFontsSelect">Library</label>
+                    <select id="cmFontsSelect" class="drive-modal-input" size="8" aria-label="Font library"></select>
+                    <p id="cmFontsPreview" class="cm-fonts-preview">The quick brown fox jumps over the lazy dragon.</p>
+                </div>
+                <div class="drive-modal-section">
+                    <label class="drive-modal-label" for="cmFontsUpload">Upload font</label>
+                    <input type="file" id="cmFontsUpload" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2,application/font-woff,application/font-woff2">
+                    <p class="drive-modal-suffix">Optional display name (blank uses the file name)</p>
+                    <input type="text" id="cmFontsUploadName" class="drive-modal-input" maxlength="60" placeholder="Font name on cards" autocomplete="off">
+                </div>
+                <div class="cm-field-options-actions" style="flex-wrap:wrap; gap:8px;">
+                    <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="cmFontsApplyCard">Use on this card</button>
+                    <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="cmFontsSetDefault">Set as default for new cards</button>
+                    <button type="button" class="drive-modal-btn drive-modal-btn-ghost" id="cmFontsRemove">Remove uploaded font</button>
+                </div>
+                <div class="drive-modal-section" style="margin-top:14px;">
+                    <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="cmFontsOverwriteAll">Apply this font to all saved cards…</button>
+                    <p class="drive-modal-suffix">Asks for confirmation, then writes the font onto every <code class="drive-code">.cardmaker.json</code> save in Drive.</p>
+                </div>
+                <p id="cmFontsModalMessage" class="drive-modal-message" role="status" aria-live="polite"></p>
+                <div class="cm-field-options-footer">
+                    <button type="button" class="drive-modal-btn drive-modal-btn-ghost" data-cm-fonts-close>Done</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="cmFontsOverwriteModal" class="drive-modal" aria-hidden="true">
+            <div class="drive-modal-backdrop" data-cm-fonts-overwrite-close aria-hidden="true"></div>
+            <div class="drive-modal-panel" role="dialog" aria-modal="true" aria-labelledby="cmFontsOverwriteTitle" style="max-width:min(480px,96vw);">
+                <button type="button" class="drive-modal-close" data-cm-fonts-overwrite-close aria-label="Close">&times;</button>
+                <h2 id="cmFontsOverwriteTitle" class="drive-modal-title">Change font on all cards?</h2>
+                <p class="drive-modal-hint" id="cmFontsOverwriteHint">This will set every saved card in Google Drive to use the selected font. Existing cards that used a different font will be overwritten. This cannot be undone automatically.</p>
+                <p id="cmFontsOverwriteProgress" class="drive-modal-message" role="status" aria-live="polite"></p>
+                <div class="cm-field-options-footer" style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <button type="button" class="drive-modal-btn drive-modal-btn-primary" id="cmFontsOverwriteConfirm">Yes, update all cards</button>
+                    <button type="button" class="drive-modal-btn drive-modal-btn-ghost" data-cm-fonts-overwrite-close>Cancel</button>
+                </div>
+            </div>
+        </div>
         
         <div class="cm-wrap">
         <div class="main-container">
@@ -162,6 +210,13 @@
                                 <button type="button" onclick="setFontSize('TitleFontSize', 250)" title="Larger title">Large</button>
                             </div>
                             <label class="cm-check-inline"><input type="checkbox" id="TitleCenterAlign" checked onchange="redrawCanvas()"> Center</label>
+                        </div>
+                        <div class="cm-quick-toolbar" aria-label="Card font">
+                            <span class="cm-quick-toolbar-label">Font</span>
+                            <div class="input-group" style="margin:0; flex:1; min-width:160px;">
+                                <select id="CardFontFamily" onchange="onCardFontFamilyChanged()" title="Font used for all text on this card" aria-label="Card font"></select>
+                            </div>
+                            <button type="button" class="cm-field-options-manage-btn" id="cmManageFontsBtn" title="Upload fonts, set the default for new cards, or apply a font to every saved card">Fonts…</button>
                         </div>
                         <div class="cm-field-grid cm-field-grid-2">
                             <div class="input-group">
@@ -214,6 +269,7 @@
                                 <select id="CardBase" onchange="applyCardBaseFromSelect()">
                                     <option value="CardFrame.png">Standard</option>
                                     <option value="CardFrame Old.png">Classic</option>
+                                    <option value="Full Art Card Frame.png">Full Art</option>
                                     <option value="__custom__">Custom…</option>
                                 </select>
                                 <div id="CardBaseCustomWrap" class="cm-cardbase-custom-wrap" hidden>
@@ -359,7 +415,7 @@
                         </div>
                         <div class="cm-export-shortcuts" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(200, 200, 220, 0.3); font-size: 11px; color: #718096;">
                             <strong>Keyboard Shortcuts:</strong><br>
-                            <kbd>Ctrl+D</kbd> Download | <kbd>Ctrl+F</kbd> Fullscreen | <kbd>Ctrl+R</kbd> Reset<br>
+                            <kbd>Ctrl+S</kbd> Save to Drive | <kbd>Ctrl+D</kbd> Download | <kbd>Ctrl+F</kbd> Fullscreen | <kbd>Ctrl+R</kbd> Reset<br>
                             <kbd>1</kbd>–<kbd>3</kbd> Toggle sidebar sections | <kbd>Esc</kbd> Close/Blur
                         </div>
                     </div>
@@ -379,6 +435,8 @@
 
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="cardmaker-fonts.js"></script>
+    <script src="cardmaker-fonts-drive.js"></script>
     <script src="card-render.js"></script>
     <script src="cardmaker-perf.js"></script>
     <script src="cardmaker-drive-auth.js"></script>
@@ -450,9 +508,21 @@
                 (event.target && event.target.isContentEditable);
             // Don't trigger shortcuts when typing in inputs or using native selects
             if (inField) {
+                if ((event.ctrlKey || event.metaKey) && (event.key === 's' || event.key === 'S')) {
+                    event.preventDefault();
+                    quickSaveCurrentCard();
+                    return;
+                }
                 if (event.key === 'Escape') {
                     event.target.blur();
                 }
+                return;
+            }
+
+            // Ctrl/Cmd + S: Save to Drive
+            if ((event.ctrlKey || event.metaKey) && (event.key === 's' || event.key === 'S')) {
+                event.preventDefault();
+                quickSaveCurrentCard();
                 return;
             }
             
@@ -975,6 +1045,9 @@
             document.getElementById("Title").value = '';
             document.getElementById("TitleFontSize").value = 200;
             document.getElementById("TitleCenterAlign").checked = true;
+            if (typeof CardMakerFonts !== 'undefined') {
+                CardMakerFonts.fillSelect(document.getElementById('CardFontFamily'), CardMakerFonts.getDefaultFamily());
+            }
             
             // Reset damage stats
             document.getElementById("DamageID").value = 0;
@@ -1074,8 +1147,10 @@
         function updateDriveButtons() {
             const signedIn = !!driveAccessToken;
             const manageBtn = document.getElementById('driveManageBtn');
+            const saveBtn = document.getElementById('driveQuickSaveBtn');
             const authBtn = document.getElementById('googleSignInBtn');
             if (manageBtn) manageBtn.disabled = !signedIn;
+            if (saveBtn) saveBtn.disabled = !signedIn;
             if (authBtn) {
                 authBtn.textContent = signedIn ? 'Sign out' : 'Sign in with Google';
             }
@@ -1427,6 +1502,9 @@
                     Title: document.getElementById('Title').value,
                     TitleFontSize: document.getElementById('TitleFontSize').value,
                     TitleCenterAlign: document.getElementById('TitleCenterAlign').checked,
+                    CardFontFamily: document.getElementById('CardFontFamily')
+                        ? document.getElementById('CardFontFamily').value
+                        : (typeof CardMakerFonts !== 'undefined' ? CardMakerFonts.getDefaultFamily() : 'Medieval'),
                     DamageID: document.getElementById('DamageID').value,
                     DefenseID: document.getElementById('DefenseID').value,
                     Rarity: document.getElementById('CardRarity') ? document.getElementById('CardRarity').value : 'Common',
@@ -1513,6 +1591,14 @@
             setIfExists('Title', f.Title);
             setIfExists('TitleFontSize', f.TitleFontSize);
             setIfExists('TitleCenterAlign', f.TitleCenterAlign);
+            var fontSelApply = document.getElementById('CardFontFamily');
+            if (fontSelApply && typeof CardMakerFonts !== 'undefined') {
+                var famApply = f.CardFontFamily != null && String(f.CardFontFamily).trim()
+                    ? String(f.CardFontFamily).trim()
+                    : 'Medieval';
+                CardMakerFonts.fillSelect(fontSelApply, famApply);
+                CardMakerFonts.ensureLoaded(famApply).then(function () { redrawCanvas(); });
+            }
             setIfExists('DamageID', f.DamageID);
             setIfExists('DefenseID', f.DefenseID);
             var cardRar = document.getElementById('CardRarity');
@@ -1723,28 +1809,86 @@
             }
         }
 
+        let cardMakerFontsDriveConfigured = false;
+        function refreshCardMakerFontSelects() {
+            if (typeof CardMakerFonts === 'undefined') return;
+            var sel = document.getElementById('CardFontFamily');
+            var keep = sel ? sel.value : '';
+            CardMakerFonts.fillSelect(sel, keep || CardMakerFonts.getDefaultFamily());
+            var lib = document.getElementById('cmFontsSelect');
+            if (lib) {
+                var prev = lib.value;
+                CardMakerFonts.fillSelect(lib, prev || (sel && sel.value) || CardMakerFonts.getDefaultFamily());
+                updateFontsManagerPreview();
+            }
+        }
+
+        function configureCardMakerFontsDriveIndex() {
+            if (cardMakerFontsDriveConfigured || typeof CardMakerFontsDrive === 'undefined' || typeof CardMakerFonts === 'undefined') {
+                return;
+            }
+            cardMakerFontsDriveConfigured = true;
+            CardMakerFontsDrive.init({
+                getToken: function () { return driveAccessToken; },
+                authHeaders: function (extra) { return driveAuthHeaders(extra); },
+                parseDriveError: parseDriveError,
+                onAfterPull: function () {
+                    CardMakerFonts.ensureAllUploadedLoaded().then(function () {
+                        refreshCardMakerFontSelects();
+                        redrawCanvas();
+                    });
+                }
+            });
+            CardMakerFonts.setMutateListener(function () {
+                if (driveAccessToken) {
+                    CardMakerFontsDrive.schedulePush();
+                }
+                refreshCardMakerFontSelects();
+            });
+        }
+
+        async function syncFontsWithDriveIfPossible() {
+            configureCardMakerFontsDriveIndex();
+            if (!driveAccessToken || typeof CardMakerFontsDrive === 'undefined') {
+                return;
+            }
+            try {
+                await CardMakerFontsDrive.pullMerge();
+            } catch (e) {
+                console.warn('Fonts Drive sync:', e);
+            }
+        }
+
         function syncDriveAppDataRegistries() {
             syncNamedSetsWithDriveIfPossible().catch(function (e) { console.warn(e); });
             syncFieldOptionsWithDriveIfPossible().catch(function (e) { console.warn(e); });
+            syncFontsWithDriveIfPossible().catch(function (e) { console.warn(e); });
         }
 
         /** List appDataFolder files (same shape as official curl sample). */
         async function listAppDataFolderFiles() {
-            const u = new URL(DRIVE_FILES_API);
-            u.searchParams.set('spaces', 'appDataFolder');
-            u.searchParams.set('fields', 'files(id,name,mimeType,modifiedTime,size,appProperties)');
-            u.searchParams.set('pageSize', '100');
-            const res = await fetch(u.toString(), { headers: driveAuthHeaders() });
-            const text = await res.text();
-            if (!res.ok) {
-                throw new Error(parseDriveError(text, res.status));
-            }
-            const data = JSON.parse(text);
-            return (data.files || []).map(function (f) {
-                if (typeof CardMakerPerf !== 'undefined') CardMakerPerf.applyAppPropertiesToFileMeta(f);
-                else if (f.appProperties && f.appProperties.cmSetId) f.cardMakerSetId = String(f.appProperties.cmSetId).trim();
-                return f;
-            });
+            var all = [];
+            var pageToken = '';
+            do {
+                const u = new URL(DRIVE_FILES_API);
+                u.searchParams.set('spaces', 'appDataFolder');
+                u.searchParams.set('fields', 'nextPageToken,files(id,name,mimeType,modifiedTime,size,appProperties)');
+                u.searchParams.set('pageSize', '100');
+                if (pageToken) u.searchParams.set('pageToken', pageToken);
+                const res = await fetch(u.toString(), { headers: driveAuthHeaders() });
+                const text = await res.text();
+                if (!res.ok) {
+                    throw new Error(parseDriveError(text, res.status));
+                }
+                const data = JSON.parse(text);
+                (data.files || []).forEach(function (f) {
+                    if (typeof CardMakerPerf !== 'undefined') CardMakerPerf.applyAppPropertiesToFileMeta(f);
+                    else if (f.appProperties && f.appProperties.cmSetId) f.cardMakerSetId = String(f.appProperties.cmSetId).trim();
+                    all.push(f);
+                });
+                pageToken = data.nextPageToken || '';
+            } while (pageToken);
+            return all;
         }
 
         async function findDriveProjectByName(fileName) {
@@ -1871,6 +2015,40 @@
             clearProjectDirty();
             setDriveStatus('Saved "' + fileName + '" to Google Drive.');
             return savedMeta;
+        }
+
+        async function quickSaveCurrentCard() {
+            if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) {
+                alert('Sign in with Google first.');
+                return;
+            }
+            var name = currentDriveFileName ? displaySaveLabel(currentDriveFileName) : '';
+            if (!name) {
+                var nameInput = document.getElementById('driveSaveNameInput');
+                if (nameInput && nameInput.value) name = nameInput.value.trim();
+            }
+            if (!name) name = driveSaveNameDefaultFromCardTitle();
+            if (!name) {
+                await openDriveProjectsModal();
+                setDriveStatus('Enter a name to save this card.');
+                var focusInp = document.getElementById('driveSaveNameInput');
+                if (focusInp) focusInp.focus();
+                return;
+            }
+            var btn = document.getElementById('driveQuickSaveBtn');
+            if (btn) btn.disabled = true;
+            try {
+                await saveProjectToDriveWithName(name);
+                var syncInp = document.getElementById('driveSaveNameInput');
+                if (syncInp) syncInp.value = name;
+            } catch (err) {
+                console.error(err);
+                var msg = err && err.message ? err.message : String(err);
+                setDriveStatus('Save failed: ' + msg.slice(0, 200));
+                alert('Could not save to Google Drive.\n\n' + msg);
+            } finally {
+                if (btn) btn.disabled = !driveAccessToken;
+            }
         }
 
         function setDriveModalMessage(text, isError) {
@@ -2609,6 +2787,20 @@
                 ev.preventDefault();
                 return;
             }
+            const fontsOverwriteModal = document.getElementById('cmFontsOverwriteModal');
+            if (fontsOverwriteModal && fontsOverwriteModal.classList.contains('is-open')) {
+                fontsOverwriteModal.classList.remove('is-open');
+                fontsOverwriteModal.setAttribute('aria-hidden', 'true');
+                ev.preventDefault();
+                return;
+            }
+            const fontsModal = document.getElementById('cmFontsModal');
+            if (fontsModal && fontsModal.classList.contains('is-open')) {
+                fontsModal.classList.remove('is-open');
+                fontsModal.setAttribute('aria-hidden', 'true');
+                ev.preventDefault();
+                return;
+            }
             const driveModal = document.getElementById('driveProjectsModal');
             if (driveModal && driveModal.classList.contains('is-open')) {
                 closeDriveProjectsModal();
@@ -2626,8 +2818,19 @@
             if (!src || String(src).indexOf('data:') === 0) return null;
             var s = String(src).split('?')[0];
             var parts = s.split('/');
-            return parts.length ? parts[parts.length - 1] : null;
+            var fn = parts.length ? parts[parts.length - 1] : null;
+            if (!fn) return null;
+            try {
+                fn = decodeURIComponent(fn);
+            } catch (e) { /* ignore */ }
+            return fn;
         }
+
+        var BUILTIN_CARD_BASES = {
+            'CardFrame.png': true,
+            'CardFrame Old.png': true,
+            'Full Art Card Frame.png': true
+        };
 
         function removeCardBaseDynamicOption() {
             var dyn = document.getElementById('CardBaseDynamicOption');
@@ -2646,7 +2849,7 @@
             if (!sel || sel.tagName !== 'SELECT') return;
             removeCardBaseDynamicOption();
             var fn = getCardBaseFilenameFromSrc(MainImage && MainImage.src);
-            if (fn === 'CardFrame.png' || fn === 'CardFrame Old.png') {
+            if (fn && BUILTIN_CARD_BASES[fn]) {
                 sel.value = fn;
                 setCardBaseCustomVisible(false);
                 return;
@@ -2741,6 +2944,42 @@
             })().catch(function (e) { console.error(e); });
         });
 
+        function currentCardFontFamily() {
+            var el = document.getElementById('CardFontFamily');
+            var fam = el && el.value ? String(el.value).trim() : '';
+            if (!fam && typeof CardMakerFonts !== 'undefined') fam = CardMakerFonts.getDefaultFamily();
+            return fam || 'Medieval';
+        }
+
+        function cmPxFont(px) {
+            var n = Math.round(px);
+            if (typeof CardMakerFonts !== 'undefined') {
+                return n + 'px ' + CardMakerFonts.cssStack(currentCardFontFamily());
+            }
+            return n + 'px Medieval';
+        }
+
+        function onCardFontFamilyChanged() {
+            var fam = currentCardFontFamily();
+            if (typeof CardMakerFonts !== 'undefined') {
+                CardMakerFonts.ensureLoaded(fam).then(function () { redrawCanvas(); });
+            }
+            redrawCanvas();
+        }
+
+        function updateFontsManagerPreview() {
+            var lib = document.getElementById('cmFontsSelect');
+            var preview = document.getElementById('cmFontsPreview');
+            if (!preview) return;
+            var fam = (lib && lib.value) || currentCardFontFamily();
+            preview.style.fontFamily = typeof CardMakerFonts !== 'undefined'
+                ? CardMakerFonts.cssStack(fam)
+                : fam;
+            if (typeof CardMakerFonts !== 'undefined') {
+                CardMakerFonts.ensureLoaded(fam);
+            }
+        }
+
         function wrapSetNameTextLines(ctx, text, maxWidth) {
             var words = String(text || '').split(/\s+/).filter(Boolean);
             var line = '';
@@ -2768,13 +3007,13 @@
             ctx.textBaseline = 'middle';
             var px;
             for (px = Math.round(64 * fs); px >= Math.round(28 * fs); px -= Math.max(1, Math.round(2 * fs))) {
-                ctx.font = px + 'px Medieval';
+                ctx.font = cmPxFont(px);
                 if (ctx.measureText(name).width <= maxWidth) {
                     ctx.fillText(name, rightX, centerY);
                     return;
                 }
             }
-            ctx.font = Math.round(28 * fs) + 'px Medieval';
+            ctx.font = cmPxFont(28 * fs);
             var lines = wrapSetNameTextLines(ctx, name, maxWidth);
             var maxLines = 3;
             if (lines.length > maxLines) {
@@ -2849,7 +3088,7 @@
             }
             ctx.drawImage(MainImage, (canvas.width - imgWidth) / 2, (canvas.height - imgHeight) / 8, imgWidth, imgHeight);
             
-            ctx.font = Math.round(200 * fs) + "px Medieval"
+            ctx.font = cmPxFont(200 * fs);
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = 'black';
@@ -2867,8 +3106,8 @@
 
             if (IsSwitchedOn) {
                 ctx.drawImage(DamageImg, dImgX, dImgY, DimgWidth, DimgHeight);
-                document.fonts.load('10px Medieval').then(() => {
-                    ctx.font = Math.round(175 * fs) + "px Medieval"
+                document.fonts.load(cmPxFont(10)).then(() => {
+                    ctx.font = cmPxFont(175 * fs);
                     ctx.textAlign = 'center';
                     ctx.fillStyle = 'black';
                     ctx.fillText(Dam.value, canvas.width / 12.5, canvas.height / 12.5)
@@ -2885,26 +3124,26 @@
                 }
             }
             
-            ctx.font = Math.round(Number(TitleSize.value) * fs) + "px Medieval"
+            ctx.font = cmPxFont(Number(TitleSize.value) * fs);
             ctx.textAlign = TitleCenterAlign.checked ? 'center' : 'left';
             const titleX = TitleCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10);
             ctx.fillText(CardTitle.value, titleX, canvas.height / 12.5)
 
-            ctx.font = Math.round(Number(TypeFontSize.value) * fs) + "px Medieval"
+            ctx.font = cmPxFont(Number(TypeFontSize.value) * fs);
             ctx.textAlign = 'center';
             ctx.fillText(Type.value, (canvas.width / 5), canvas.height /7.3)
-            ctx.font = Math.round(Number(SubtypeFontSize.value) * fs) + "px Medieval"
+            ctx.font = cmPxFont(Number(SubtypeFontSize.value) * fs);
             ctx.textAlign = 'center';
             ctx.fillText(Subtype.value, canvas.width - (canvas.width / 5), canvas.height /7.3)
 
             ctx.fillStyle = 'black';
 
-            ctx.font = Math.round(Number(TreasureFontSize.value) * fs) + "px Medieval"
+            ctx.font = cmPxFont(Number(TreasureFontSize.value) * fs);
             ctx.textAlign = 'center';
             ctx.fillText(TreasureCost.value, canvas.width - (canvas.width / 6.9), canvas.height / 1.99)
 
 
-            ctx.font = Math.round(Number(QuoteFontSize.value) * fs) + "px Medieval"
+            ctx.font = cmPxFont(Number(QuoteFontSize.value) * fs);
             ctx.textAlign = QuoteCenterAlign.checked ? 'center' : 'left';
             const quoteX = QuoteCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10);
             ctx.fillText(Quote.value, quoteX, canvas.height - (canvas.height / 13))
@@ -2943,13 +3182,13 @@
                     let x = leftPadX;
                     const sL = String(setSn);
                     const sR = String(setSt);
-                    ctx.font = setDigitFontPx + 'px Medieval';
+                    ctx.font = cmPxFont(setDigitFontPx);
                     ctx.fillText(sL, x, rarityY);
                     x += ctx.measureText(sL).width + ctx.measureText(' ').width / 2;
-                    ctx.font = setSlashFontPx + 'px Medieval';
+                    ctx.font = cmPxFont(setSlashFontPx);
                     ctx.fillText('/', x, rarityY);
                     x += ctx.measureText('/').width;
-                    ctx.font = setDigitFontPx + 'px Medieval';
+                    ctx.font = cmPxFont(setDigitFontPx);
                     x += ctx.measureText(' ').width / 2;
                     ctx.fillText(sR, x, rarityY);
                     x += ctx.measureText(sR).width;
@@ -2957,7 +3196,7 @@
                 }
                 if (rarLabel) {
                     ctx.textAlign = 'left';
-                    ctx.font = Math.round(70 * fs) + 'px Medieval';
+                    ctx.font = cmPxFont(70 * fs);
                     ctx.fillText(rarLabel, rarityX, rarityY);
                 }
                 if (setNameStr) {
@@ -2969,7 +3208,7 @@
             }
             ctx.fillStyle = 'black';
 
-            ctx.font = Math.round(Number(DiscriptionFontSize.value) * fs) + "px Medieval"
+            ctx.font = cmPxFont(Number(DiscriptionFontSize.value) * fs);
             ctx.textAlign = MainDescriptionCenterAlign.checked ? 'center' : 'left';
             const descriptionX = MainDescriptionCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10);
             i = 0;
@@ -2979,7 +3218,7 @@
             });
 
 
-            ctx.font = Math.round(Number(SubFontSize.value) * fs) + "px Medieval"
+            ctx.font = cmPxFont(Number(SubFontSize.value) * fs);
             ctx.textAlign = SubDescriptionCenterAlign.checked ? 'center' : 'left';
             const subDescriptionX = SubDescriptionCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10);
             i = 0;
@@ -3416,6 +3655,227 @@
             if (addSub) addSub.addEventListener('click', function () { doAdd('subtypes', subInput, subList); });
             if (renSub) renSub.addEventListener('click', function () { doRename('subtypes', subList, subInput); });
             if (remSub) remSub.addEventListener('click', function () { doRemove('subtypes', subList, subInput); });
+        })();
+
+        (function initCardMakerFontsUi() {
+            if (typeof CardMakerFonts === 'undefined') return;
+            configureCardMakerFontsDriveIndex();
+            var fontSelInit = document.getElementById('CardFontFamily');
+            CardMakerFonts.fillSelect(fontSelInit, (fontSelInit && fontSelInit.value) || CardMakerFonts.getDefaultFamily());
+            CardMakerFonts.ensureAllUploadedLoaded().then(function () { redrawCanvas(); });
+
+            var modal = document.getElementById('cmFontsModal');
+            var overwriteModal = document.getElementById('cmFontsOverwriteModal');
+            var openBtn = document.getElementById('cmManageFontsBtn');
+            var msgEl = document.getElementById('cmFontsModalMessage');
+            var lib = document.getElementById('cmFontsSelect');
+            var uploadInp = document.getElementById('cmFontsUpload');
+            var uploadName = document.getElementById('cmFontsUploadName');
+            var pendingOverwriteFamily = '';
+
+            function setMsg(text, isError) {
+                if (!msgEl) return;
+                msgEl.textContent = text || '';
+                msgEl.classList.toggle('is-error', !!isError);
+            }
+
+            function fillLib() {
+                if (!lib) return;
+                var keep = lib.value || currentCardFontFamily();
+                CardMakerFonts.fillSelect(lib, keep);
+                updateFontsManagerPreview();
+            }
+
+            function openModal() {
+                if (!modal) return;
+                fillLib();
+                setMsg('');
+                modal.classList.add('is-open');
+                modal.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closeModal() {
+                if (!modal) return;
+                modal.classList.remove('is-open');
+                modal.setAttribute('aria-hidden', 'true');
+                var ow = overwriteModal && overwriteModal.classList.contains('is-open');
+                var fo = document.getElementById('fieldOptionsModal');
+                var drive = document.getElementById('driveProjectsModal');
+                if (!ow && (!fo || !fo.classList.contains('is-open')) && (!drive || !drive.classList.contains('is-open'))) {
+                    document.body.style.overflow = '';
+                }
+            }
+
+            function closeOverwriteModal() {
+                if (!overwriteModal) return;
+                overwriteModal.classList.remove('is-open');
+                overwriteModal.setAttribute('aria-hidden', 'true');
+            }
+
+            function selectedLibraryFamily() {
+                return lib && lib.value ? lib.value : currentCardFontFamily();
+            }
+
+            if (openBtn) openBtn.addEventListener('click', openModal);
+            if (modal) {
+                modal.querySelectorAll('[data-cm-fonts-close]').forEach(function (el) {
+                    el.addEventListener('click', closeModal);
+                });
+            }
+            if (overwriteModal) {
+                overwriteModal.querySelectorAll('[data-cm-fonts-overwrite-close]').forEach(function (el) {
+                    el.addEventListener('click', closeOverwriteModal);
+                });
+            }
+            if (lib) {
+                lib.addEventListener('change', function () {
+                    updateFontsManagerPreview();
+                });
+            }
+
+            var applyBtn = document.getElementById('cmFontsApplyCard');
+            if (applyBtn) {
+                applyBtn.addEventListener('click', function () {
+                    var fam = selectedLibraryFamily();
+                    var cardSel = document.getElementById('CardFontFamily');
+                    CardMakerFonts.fillSelect(cardSel, fam);
+                    CardMakerFonts.ensureLoaded(fam).then(function () { redrawCanvas(); });
+                    setMsg('This card now uses “' + fam + '”.');
+                    redrawCanvas();
+                });
+            }
+
+            var defBtn = document.getElementById('cmFontsSetDefault');
+            if (defBtn) {
+                defBtn.addEventListener('click', function () {
+                    var fam = selectedLibraryFamily();
+                    CardMakerFonts.setDefaultFamily(fam);
+                    setMsg('New cards will use “' + fam + '”.');
+                });
+            }
+
+            var remBtn = document.getElementById('cmFontsRemove');
+            if (remBtn) {
+                remBtn.addEventListener('click', function () {
+                    var fam = selectedLibraryFamily();
+                    var item = CardMakerFonts.getCatalog().filter(function (c) {
+                        return !c.builtin && c.family === fam;
+                    })[0];
+                    if (!item) {
+                        setMsg('Built-in fonts cannot be removed.', true);
+                        return;
+                    }
+                    CardMakerFonts.removeUploadedFont(item.id).then(function () {
+                        fillLib();
+                        refreshCardMakerFontSelects();
+                        setMsg('Removed “' + fam + '”.');
+                        redrawCanvas();
+                    });
+                });
+            }
+
+            if (uploadInp) {
+                uploadInp.addEventListener('change', function () {
+                    var file = uploadInp.files && uploadInp.files[0];
+                    if (!file) return;
+                    var name = uploadName && uploadName.value ? uploadName.value.trim() : '';
+                    setMsg('Uploading…');
+                    CardMakerFonts.addUploadedFont(file, name).then(function (rec) {
+                        uploadInp.value = '';
+                        if (uploadName) uploadName.value = '';
+                        fillLib();
+                        if (lib) lib.value = rec.family;
+                        CardMakerFonts.ensureLoaded(rec.family).then(function () {
+                            updateFontsManagerPreview();
+                        });
+                        setMsg('Added “' + rec.family + '”. Use on this card or set it as the default.');
+                    }).catch(function (err) {
+                        setMsg((err && err.message) ? err.message : 'Upload failed.', true);
+                    });
+                });
+            }
+
+            var overwriteOpen = document.getElementById('cmFontsOverwriteAll');
+            if (overwriteOpen) {
+                overwriteOpen.addEventListener('click', function () {
+                    pendingOverwriteFamily = selectedLibraryFamily();
+                    var hint = document.getElementById('cmFontsOverwriteHint');
+                    if (hint) {
+                        hint.textContent = 'This will set every saved card in Google Drive to use “' +
+                            pendingOverwriteFamily +
+                            '”. Cards that used a different font will be overwritten. This cannot be undone automatically.';
+                    }
+                    var prog = document.getElementById('cmFontsOverwriteProgress');
+                    if (prog) prog.textContent = '';
+                    if (overwriteModal) {
+                        overwriteModal.classList.add('is-open');
+                        overwriteModal.setAttribute('aria-hidden', 'false');
+                    }
+                });
+            }
+
+            var overwriteConfirm = document.getElementById('cmFontsOverwriteConfirm');
+            if (overwriteConfirm) {
+                overwriteConfirm.addEventListener('click', function () {
+                    var fam = pendingOverwriteFamily || selectedLibraryFamily();
+                    var prog = document.getElementById('cmFontsOverwriteProgress');
+                    overwriteConfirm.disabled = true;
+                    (async function () {
+                        try {
+                            if (!(await ensureDriveTokenBeforeDriveOp()) || !driveAccessToken) {
+                                if (prog) prog.textContent = 'Sign in with Google first.';
+                                return;
+                            }
+                            var files = await listDriveProjects();
+                            if (!files.length) {
+                                if (prog) prog.textContent = 'No saved cards found.';
+                                return;
+                            }
+                            var done = 0;
+                            var failed = 0;
+                            var i;
+                            for (i = 0; i < files.length; i++) {
+                                var file = files[i];
+                                if (prog) prog.textContent = 'Updating ' + (i + 1) + ' of ' + files.length + '…';
+                                try {
+                                    var state = await fetchDriveProjectJsonByFile(file);
+                                    if (!state || typeof state !== 'object') throw new Error('Invalid save');
+                                    if (!state.fields || typeof state.fields !== 'object') state.fields = {};
+                                    state.fields.CardFontFamily = fam;
+                                    state.updatedAt = new Date().toISOString();
+                                    var json = JSON.stringify(state);
+                                    var appProps = typeof CardMakerPerf !== 'undefined'
+                                        ? CardMakerPerf.buildAppPropertiesFromState(state)
+                                        : null;
+                                    await uploadProjectToDrive(file.name, json, file.id, appProps);
+                                    if (typeof CardMakerPerf !== 'undefined') {
+                                        await CardMakerPerf.writeSaveCache(file.id, file, state);
+                                    }
+                                    done++;
+                                } catch (errOne) {
+                                    failed++;
+                                    console.warn('Font overwrite failed', file && file.name, errOne);
+                                }
+                            }
+                            var cardSel = document.getElementById('CardFontFamily');
+                            CardMakerFonts.fillSelect(cardSel, fam);
+                            CardMakerFonts.ensureLoaded(fam).then(function () { redrawCanvas(); });
+                            redrawCanvas();
+                            var summary = 'Updated ' + done + ' of ' + files.length + ' card' + (files.length === 1 ? '' : 's') + '.';
+                            if (failed) summary += ' ' + failed + ' failed.';
+                            if (prog) prog.textContent = summary;
+                            setMsg(summary);
+                            setDriveStatus(summary);
+                        } catch (err) {
+                            var msg = err && err.message ? err.message : String(err);
+                            if (prog) prog.textContent = 'Update failed: ' + msg;
+                        } finally {
+                            overwriteConfirm.disabled = false;
+                        }
+                    })();
+                });
+            }
         })();
 
     </script>

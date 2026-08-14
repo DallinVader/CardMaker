@@ -1264,6 +1264,8 @@
         <div class="spm-hover-preview-fallback">No preview available for this save.</div>
     </div>
 
+    <script src="cardmaker-fonts.js"></script>
+    <script src="cardmaker-fonts-drive.js"></script>
     <script src="card-render.js"></script>
     <script src="cardmaker-perf.js"></script>
     <script src="cardmaker-drive-auth.js"></script>
@@ -1698,9 +1700,45 @@
             }
         }
 
+        let spmFontsDriveConfigured = false;
+        function configureSavedProjectsFontsDrive() {
+            if (spmFontsDriveConfigured || typeof CardMakerFontsDrive === 'undefined' || typeof CardMakerFonts === 'undefined') {
+                return;
+            }
+            spmFontsDriveConfigured = true;
+            CardMakerFontsDrive.init({
+                getToken: function () { return driveAccessToken; },
+                authHeaders: function (extra) { return driveAuthHeaders(driveAccessToken, extra); },
+                parseDriveError: parseDriveError,
+                onAfterPull: function () {
+                    if (typeof CardMakerFonts !== 'undefined') {
+                        CardMakerFonts.ensureAllUploadedLoaded();
+                    }
+                }
+            });
+            CardMakerFonts.setMutateListener(function () {
+                if (driveAccessToken) {
+                    CardMakerFontsDrive.schedulePush();
+                }
+            });
+        }
+
+        async function syncFontsWithDriveIfPossibleSpm() {
+            configureSavedProjectsFontsDrive();
+            if (!driveAccessToken || typeof CardMakerFontsDrive === 'undefined') {
+                return;
+            }
+            try {
+                await CardMakerFontsDrive.pullMerge();
+            } catch (e) {
+                console.warn('Fonts Drive sync:', e);
+            }
+        }
+
         async function syncDriveAppDataRegistriesSpm() {
             await syncNamedSetsWithDriveIfPossibleSpm();
             await syncFieldOptionsWithDriveIfPossibleSpm();
+            await syncFontsWithDriveIfPossibleSpm();
         }
 
         let gisTokenClient = null;
@@ -2524,6 +2562,7 @@
                     QoteDiscription: '',
                     QoteDiscriptionFontSize: '60',
                     QuoteCenterAlign: true,
+                    CardFontFamily: (typeof CardMakerFonts !== 'undefined' ? CardMakerFonts.getDefaultFamily() : 'Medieval'),
                     downloadFormat: 'png',
                     exportIncludeBleed: true,
                     exportWidth: '800',
