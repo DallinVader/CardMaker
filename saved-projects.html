@@ -2302,8 +2302,10 @@
             });
         }
 
-        // Loaded projects cache. Grid rows are lite (name/type/set/# only) until Edit hydrates `state`.
+        // Loaded projects. Local IndexedDB cache paints first (same as Deck builder); Drive list merges after.
         let projects = [];
+        var saveCacheById = new Map();
+        var spmLocalCacheReady = false;
 
         function getFieldsFromState(state) {
             return (state && state.fields) ? state.fields : {};
@@ -2589,6 +2591,93 @@
             return buildLiteProject(file, fieldsFromDriveFile(file));
         }
 
+        function projectFromCacheRow(row) {
+            var fields = getFieldsFromState(row.state);
+            var title = computeCardTitle(fields) || 'card';
+            var file = {
+                id: row.id,
+                name: title + PROJECT_FILE_EXTENSION,
+                modifiedTime: row.modifiedTime,
+                size: row.size
+            };
+            return buildProjectFromState(file, row.state);
+        }
+
+        function paintSummaryFromProjects(statusText, messageText) {
+            const typeCounts = {};
+            const subtypeCounts = {};
+            const rarityCounts = {};
+            projects.forEach(function (p) {
+                if (p._loading) return;
+                const t = p.fieldsType || '';
+                const st = p.fieldsSubtype || '';
+                const r = p.rarity || '';
+                typeCounts[t || '(empty)'] = (typeCounts[t || '(empty)'] || 0) + 1;
+                subtypeCounts[st || '(empty)'] = (subtypeCounts[st || '(empty)'] || 0) + 1;
+                rarityCounts[r || '(empty)'] = (rarityCounts[r || '(empty)'] || 0) + 1;
+            });
+            if (spmTotalCount) spmTotalCount.textContent = String(projects.length);
+            if (spmLoadedCount) spmLoadedCount.textContent = String(projects.length);
+            renderCounts(typeCounts, subtypeCounts, rarityCounts, projects.length, projects.length);
+            rebuildFilterSelects();
+            applyFiltersAndRender();
+            if (statusText) spmStatus.textContent = statusText;
+            if (messageText != null) setMessage(messageText);
+        }
+
+        var saveCacheMapPromise = null;
+        function ensureSaveCacheMap() {
+            if (spmLocalCacheReady) return Promise.resolve(saveCacheById);
+            if (saveCacheMapPromise) return saveCacheMapPromise;
+            if (typeof CardMakerPerf === 'undefined' || !CardMakerPerf.readAllSaveCache) {
+                spmLocalCacheReady = true;
+                return Promise.resolve(saveCacheById);
+            }
+            saveCacheMapPromise = CardMakerPerf.readAllSaveCache().then(function (rows) {
+                saveCacheById = new Map();
+                (rows || []).forEach(function (r) {
+                    if (r && r.id && r.state && r.state.fields && r.state.kind !== 'cardmaker-deck') {
+                        saveCacheById.set(r.id, r);
+                    }
+                });
+                spmLocalCacheReady = true;
+                return saveCacheById;
+            }).catch(function () {
+                spmLocalCacheReady = true;
+                return saveCacheById;
+            });
+            return saveCacheMapPromise;
+        }
+
+        function paintProjectsFromLocalCache() {
+            if (projects.length || !saveCacheById.size) return;
+            var list = [];
+            saveCacheById.forEach(function (row) {
+                list.push(projectFromCacheRow(row));
+            });
+            projects = list;
+            paintSummaryFromProjects(
+                'Library: ' + projects.length + ' cached card(s).',
+                ''
+            );
+        }
+
+        function projectFromDriveFile(file) {
+            var cached = saveCacheById.get(file.id);
+            if (cached && cached.state && driveFileMetaUnchanged(
+                { modifiedTime: cached.modifiedTime, size: cached.size },
+                file
+            )) {
+                return buildProjectFromState(file, cached.state);
+            }
+            if (cached && cached.state && !liteListMetaComplete(fieldsFromDriveFile(file))) {
+                var lite = buildLiteProject(file, getFieldsFromState(cached.state));
+                lite.file = file;
+                return lite;
+            }
+            return buildLiteProject(file, fieldsFromDriveFile(file));
+        }
+
         async function ensureProjectHydrated(projectId) {
             var project = projects.find(function (p) { return p.file && p.file.id === projectId; });
             if (!project) return null;
@@ -2844,33 +2933,34 @@
             var project = projects.find(function (p) { return p.file && p.file.id === id; });
             if (!project || !project.file) return;
             var mt = project.file.modifiedTime;
-            var variant = gridThumbVariant();
-            var gotHi = false;
+            var state = (project.state && typeof project.state === 'object')
+                ? project.state
+                : (saveCacheById.get(id) && saveCacheById.get(id).state);
+            var opts = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.THUMB_RENDER_OPTS)
+                ? CardMakerPerf.THUMB_RENDER_OPTS
+                : { maxOutputSide: 400, outputMime: 'image/jpeg', outputQuality: 0.78 };
             var fromCache = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.readThumbCache)
-                ? CardMakerPerf.readThumbCache(id, mt, variant)
+                ? CardMakerPerf.readThumbCache(id, mt, gridThumbVariant())
                 : Promise.resolve(null);
             fromCache.then(function (hit) {
                 if (hit && hit.dataUrl) {
                     applySpmThumbUrl(img, id, hit.dataUrl);
-                    gotHi = true;
                     return null;
                 }
                 if (typeof CardMakerPerf === 'undefined' || !CardMakerPerf.readThumbCache) return null;
                 return CardMakerPerf.readThumbCache(id, mt);
             }).then(function (legacy) {
-                if (gotHi) return { skip: true };
-                if (legacy && legacy.dataUrl) applySpmThumbUrl(img, id, legacy.dataUrl);
-                return spmReadSaveCache(id);
-            }).then(function (cached) {
-                if (!cached || cached.skip || !cached.state) return null;
-                var diskMeta = { modifiedTime: cached.modifiedTime, size: cached.size };
-                if (!driveFileMetaUnchanged(diskMeta, project.file)) return null;
-                if (typeof window.renderCardMakerProjectToDataUrl !== 'function') return null;
-                return window.renderCardMakerProjectToDataUrl(stateForCardPreviewRender(cached.state), gridThumbOpts()).then(function (url) {
+                if (img.classList.contains('is-loaded')) return null;
+                if (legacy && legacy.dataUrl) {
+                    applySpmThumbUrl(img, id, legacy.dataUrl);
+                    return null;
+                }
+                if (!state || typeof window.renderCardMakerProjectToDataUrl !== 'function') return null;
+                return window.renderCardMakerProjectToDataUrl(stateForCardPreviewRender(state), opts).then(function (url) {
                     if (!url) return;
                     applySpmThumbUrl(img, id, url);
                     if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.writeThumbCache) {
-                        CardMakerPerf.writeThumbCache(id, mt, url, variant);
+                        CardMakerPerf.writeThumbCache(id, mt, url);
                     }
                 });
             }).catch(function () { /* ignore */ });
@@ -3061,9 +3151,6 @@
                 spmSelectAll.checked = false;
                 spmSelectAll.indeterminate = false;
             }
-            spmStatus.textContent = 'Loading saved projects…';
-            spmTotalCount.textContent = '—';
-            spmLoadedCount.textContent = '—';
 
             try {
                 if (!await ensureSignedIn()) {
@@ -3072,16 +3159,16 @@
                     return;
                 }
 
-                const files = await listCardMakerProjects();
-                spmTotalCount.textContent = files.length;
-                spmTypeCounts.innerHTML = '<div class="spm-muted">Loading…</div>';
-                spmSubtypeCounts.innerHTML = '<div class="spm-muted">Loading…</div>';
-                spmRarityCounts.innerHTML = '<div class="spm-muted">Loading…</div>';
-                spmStatus.textContent = 'Listing saves (' + files.length + ')…';
+                spmStatus.textContent = projects.length
+                    ? 'Refreshing from Drive…'
+                    : 'Loading saved projects…';
 
+                await ensureSaveCacheMap();
+
+                const files = await listCardMakerProjects();
                 var previousById = new Map();
                 projects.forEach(function (p) {
-                    if (p && p.file && p.file.id && !p._lite && p.state && typeof p.state === 'object') {
+                    if (p && p.file && p.file.id && p.state && typeof p.state === 'object') {
                         previousById.set(p.file.id, p);
                     }
                 });
@@ -3092,47 +3179,15 @@
                         prev.file = file;
                         return prev;
                     }
-                    return buildLiteProject(file, fieldsFromDriveFile(file));
+                    return projectFromDriveFile(file);
                 });
-                spmLoadedCount.textContent = String(files.length);
                 spmTablePage = 0;
-                applyFiltersAndRender();
-
-                var filledFromCache = 0;
-                await mapLimit(projects, SPM_PROJECT_FETCH_CONCURRENCY, async function (p, i) {
-                    if (!p || p.state) return;
-                    if (liteListMetaComplete(p.fields)) return;
-                    var fromDisk = await spmReadSaveCache(p.file.id);
-                    var diskMeta = { modifiedTime: fromDisk && fromDisk.modifiedTime, size: fromDisk && fromDisk.size };
-                    if (!fromDisk || !fromDisk.state || !driveFileMetaUnchanged(diskMeta, p.file)) return;
-                    projects[i] = buildLiteProject(p.file, getFieldsFromState(fromDisk.state));
-                    filledFromCache++;
-                });
-
-                const typeCounts = {};
-                const subtypeCounts = {};
-                const rarityCounts = {};
-                projects.forEach(function (p) {
-                    if (p._loading) return;
-                    const t = p.fieldsType || '';
-                    const st = p.fieldsSubtype || '';
-                    const r = p.rarity || '';
-                    typeCounts[t || '(empty)'] = (typeCounts[t || '(empty)'] || 0) + 1;
-                    subtypeCounts[st || '(empty)'] = (subtypeCounts[st || '(empty)'] || 0) + 1;
-                    rarityCounts[r || '(empty)'] = (rarityCounts[r || '(empty)'] || 0) + 1;
-                });
-
-                spmStatus.textContent = 'Listed ' + projects.length + ' project(s).';
-                renderCounts(typeCounts, subtypeCounts, rarityCounts, files.length, projects.length);
-                rebuildFilterSelects();
-                applyFiltersAndRender();
-                var msg = 'Listed ' + projects.length + ' saves. Full card data loads when you Edit.';
-                if (filledFromCache > 0) {
-                    msg += ' Filled type/set info for ' + filledFromCache + ' from local cache.';
-                }
-                setMessage(msg);
+                paintSummaryFromProjects(
+                    'Loaded ' + projects.length + ' project(s).',
+                    'Loaded ' + projects.length + ' saves.'
+                );
                 var keepIds = new Set(files.map(function (f) { return f.id; }));
-                await spmPruneSaveCache(keepIds);
+                spmPruneSaveCache(keepIds);
             } catch (e) {
                 console.error(e);
                 spmStatus.textContent = 'Load failed';
@@ -3410,6 +3465,7 @@
             spmZoom.setAttribute('aria-hidden', 'true');
             if (spmZoomImg) {
                 spmZoomImg.removeAttribute('src');
+                spmZoomImg.removeAttribute('data-zoom-id');
                 spmZoomImg.alt = '';
             }
         }
@@ -3419,13 +3475,39 @@
             var project = projects.find(function (p) { return p.file && p.file.id === projectId; });
             if (!project) return;
             var title = cardListTitle(project) || 'Card preview';
+            var zoomOpts = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.PRINT_RENDER_OPTS)
+                ? CardMakerPerf.PRINT_RENDER_OPTS
+                : { maxOutputSide: 1400, outputMime: 'image/jpeg', outputQuality: 0.9 };
             spmZoomImg.alt = title;
+            spmZoomImg.setAttribute('data-zoom-id', projectId);
             spmZoomImg.removeAttribute('src');
             spmZoom.hidden = false;
             spmZoom.classList.add('is-open');
             spmZoom.setAttribute('aria-hidden', 'false');
             var thumb = spmCardGrid && spmCardGrid.querySelector('img.spm-thumb[data-id="' + String(projectId).replace(/"/g, '') + '"]');
             if (thumb && thumb.src) spmZoomImg.src = thumb.src;
+
+            function renderHi(state) {
+                if (!state || typeof window.renderCardMakerProjectToDataUrl !== 'function') return;
+                window.renderCardMakerProjectToDataUrl(stateForCardPreviewRender(state), zoomOpts).then(function (url) {
+                    if (!url || !spmZoom.classList.contains('is-open')) return;
+                    if (spmZoomImg.getAttribute('data-zoom-id') !== projectId) return;
+                    spmZoomImg.src = url;
+                }).catch(function () { /* keep thumb */ });
+            }
+
+            var state = (project.state && typeof project.state === 'object')
+                ? project.state
+                : (saveCacheById.get(projectId) && saveCacheById.get(projectId).state);
+            if (state) {
+                renderHi(state);
+                return;
+            }
+            ensureProjectHydrated(projectId).then(function (hydrated) {
+                if (!hydrated || !hydrated.state || !spmZoom.classList.contains('is-open')) return;
+                if (spmZoomImg.getAttribute('data-zoom-id') !== projectId) return;
+                renderHi(hydrated.state);
+            }).catch(function () { /* keep thumb */ });
         }
 
         if (spmZoom) {
@@ -4309,13 +4391,19 @@
 
         // Boot: try restoring session from localStorage
         (async function boot() {
+            var cachePaint = ensureSaveCacheMap().then(function () {
+                paintProjectsFromLocalCache();
+            });
             const ok = await ensureSignedIn();
             updateButtons();
+            await cachePaint;
             if (ok) {
-                spmStatus.textContent = 'Loading saved projects…';
                 spmRefreshBtn.disabled = false;
-                await syncDriveAppDataRegistriesSpm();
+                var registriesP = syncDriveAppDataRegistriesSpm();
                 await refreshAll();
+                await registriesP;
+            } else if (!projects.length) {
+                spmStatus.textContent = 'Not connected';
             }
         })();
     </script>
