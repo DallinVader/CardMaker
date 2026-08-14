@@ -184,10 +184,11 @@
         }
         .spm-zoom.is-open { display: flex; }
         .spm-zoom img {
+            width: min(92vw, 720px);
             max-width: min(92vw, 720px);
             max-height: 92vh;
-            width: auto;
             height: auto;
+            object-fit: contain;
             border-radius: 12px;
             box-shadow: 0 18px 50px rgba(0,0,0,0.55);
             background: #0f172a;
@@ -3470,14 +3471,104 @@
             }
         }
 
+        function replaceProjectInList(file, state) {
+            if (!file || !file.id || !state) return null;
+            var next = buildProjectFromState(file, state);
+            var i = projects.findIndex(function (p) { return p.file && p.file.id === file.id; });
+            if (i >= 0) projects[i] = next;
+            saveCacheById.set(file.id, {
+                id: file.id,
+                state: state,
+                modifiedTime: file.modifiedTime != null ? String(file.modifiedTime) : null,
+                size: file.size != null ? String(file.size) : null
+            });
+            spmWriteSaveCache(file.id, file, state);
+            return next;
+        }
+
+        function updateSpmCardTile(project, thumbUrl) {
+            if (!project || !project.file || !spmCardGrid) return;
+            var id = String(project.file.id);
+            var tile = spmCardGrid.querySelector('article.spm-card[data-project-id="' + id.replace(/"/g, '') + '"]');
+            if (!tile) return;
+            if (thumbUrl) {
+                var img = tile.querySelector('img.spm-thumb');
+                applySpmThumbUrl(img, id, thumbUrl);
+            }
+            var titleEl = tile.querySelector('.spm-card-title');
+            var subEl = tile.querySelector('.spm-card-sub');
+            var nameShort = displaySaveLabel(project.file.name);
+            var cardTitle = cardListTitle(project) || nameShort || '(untitled)';
+            if (titleEl) {
+                var dupTip = titleEl.querySelector('.spm-dup-mark');
+                titleEl.textContent = cardTitle;
+                if (dupTip) titleEl.appendChild(dupTip);
+            }
+            if (subEl) {
+                var subParts = [];
+                if (project.fieldsType) subParts.push(project.fieldsType);
+                if (project.fieldsSubtype) subParts.push(project.fieldsSubtype);
+                var namedSetDisplay = resolveNamedSetLabel(project);
+                if (namedSetDisplay && namedSetDisplay !== '—') subParts.push(namedSetDisplay);
+                if (project.cardSetLabel) subParts.push(project.cardSetLabel);
+                subEl.textContent = subParts.join(' · ') || '—';
+            }
+        }
+
+        function spmZoomStillOpen(projectId) {
+            return !!(spmZoom && spmZoom.classList.contains('is-open') &&
+                spmZoomImg && spmZoomImg.getAttribute('data-zoom-id') === projectId);
+        }
+
+        function renderSpmPreviewUrl(state, opts) {
+            if (!state || typeof window.renderCardMakerProjectToDataUrl !== 'function') {
+                return Promise.resolve(null);
+            }
+            return window.renderCardMakerProjectToDataUrl(stateForCardPreviewRender(state), opts);
+        }
+
+        async function refreshOneProjectFromDrive(projectId) {
+            if (!driveAccessToken) return ensureProjectHydrated(projectId);
+            try {
+                var url = DRIVE_FILES_API + '/' + encodeURIComponent(projectId) +
+                    '?fields=id,name,modifiedTime,size,appProperties';
+                var res = await fetch(url, { headers: driveAuthHeaders(driveAccessToken) });
+                var txt = await res.text();
+                if (!res.ok) throw new Error(parseDriveError(txt, res.status));
+                var file = JSON.parse(txt);
+                if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.applyAppPropertiesToFileMeta) {
+                    CardMakerPerf.applyAppPropertiesToFileMeta(file);
+                }
+                var existing = projects.find(function (p) { return p.file && p.file.id === projectId; });
+                var cached = saveCacheById.get(projectId);
+                if (existing && existing.state && typeof existing.state === 'object' &&
+                    driveFileMetaUnchanged(existing.file, file)) {
+                    existing.file = file;
+                    return existing;
+                }
+                if (cached && cached.state && driveFileMetaUnchanged(
+                    { modifiedTime: cached.modifiedTime, size: cached.size },
+                    file
+                )) {
+                    return replaceProjectInList(file, cached.state);
+                }
+                var state = await fetchDriveProjectJson(projectId);
+                return replaceProjectInList(file, state);
+            } catch (e) {
+                console.warn('Preview card refresh:', e);
+                return ensureProjectHydrated(projectId);
+            }
+        }
+
         function openSpmZoom(projectId) {
             if (!projectId || !spmZoom || !spmZoomImg) return;
             var project = projects.find(function (p) { return p.file && p.file.id === projectId; });
             if (!project) return;
             var title = cardListTitle(project) || 'Card preview';
-            var zoomOpts = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.PRINT_RENDER_OPTS)
-                ? CardMakerPerf.PRINT_RENDER_OPTS
-                : { maxOutputSide: 1400, outputMime: 'image/jpeg', outputQuality: 0.9 };
+            var zoomOpts = { maxOutputSide: 1750, outputMime: 'image/jpeg', outputQuality: 0.92 };
+            var thumbOpts = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.THUMB_RENDER_OPTS)
+                ? CardMakerPerf.THUMB_RENDER_OPTS
+                : { maxOutputSide: 400, outputMime: 'image/jpeg', outputQuality: 0.78 };
             spmZoomImg.alt = title;
             spmZoomImg.setAttribute('data-zoom-id', projectId);
             spmZoomImg.removeAttribute('src');
@@ -3487,27 +3578,43 @@
             var thumb = spmCardGrid && spmCardGrid.querySelector('img.spm-thumb[data-id="' + String(projectId).replace(/"/g, '') + '"]');
             if (thumb && thumb.src) spmZoomImg.src = thumb.src;
 
-            function renderHi(state) {
-                if (!state || typeof window.renderCardMakerProjectToDataUrl !== 'function') return;
-                window.renderCardMakerProjectToDataUrl(stateForCardPreviewRender(state), zoomOpts).then(function (url) {
-                    if (!url || !spmZoom.classList.contains('is-open')) return;
-                    if (spmZoomImg.getAttribute('data-zoom-id') !== projectId) return;
-                    spmZoomImg.src = url;
+            function applyHiRes(url, state, fileMeta) {
+                if (!url || !spmZoomStillOpen(projectId)) return;
+                spmZoomImg.src = url;
+                var mt = fileMeta && fileMeta.modifiedTime;
+                renderSpmPreviewUrl(state, thumbOpts).then(function (thumbUrl) {
+                    if (!thumbUrl) return;
+                    updateSpmCardTile(
+                        projects.find(function (p) { return p.file && p.file.id === projectId; }) || project,
+                        thumbUrl
+                    );
+                    if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.writeThumbCache && mt) {
+                        CardMakerPerf.writeThumbCache(projectId, mt, thumbUrl);
+                    }
+                }).catch(function () { /* ignore */ });
+            }
+
+            function renderHi(state, fileMeta) {
+                if (!state) return Promise.resolve();
+                return renderSpmPreviewUrl(state, zoomOpts).then(function (url) {
+                    applyHiRes(url, state, fileMeta || (project && project.file));
                 }).catch(function () { /* keep thumb */ });
             }
 
-            var state = (project.state && typeof project.state === 'object')
+            var localState = (project.state && typeof project.state === 'object')
                 ? project.state
                 : (saveCacheById.get(projectId) && saveCacheById.get(projectId).state);
-            if (state) {
-                renderHi(state);
-                return;
-            }
-            ensureProjectHydrated(projectId).then(function (hydrated) {
-                if (!hydrated || !hydrated.state || !spmZoom.classList.contains('is-open')) return;
-                if (spmZoomImg.getAttribute('data-zoom-id') !== projectId) return;
-                renderHi(hydrated.state);
-            }).catch(function () { /* keep thumb */ });
+            if (localState) renderHi(localState, project.file);
+
+            refreshOneProjectFromDrive(projectId).then(function (updated) {
+                if (!updated || !updated.state || !spmZoomStillOpen(projectId)) return;
+                spmZoomImg.alt = cardListTitle(updated) || title;
+                updateSpmCardTile(updated, null);
+                var localMt = project.file && project.file.modifiedTime;
+                var newMt = updated.file && updated.file.modifiedTime;
+                if (localState && localMt && newMt && String(localMt) === String(newMt)) return;
+                return renderHi(updated.state, updated.file);
+            }).catch(function () { /* keep current preview */ });
         }
 
         if (spmZoom) {
@@ -4379,10 +4486,10 @@
                     return;
                 }
                 if (e.target.closest('.spm-card-check') || e.target.closest('.spm-actions') || e.target.closest('a')) return;
-                var art = e.target.closest('.spm-card-art');
-                if (art) {
+                var tile = e.target.closest('.spm-card');
+                if (tile) {
                     e.preventDefault();
-                    openSpmZoom(art.getAttribute('data-zoom-id'));
+                    openSpmZoom(tile.getAttribute('data-project-id'));
                 }
             });
         }
