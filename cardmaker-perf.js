@@ -19,6 +19,14 @@
         outputQuality: 0.78
     };
 
+    /** Saved Projects grid — a bit sharper than library/player thumbs. */
+    var GRID_THUMB_RENDER_OPTS = {
+        maxOutputSide: 640,
+        outputMime: 'image/jpeg',
+        outputQuality: 0.86
+    };
+    var GRID_THUMB_VARIANT = 'g640';
+
     /** Print grid / PDF faces — sharp enough at poker size, much faster than full 2500×3500 PNG. */
     var PRINT_RENDER_OPTS = {
         maxOutputSide: 1400,
@@ -206,17 +214,19 @@
         });
     }
 
-    function thumbCacheKey(fileId, modifiedTime) {
-        return String(fileId || '') + '|' + String(modifiedTime || '');
+    function thumbCacheKey(fileId, modifiedTime, variant) {
+        var k = String(fileId || '') + '|' + String(modifiedTime || '');
+        if (variant) k += '|' + String(variant);
+        return k;
     }
 
-    function readThumbCache(fileId, modifiedTime) {
-        return idbGet(IDB_STORE_THUMBS, thumbCacheKey(fileId, modifiedTime));
+    function readThumbCache(fileId, modifiedTime, variant) {
+        return idbGet(IDB_STORE_THUMBS, thumbCacheKey(fileId, modifiedTime, variant));
     }
 
-    function writeThumbCache(fileId, modifiedTime, dataUrl) {
+    function writeThumbCache(fileId, modifiedTime, dataUrl, variant) {
         if (!fileId || !dataUrl) return Promise.resolve();
-        return idbPut(IDB_STORE_THUMBS, thumbCacheKey(fileId, modifiedTime), {
+        return idbPut(IDB_STORE_THUMBS, thumbCacheKey(fileId, modifiedTime, variant), {
             dataUrl: dataUrl,
             modifiedTime: modifiedTime,
             cachedAt: Date.now()
@@ -235,20 +245,34 @@
         return idbDelete(IDB_STORE_SAVES, EDITOR_DRAFT_KEY);
     }
 
+    function clipAppProp(value, maxLen) {
+        var s = value == null ? '' : String(value).trim();
+        if (maxLen && s.length > maxLen) return s.slice(0, maxLen);
+        return s;
+    }
+
     /** Drive appProperties (strings only) for list/filter without downloading media. */
     function buildAppPropertiesFromState(state) {
         var fields = state && state.fields ? state.fields : {};
-        var setId = fields.CardMakerSetId != null ? String(fields.CardMakerSetId).trim() : '';
-        var title = fields.Title != null ? String(fields.Title).trim() : '';
-        var rarity = fields.Rarity != null ? String(fields.Rarity).trim() : '';
-        if (title.length > 80) title = title.slice(0, 80);
-        if (setId.length > 64) setId = setId.slice(0, 64);
-        if (rarity.length > 32) rarity = rarity.slice(0, 32);
-        return {
+        var setId = clipAppProp(fields.CardMakerSetId, 64);
+        var title = clipAppProp(fields.Title, 80);
+        var rarity = clipAppProp(fields.Rarity, 32);
+        var type = clipAppProp(fields.Type, 48);
+        var subtype = clipAppProp(fields.Subtype, 48);
+        var n = parseInt(fields.CardSetNumber, 10);
+        var t = parseInt(fields.CardSetTotal, 10);
+        var cost = clipAppProp(fields.TreasureCost, 16);
+        var props = {
             cmSetId: setId || '',
             cmTitle: title || '',
-            cmRarity: rarity || ''
+            cmRarity: rarity || '',
+            cmType: type || '',
+            cmSubtype: subtype || ''
         };
+        if (n >= 1) props.cmSetN = String(n);
+        if (t >= 1) props.cmSetT = String(t);
+        if (cost) props.cmCost = cost;
+        return props;
     }
 
     function setIdFromDriveFile(file) {
@@ -396,6 +420,8 @@
 
     global.CardMakerPerf = {
         THUMB_RENDER_OPTS: THUMB_RENDER_OPTS,
+        GRID_THUMB_RENDER_OPTS: GRID_THUMB_RENDER_OPTS,
+        GRID_THUMB_VARIANT: GRID_THUMB_VARIANT,
         PRINT_RENDER_OPTS: PRINT_RENDER_OPTS,
         PROJECT_EXT: PROJECT_EXT,
         EDITOR_DRAFT_KEY: EDITOR_DRAFT_KEY,

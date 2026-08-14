@@ -94,52 +94,113 @@
         .spm-select { padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #e2e8f0; font-weight: 800; }
         .spm-input { padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #e2e8f0; min-width: 240px; font-weight: 700; }
 
-        .spm-table-scroll {
-            margin-top: 4px;
-            border-radius: 16px;
-            border: 1px solid rgba(148,163,184,0.16);
+        .spm-grid-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px 16px;
+            margin: 12px 0 10px;
         }
-        table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 16px; background: rgba(15,23,42,0.18); }
-        thead th {
-            position: sticky; top: 0;
-            background: rgba(15,23,42,0.92);
-            backdrop-filter: blur(8px);
-            color: #93c5fd;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            padding: 12px 12px;
-            border-bottom: 1px solid rgba(148,163,184,0.18);
-            text-align: left;
-            z-index: 1;
-        }
-        th.spm-th-check { text-align: center; vertical-align: middle; width: 48px !important; }
-        tbody td {
-            padding: 9px 11px;
-            border-bottom: 1px solid rgba(148,163,184,0.12);
-            vertical-align: middle;
+        .spm-select-all-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 800;
             font-size: 13px;
             color: #e2e8f0;
+            cursor: pointer;
+            user-select: none;
         }
-        td.spm-actions {
-            white-space: nowrap;
-            width: 1%;
+        .spm-card-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
         }
-        tbody tr { background: transparent; transition: background 0.12s ease, box-shadow 0.12s ease; }
-        tbody tr:hover { background: rgba(102,126,234,0.1); }
-        tbody tr.spm-row-selected {
-            background: rgba(99,102,241,0.11);
-            box-shadow: inset 3px 0 0 #818cf8;
+        @media (max-width: 1100px) { .spm-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media (max-width: 720px) { .spm-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        .spm-card {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
-        tbody tr.spm-row-selected:hover { background: rgba(99,102,241,0.16); }
-        tbody tr.spm-row-dup {
-            box-shadow: inset 3px 0 0 rgba(248, 113, 113, 0.9);
+        .spm-card.is-selected {
+            border-color: rgba(129, 140, 248, 0.65);
+            box-shadow: 0 0 0 1px rgba(129,140,248,0.25);
         }
-        tbody tr.spm-row-selected.spm-row-dup {
-            box-shadow: inset 3px 0 0 #818cf8, inset 6px 0 0 rgba(248, 113, 113, 0.9);
+        .spm-card.is-dup { box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.55); }
+        .spm-card.is-selected.is-dup {
+            box-shadow: 0 0 0 1px rgba(129,140,248,0.25), 0 0 0 3px rgba(248, 113, 113, 0.45);
         }
-        tbody tr.spm-row-dup:hover { background: rgba(248, 113, 113, 0.07); }
-        tbody tr.spm-row-selected.spm-row-dup:hover { background: rgba(99,102,241,0.14); }
+        .spm-card-art {
+            position: relative;
+            aspect-ratio: 2.5 / 3.5;
+            background: #1e293b;
+            cursor: zoom-in;
+        }
+        .spm-card-art img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+        }
+        .spm-card-art img.is-loaded { opacity: 1; }
+        .spm-card-ph {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            font-size: 12px;
+            pointer-events: none;
+        }
+        .spm-card-art img.is-loaded + .spm-card-ph { display: none; }
+        .spm-card-check {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            z-index: 2;
+            cursor: pointer;
+        }
+        .spm-card-meta { padding: 8px 10px 6px; min-height: 3.1rem; }
+        .spm-card-title { font-weight: 800; font-size: 13px; color: #f8fafc; line-height: 1.25; }
+        .spm-card-sub { display: block; margin-top: 3px; font-size: 11px; color: #94a3b8; }
+        .spm-grid-empty { padding: 28px 16px; text-align: center; color: #94a3b8; }
+        .spm-zoom {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 80;
+            background: rgba(2, 6, 23, 0.82);
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            cursor: zoom-out;
+        }
+        .spm-zoom.is-open { display: flex; }
+        .spm-zoom img {
+            max-width: min(92vw, 720px);
+            max-height: 92vh;
+            width: auto;
+            height: auto;
+            border-radius: 12px;
+            box-shadow: 0 18px 50px rgba(0,0,0,0.55);
+            background: #0f172a;
+        }
+        .spm-zoom-hint {
+            position: absolute;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #cbd5e1;
+            font-size: 12px;
+            pointer-events: none;
+        }
         .spm-dup-mark {
             display: inline-flex;
             align-items: center;
@@ -158,38 +219,6 @@
             line-height: 1;
             cursor: help;
         }
-        tbody tr[data-project-id] { cursor: help; }
-        .spm-name { max-width: min(640px, 50vw); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 900; }
-
-        .spm-hover-preview {
-            position: fixed;
-            z-index: 10050;
-            pointer-events: none;
-            width: min(240px, 42vw);
-            max-height: min(340px, 52vh);
-            border-radius: 14px;
-            border: 2px solid rgba(129, 140, 248, 0.65);
-            box-shadow: 0 24px 56px rgba(0, 0, 0, 0.55);
-            background: #0f172a;
-            overflow: hidden;
-        }
-        .spm-hover-preview img {
-            display: block;
-            width: 100%;
-            height: auto;
-            vertical-align: top;
-        }
-        .spm-hover-preview.is-loading img { opacity: 0.35; }
-        .spm-hover-preview-fallback {
-            display: none;
-            padding: 18px 14px;
-            font-size: 12px;
-            line-height: 1.45;
-            color: #94a3b8;
-            text-align: center;
-        }
-        .spm-hover-preview.is-fallback .spm-hover-preview-fallback { display: block; }
-        .spm-hover-preview.is-fallback img { display: none; }
         .spm-muted { color: #cbd5e1; }
 
         .spm-rarity {
@@ -201,18 +230,6 @@
             background: rgba(255,255,255,0.06);
             color: #e2e8f0;
             font-weight: 800;
-        }
-
-        .spm-th-sortable {
-            cursor: pointer;
-            user-select: none;
-        }
-        .spm-th-sortable:hover { filter: brightness(1.08); }
-        .spm-th-arrow {
-            margin-left: 8px;
-            color: #cbd5e1;
-            font-weight: 900;
-            font-size: 12px;
         }
 
         /* Ensure select dropdown options are readable. Native option styling varies by browser,
@@ -437,25 +454,29 @@
             background: rgba(239,68,68,0.12);
             color: #fecaca;
         }
-        /* Open + Delete stay on one compact row so table rows stay short */
         .spm-actions {
-            display: inline-flex;
+            display: flex;
             flex-direction: row;
-            flex-wrap: nowrap;
-            align-items: center;
+            flex-wrap: wrap;
+            align-items: stretch;
             gap: 6px;
-            white-space: nowrap;
+            padding: 0 10px 10px;
         }
         .spm-actions .spm-link-btn,
         .spm-actions .spm-small-btn {
-            padding: 6px 10px;
+            padding: 8px 10px;
             border-radius: 8px;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 800;
             line-height: 1.2;
-            flex: 0 0 auto;
+            flex: 1 1 0;
+            min-width: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-sizing: border-box;
         }
-        .spm-actions .spm-btn-edit { padding: 6px 10px; font-size: 11px; }
 
         .spm-check-cell { text-align: center; }
         .spm-row-check {
@@ -743,128 +764,16 @@
         }
 
         @media (max-width: 720px) {
-            tbody tr[data-project-id] { cursor: default; }
             .spm-wrap { padding-top: 16px; padding-bottom: max(28px, env(safe-area-inset-bottom)); }
-            .spm-table-scroll {
-                margin-top: 8px;
-                max-height: none;
-                -webkit-overflow-scrolling: touch;
-                overflow-x: visible;
-                border: none;
-                border-radius: 0;
-                background: transparent;
-            }
-            .spm-table-scroll table {
-                display: block;
-                background: transparent;
-                border-radius: 0;
-            }
-            .spm-table-scroll thead {
-                position: static;
-                display: none;
-            }
-            .spm-table-scroll tbody {
-                display: block;
-            }
-            .spm-table-scroll tbody tr {
-                display: block;
-                margin-bottom: 14px;
-                padding: 12px 14px;
-                border-radius: 14px;
-                border: 1px solid rgba(148, 163, 184, 0.22);
-                background: rgba(15, 23, 42, 0.55);
-                box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
-            }
-            .spm-table-scroll tbody tr.spm-row-selected {
-                box-shadow: inset 3px 0 0 #818cf8, 0 4px 18px rgba(0, 0, 0, 0.22);
-            }
-            .spm-table-scroll tbody td {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                gap: 8px 12px;
-                padding: 10px 0;
-                border-bottom: 1px dashed rgba(148, 163, 184, 0.18);
-                border-left: none;
-                border-right: none;
-                font-size: 14px;
-            }
-            .spm-table-scroll tbody tr > td:last-child {
-                border-bottom: none;
-                padding-bottom: 4px;
-            }
-            .spm-table-scroll tbody td[data-label]:not([data-label=""])::before {
-                content: attr(data-label);
-                flex: 0 0 7rem;
-                min-width: 6rem;
-                font-size: 10px;
-                font-weight: 800;
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-                color: #94a3b8;
-                line-height: 1.3;
-            }
-            .spm-table-scroll tbody td.spm-check-cell {
-                border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-                padding-bottom: 12px;
-                margin-bottom: 4px;
-                justify-content: flex-start;
-            }
-            .spm-table-scroll tbody td.spm-check-cell::before {
-                display: none;
-                content: none;
-            }
-            .spm-table-scroll tbody td.spm-check-cell .spm-row-check {
+            .spm-card-check .spm-row-check {
                 width: 26px;
                 height: 26px;
             }
-            .spm-table-scroll tbody td.spm-actions {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 10px;
-                padding-top: 14px;
-            }
-            .spm-table-scroll tbody td.spm-actions::before {
-                flex: 0 0 100%;
-                min-width: 100%;
-                margin-bottom: 2px;
-            }
-            .spm-table-scroll .spm-actions {
-                white-space: normal;
-                flex-wrap: wrap;
-            }
-            .spm-table-scroll .spm-actions .spm-small-btn,
-            .spm-table-scroll .spm-actions .spm-link-btn {
-                flex: 1 1 auto;
+            .spm-actions .spm-small-btn,
+            .spm-actions .spm-link-btn {
                 min-height: 44px;
                 padding: 12px 14px;
                 font-size: 13px;
-                justify-content: center;
-            }
-            .spm-table-scroll tbody td .spm-rarity select {
-                min-height: 44px;
-                width: 100%;
-                max-width: 100%;
-            }
-            .spm-name {
-                max-width: none;
-                white-space: normal;
-                word-break: break-word;
-            }
-            .spm-table-empty-row td,
-            .spm-table-empty-row td.spm-table-empty-msg {
-                display: block !important;
-                text-align: center !important;
-                padding: 22px 14px !important;
-                border: none !important;
-                font-size: 14px;
-            }
-            .spm-table-empty-row td::before {
-                display: none !important;
-                content: none !important;
-            }
-            .spm-hover-preview {
-                display: none;
             }
             .spm-modal {
                 padding: max(8px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-right))
@@ -975,7 +884,7 @@
                         </label>
                     </div>
                     <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:flex-end;">
-                        <button type="button" class="spm-small-btn" id="spmExportCsvBtn" disabled title="Download the current table as CSV">Export CSV</button>
+                        <button type="button" class="spm-small-btn" id="spmExportCsvBtn" disabled title="Download the current list as CSV">Export CSV</button>
                         <label style="font-weight:900; color:#e2e8f0; font-size:13px;">
                             Sort
                             <select class="spm-select" id="spmSortSelect">
@@ -1052,26 +961,14 @@
                     </div>
                 </details>
 
-                <div class="spm-table-scroll" style="max-height: 560px; overflow:auto;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th class="spm-th-check" title="Select all rows in the current filtered list"><input type="checkbox" class="spm-row-check" id="spmSelectAll" aria-label="Select all visible rows" /></th>
-                                <th style="min-width: 280px;" class="spm-th-sortable" data-sort-base="name">Save <span class="spm-th-arrow" data-arrow-base="name">↕</span></th>
-                                <th style="width: 80px;">Size</th>
-                                <th style="width: 80px;" class="spm-th-sortable" data-sort-base="cost">Cost <span class="spm-th-arrow" data-arrow-base="cost">↕</span></th>
-                                <th style="min-width: 150px;" class="spm-th-sortable" data-sort-base="type">Type <span class="spm-th-arrow" data-arrow-base="type">↕</span></th>
-                                <th style="min-width: 160px;" class="spm-th-sortable" data-sort-base="subtype">Subtype <span class="spm-th-arrow" data-arrow-base="subtype">↕</span></th>
-                                <th style="min-width: 120px;">Set</th>
-                                <th style="min-width: 100px;" class="spm-th-sortable" data-sort-base="cardset">Card # <span class="spm-th-arrow" data-arrow-base="cardset">↕</span></th>
-                                <th style="min-width: 140px;" class="spm-th-sortable" data-sort-base="rarity">Rarity <span class="spm-th-arrow" data-arrow-base="rarity">↕</span></th>
-                                <th style="min-width: 160px;" class="spm-th-sortable" data-sort-base="updated">Updated <span class="spm-th-arrow" data-arrow-base="updated">↕</span></th>
-                                <th class="spm-th-actions" style="width: 198px;">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="spmTableBody"></tbody>
-                    </table>
+                <div class="spm-grid-toolbar">
+                    <label class="spm-select-all-label" title="Select all cards in the current filtered list">
+                        <input type="checkbox" class="spm-row-check" id="spmSelectAll" aria-label="Select all visible cards" />
+                        Select all visible
+                    </label>
                 </div>
+                <div class="spm-card-grid" id="spmCardGrid"></div>
+                <p class="spm-grid-empty" id="spmGridEmpty" hidden>No projects match the current filters (or nothing loaded yet).</p>
 
                 <div class="spm-message" id="spmMessage" aria-live="polite"></div>
             </div>
@@ -1259,9 +1156,9 @@
         </div>
     </div>
 
-    <div id="spmHoverPreview" class="spm-hover-preview" hidden aria-hidden="true">
-        <img alt="" decoding="async" />
-        <div class="spm-hover-preview-fallback">No preview available for this save.</div>
+    <div class="spm-zoom" id="spmZoom" hidden aria-hidden="true">
+        <img id="spmZoomImg" alt="Card preview">
+        <div class="spm-zoom-hint">Click or press Esc to close</div>
     </div>
 
     <script src="cardmaker-fonts.js"></script>
@@ -1299,7 +1196,11 @@
         const spmSubtypeCounts = document.getElementById('spmSubtypeCounts');
         const spmRarityCounts = document.getElementById('spmRarityCounts');
 
-        const spmTableBody = document.getElementById('spmTableBody');
+        const spmCardGrid = document.getElementById('spmCardGrid');
+        const spmGridEmpty = document.getElementById('spmGridEmpty');
+        const spmZoom = document.getElementById('spmZoom');
+        const spmZoomImg = document.getElementById('spmZoomImg');
+        var spmThumbIo = null;
         const spmSearchInput = document.getElementById('spmSearchInput');
         const spmSortSelect = document.getElementById('spmSortSelect');
         const spmFilterType = document.getElementById('spmFilterType');
@@ -2249,7 +2150,7 @@
             return isFinite(n) ? n : NaN;
         }
 
-        /** Parallelism for downloading project JSON from Drive (images are inside JSON — more workers = list fills faster). */
+        /** Parallelism for local cache field fills / bulk Drive writes. */
         const SPM_PROJECT_FETCH_CONCURRENCY = 14;
         /** Parallel uploads when assigning sets / bulk rarity (bounded to reduce Drive throttling). */
         const SPM_BULK_UPLOAD_CONCURRENCY = 8;
@@ -2401,8 +2302,7 @@
             });
         }
 
-        // Loaded projects cache
-        // { file: {id,name,modifiedTime,size}, state, fields, costNumber, rarity }
+        // Loaded projects cache. Grid rows are lite (name/type/set/# only) until Edit hydrates `state`.
         let projects = [];
 
         function getFieldsFromState(state) {
@@ -2436,11 +2336,61 @@
             return String(fields.Title).trim();
         }
 
-        /** Which loaded projects share the same card Title or same card # (set index), for duplicate warnings in the table. */
+        function cardListTitle(p) {
+            var t = computeCardTitle(p && p.fields);
+            if (t) return t;
+            return displaySaveLabel(p && p.file && p.file.name) || '';
+        }
+
+        function liteFieldsFrom(fields) {
+            fields = fields || {};
+            var n = parseInt(fields.CardSetNumber, 10);
+            var t = parseInt(fields.CardSetTotal, 10);
+            var cost = fields.TreasureCost;
+            return {
+                Title: fields.Title != null ? String(fields.Title).trim() : '',
+                Type: fields.Type != null ? String(fields.Type).trim() : '',
+                Subtype: fields.Subtype != null ? String(fields.Subtype).trim() : '',
+                Rarity: fields.Rarity != null ? String(fields.Rarity).trim() : '',
+                CardMakerSetId: fields.CardMakerSetId != null ? String(fields.CardMakerSetId).trim() : '',
+                CardSetNumber: n >= 1 ? String(n) : '',
+                CardSetTotal: t >= 1 ? String(t) : '',
+                TreasureCost: cost != null && String(cost).trim() !== '' ? String(cost).trim() : ''
+            };
+        }
+
+        function fieldsFromDriveFile(file) {
+            var ap = (file && file.appProperties) || {};
+            var setId = '';
+            if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.setIdFromDriveFile) {
+                setId = CardMakerPerf.setIdFromDriveFile(file) || '';
+            } else if (file && file.cardMakerSetId) {
+                setId = String(file.cardMakerSetId).trim();
+            } else if (ap.cmSetId) {
+                setId = String(ap.cmSetId).trim();
+            }
+            return liteFieldsFrom({
+                Title: ap.cmTitle,
+                Type: ap.cmType,
+                Subtype: ap.cmSubtype,
+                Rarity: ap.cmRarity,
+                CardMakerSetId: setId,
+                CardSetNumber: ap.cmSetN,
+                CardSetTotal: ap.cmSetT,
+                TreasureCost: ap.cmCost
+            });
+        }
+
+        function liteListMetaComplete(fields) {
+            fields = fields || {};
+            return !!String(fields.Type || '').trim();
+        }
+
+        /** Which loaded projects share the same card Title or same card # (set index), for duplicate warnings in the grid. */
         function computeDuplicateProjectIds(allProjects) {
             var nameCounts = {};
             var numCounts = {};
-            var loaded = allProjects.filter(function (p) { return p && !p._loading && p.file && p.file.id; });
+            var loaded = allProjects.filter(function (p) { return p && p.file && p.file.id && !p._loading; });
             loaded.forEach(function (p) {
                 var title = computeCardTitle(p.fields);
                 if (title) {
@@ -2556,9 +2506,15 @@
                     MainDisciption: '',
                     MainDisciptionFontSize: '125',
                     MainDescriptionCenterAlign: true,
+                    MainDisciptionPosX: '0',
+                    MainDisciptionPosY: '0',
+                    MainDisciptionWrap: '79',
                     SubDisciption: '',
                     SubDisciptionFontSize: '70',
                     SubDescriptionCenterAlign: true,
+                    SubDisciptionPosX: '0',
+                    SubDisciptionPosY: '0',
+                    SubDisciptionWrap: '79',
                     QoteDiscription: '',
                     QoteDiscriptionFontSize: '60',
                     QuoteCenterAlign: true,
@@ -2577,6 +2533,34 @@
             };
         }
 
+        function buildLiteProject(file, fieldsSource) {
+            var fields = liteFieldsFrom(fieldsSource);
+            var cs = computeCardSetKey(fields);
+            var setId = fields.CardMakerSetId || '';
+            if (!setId && file) {
+                if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.setIdFromDriveFile) {
+                    setId = CardMakerPerf.setIdFromDriveFile(file) || '';
+                } else if (file.cardMakerSetId) {
+                    setId = String(file.cardMakerSetId).trim();
+                }
+                if (setId) fields.CardMakerSetId = setId;
+            }
+            return {
+                file: file,
+                state: null,
+                _lite: true,
+                fields: fields,
+                fieldsType: computeType(fields),
+                fieldsSubtype: computeSubtype(fields),
+                costNumber: computeCost(fields),
+                rarity: computeRarityValue(fields),
+                cardSetN: cs.n,
+                cardSetT: cs.t,
+                cardSetLabel: cs.label,
+                cardMakerSetId: setId
+            };
+        }
+
         function buildProjectFromState(file, state) {
             const fields = getFieldsFromState(state);
             const costNumber = computeCost(fields);
@@ -2588,6 +2572,7 @@
             return {
                 file: file,
                 state: state,
+                _lite: false,
                 fieldsType: fieldsType,
                 fieldsSubtype: fieldsSubtype,
                 costNumber: costNumber,
@@ -2601,34 +2586,13 @@
         }
 
         function makePlaceholderProject(file) {
-            var setId = '';
-            if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.setIdFromDriveFile) {
-                setId = CardMakerPerf.setIdFromDriveFile(file) || '';
-            } else if (file && file.cardMakerSetId) {
-                setId = String(file.cardMakerSetId).trim();
-            } else if (file && file.appProperties && file.appProperties.cmSetId) {
-                setId = String(file.appProperties.cmSetId).trim();
-            }
-            return {
-                file: file,
-                _loading: true,
-                state: null,
-                fields: {},
-                fieldsType: '',
-                fieldsSubtype: '',
-                costNumber: NaN,
-                rarity: '',
-                cardSetN: NaN,
-                cardSetT: NaN,
-                cardSetLabel: '',
-                cardMakerSetId: setId
-            };
+            return buildLiteProject(file, fieldsFromDriveFile(file));
         }
 
         async function ensureProjectHydrated(projectId) {
             var project = projects.find(function (p) { return p.file && p.file.id === projectId; });
             if (!project) return null;
-            if (!project._loading && project.state && typeof project.state === 'object') return project;
+            if (!project._lite && project.state && typeof project.state === 'object') return project;
             var cached = await spmReadSaveCache(projectId);
             var metaRef = { modifiedTime: cached && cached.modifiedTime, size: cached && cached.size };
             if (cached && cached.state && project.file && driveFileMetaUnchanged(metaRef, project.file)) {
@@ -2756,8 +2720,12 @@
             return items.sort(function (a, b) {
                 if (sortKey === 'updatedDesc') return getUpdatedTime(b) - getUpdatedTime(a);
                 if (sortKey === 'updatedAsc') return getUpdatedTime(a) - getUpdatedTime(b);
-                if (sortKey === 'nameAsc') return String(a.file.name).localeCompare(String(b.file.name));
-                if (sortKey === 'nameDesc') return String(b.file.name).localeCompare(String(a.file.name));
+                if (sortKey === 'nameAsc') {
+                    return cardListTitle(a).localeCompare(cardListTitle(b), undefined, { sensitivity: 'base' });
+                }
+                if (sortKey === 'nameDesc') {
+                    return cardListTitle(b).localeCompare(cardListTitle(a), undefined, { sensitivity: 'base' });
+                }
                 const aCost = isFinite(a.costNumber) ? a.costNumber : Infinity;
                 const bCost = isFinite(b.costNumber) ? b.costNumber : Infinity;
                 if (sortKey === 'costAsc') return aCost - bCost;
@@ -2851,95 +2819,139 @@
 
         updateHeaderArrows();
 
+        function gridThumbOpts() {
+            if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.GRID_THUMB_RENDER_OPTS) {
+                return CardMakerPerf.GRID_THUMB_RENDER_OPTS;
+            }
+            return { maxOutputSide: 640, outputMime: 'image/jpeg', outputQuality: 0.86 };
+        }
+
+        function gridThumbVariant() {
+            return (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.GRID_THUMB_VARIANT)
+                ? CardMakerPerf.GRID_THUMB_VARIANT
+                : 'g640';
+        }
+
+        function applySpmThumbUrl(img, id, url) {
+            if (!url || !img || img.getAttribute('data-id') !== id) return;
+            img.src = url;
+            img.classList.add('is-loaded');
+        }
+
+        function loadSpmThumb(img) {
+            var id = img.getAttribute('data-id');
+            if (!id) return;
+            var project = projects.find(function (p) { return p.file && p.file.id === id; });
+            if (!project || !project.file) return;
+            var mt = project.file.modifiedTime;
+            var variant = gridThumbVariant();
+            var gotHi = false;
+            var fromCache = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.readThumbCache)
+                ? CardMakerPerf.readThumbCache(id, mt, variant)
+                : Promise.resolve(null);
+            fromCache.then(function (hit) {
+                if (hit && hit.dataUrl) {
+                    applySpmThumbUrl(img, id, hit.dataUrl);
+                    gotHi = true;
+                    return null;
+                }
+                if (typeof CardMakerPerf === 'undefined' || !CardMakerPerf.readThumbCache) return null;
+                return CardMakerPerf.readThumbCache(id, mt);
+            }).then(function (legacy) {
+                if (gotHi) return { skip: true };
+                if (legacy && legacy.dataUrl) applySpmThumbUrl(img, id, legacy.dataUrl);
+                return spmReadSaveCache(id);
+            }).then(function (cached) {
+                if (!cached || cached.skip || !cached.state) return null;
+                var diskMeta = { modifiedTime: cached.modifiedTime, size: cached.size };
+                if (!driveFileMetaUnchanged(diskMeta, project.file)) return null;
+                if (typeof window.renderCardMakerProjectToDataUrl !== 'function') return null;
+                return window.renderCardMakerProjectToDataUrl(stateForCardPreviewRender(cached.state), gridThumbOpts()).then(function (url) {
+                    if (!url) return;
+                    applySpmThumbUrl(img, id, url);
+                    if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.writeThumbCache) {
+                        CardMakerPerf.writeThumbCache(id, mt, url, variant);
+                    }
+                });
+            }).catch(function () { /* ignore */ });
+        }
+
+        function setupLazyThumbs() {
+            if (spmThumbIo) {
+                try { spmThumbIo.disconnect(); } catch (e) { /* ignore */ }
+                spmThumbIo = null;
+            }
+            if (!spmCardGrid) return;
+            var imgs = spmCardGrid.querySelectorAll('img.spm-thumb');
+            if (!imgs.length) return;
+            if (typeof IntersectionObserver === 'undefined') {
+                Array.prototype.forEach.call(imgs, loadSpmThumb);
+                return;
+            }
+            spmThumbIo = new IntersectionObserver(function (entries) {
+                entries.forEach(function (en) {
+                    if (!en.isIntersecting) return;
+                    try { spmThumbIo.unobserve(en.target); } catch (e2) { /* ignore */ }
+                    loadSpmThumb(en.target);
+                });
+            }, { rootMargin: '160px 0px' });
+            Array.prototype.forEach.call(imgs, function (im) { spmThumbIo.observe(im); });
+        }
+
         function renderTable(items) {
-            if (!spmTableBody) return;
+            if (!spmCardGrid) return;
+            if (spmGridEmpty) spmGridEmpty.hidden = !!(items && items.length);
             if (!items || items.length === 0) {
-                spmTableBody.innerHTML = '<tr class="spm-table-empty-row"><td colspan="11" class="spm-muted spm-table-empty-msg">No projects match the current filters (or nothing loaded yet).</td></tr>';
+                spmCardGrid.innerHTML = '';
+                if (spmGridEmpty) spmGridEmpty.hidden = false;
                 return;
             }
             var dupSets = computeDuplicateProjectIds(projects);
-            spmTableBody.innerHTML = items.map(function (p) {
-                const nameShort = displaySaveLabel(p.file.name);
-                const when = p.file.modifiedTime ? escapeHtml(new Date(p.file.modifiedTime).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })) : '—';
-                const sz = formatFileSize(p.file.size);
-                const szTitle = p.file.size != null ? escapeHtml(String(p.file.size) + ' bytes') : '';
-                const openHref = 'index.html?openDriveFile=' + encodeURIComponent(p.file.id);
-                const chk = selectedProjectIds.has(p.file.id) ? 'checked' : '';
-                var rowClasses = [];
-                if (selectedProjectIds.has(p.file.id)) rowClasses.push('spm-row-selected');
-                const isDup = !p._loading && (dupSets.dupTitle.has(p.file.id) || dupSets.dupNum.has(p.file.id));
-                if (isDup) rowClasses.push('spm-row-dup');
-                const rowClass = rowClasses.length ? ' class="' + rowClasses.join(' ') + '"' : '';
-                const rowAttr = ' data-project-id="' + escapeHtml(p.file.id) + '"';
-                const dupTip = !p._loading ? duplicateWarningMark(p.file.id, dupSets) : '';
-                const rowTitleAttr = (function () {
-                    if (p._loading) return '';
+            spmCardGrid.innerHTML = items.map(function (p) {
+                var nameShort = displaySaveLabel(p.file.name);
+                var cardTitle = cardListTitle(p) || nameShort || '(untitled)';
+                var openHref = 'index.html?openDriveFile=' + encodeURIComponent(p.file.id);
+                var chk = selectedProjectIds.has(p.file.id) ? 'checked' : '';
+                var isDup = !p._loading && (dupSets.dupTitle.has(p.file.id) || dupSets.dupNum.has(p.file.id));
+                var classes = 'spm-card';
+                if (selectedProjectIds.has(p.file.id)) classes += ' is-selected';
+                if (isDup) classes += ' is-dup';
+                var dupTip = !p._loading ? duplicateWarningMark(p.file.id, dupSets) : '';
+                var titleAttr = '';
+                if (!p._loading) {
                     var parts = [];
                     if (dupSets.dupTitle.has(p.file.id)) parts.push('Same card title as another save');
                     if (dupSets.dupNum.has(p.file.id)) parts.push('Same card # as another save');
-                    if (!parts.length) return '';
-                    return ' title="' + escapeHtml(parts.join('. ') + '.') + '"';
-                })();
-                const busy = '<span class="spm-muted">…</span>';
-
-                if (p._loading) {
-                    return '<tr' + rowClass + rowAttr + '>' +
-                        '<td class="spm-check-cell" data-label=""><input type="checkbox" class="spm-row-check" data-spm-row-check data-project-id="' + escapeHtml(p.file.id) + '" ' + chk + ' aria-label="Select ' + escapeHtml(nameShort) + '"/></td>' +
-                        '<td class="spm-name" data-label="Save" title="' + escapeHtml(p.file.name) + '">' + escapeHtml(nameShort) + '</td>' +
-                        '<td class="spm-muted" data-label="Size" title="' + szTitle + '">' + escapeHtml(sz) + '</td>' +
-                        '<td data-label="Cost">' + busy + '</td>' +
-                        '<td data-label="Type">' + busy + '</td>' +
-                        '<td data-label="Subtype">' + busy + '</td>' +
-                        '<td class="spm-muted" data-label="Set">' + busy + '</td>' +
-                        '<td class="spm-muted" data-label="Card #">' + busy + '</td>' +
-                        '<td data-label="Rarity" data-rarity-tier=""><span class="spm-muted">…</span></td>' +
-                        '<td class="spm-muted" data-label="Updated">' + when + '</td>' +
-                        '<td class="spm-actions" data-label="Actions">' +
-                            '<button type="button" class="spm-small-btn spm-btn-edit" data-spm-edit data-project-id="' + escapeHtml(p.file.id) + '" disabled title="Loading save details…">Edit</button>' +
-                            '<a class="spm-link-btn" href="' + openHref + '" target="_blank" rel="noopener">Open</a>' +
-                            '<button type="button" class="spm-small-btn spm-danger" data-spm-delete data-project-id="' + escapeHtml(p.file.id) + '">Delete</button>' +
-                        '</td>' +
-                    '</tr>';
+                    if (parts.length) titleAttr = ' title="' + escapeHtml(parts.join('. ') + '.') + '"';
                 }
-
-                const cost = isFinite(p.costNumber) ? String(p.costNumber) : '—';
-                const rarityValue = p.rarity || '';
-                const typeValue = p.fieldsType || '—';
-                const subtypeValue = p.fieldsSubtype || '—';
-                const namedSetDisplay = resolveNamedSetLabel(p);
-                const cardSetDisplay = p.cardSetLabel ? p.cardSetLabel : '—';
-
-                const selectOptions = RARITY_OPTIONS.map(function (opt) {
-                    const val = opt;
-                    const selected = rarityValue === val ? 'selected' : '';
-                    const label = opt === '' ? '—' : opt;
-                    return '<option value="' + escapeHtml(val) + '" ' + selected + '>' + escapeHtml(label) + '</option>';
-                }).join('');
-
-                return '<tr' + rowClass + rowAttr + rowTitleAttr + '>' +
-                    '<td class="spm-check-cell" data-label=""><input type="checkbox" class="spm-row-check" data-spm-row-check data-project-id="' + escapeHtml(p.file.id) + '" ' + chk + ' aria-label="Select ' + escapeHtml(nameShort) + '"/></td>' +
-                    '<td class="spm-name" data-label="Save" title="' + escapeHtml(p.file.name) + '">' + escapeHtml(nameShort) + dupTip + '</td>' +
-                    '<td class="spm-muted" data-label="Size" title="' + szTitle + '">' + escapeHtml(sz) + '</td>' +
-                    '<td data-label="Cost">' + escapeHtml(cost) + '</td>' +
-                    '<td data-label="Type">' + escapeHtml(typeValue) + '</td>' +
-                    '<td data-label="Subtype">' + escapeHtml(subtypeValue) + '</td>' +
-                    '<td class="spm-muted" data-label="Set">' + escapeHtml(namedSetDisplay) + '</td>' +
-                    '<td class="spm-muted" data-label="Card #">' + escapeHtml(cardSetDisplay) + '</td>' +
-                    '<td data-label="Rarity" data-rarity-tier="' + escapeHtml(rarityValue || '') + '">' +
-                        '<div class="spm-rarity">' +
-                            '<select data-rarity-set data-project-id="' + escapeHtml(p.file.id) + '">' +
-                                selectOptions +
-                            '</select>' +
-                        '</div>' +
-                    '</td>' +
-                    '<td class="spm-muted" data-label="Updated">' + when + '</td>' +
-                    '<td class="spm-actions" data-label="Actions">' +
-                        '<button type="button" class="spm-small-btn spm-btn-edit" data-spm-edit data-project-id="' + escapeHtml(p.file.id) + '">Edit</button>' +
+                var subParts = [];
+                if (p.fieldsType) subParts.push(p.fieldsType);
+                if (p.fieldsSubtype) subParts.push(p.fieldsSubtype);
+                var namedSetDisplay = resolveNamedSetLabel(p);
+                if (namedSetDisplay && namedSetDisplay !== '—') subParts.push(namedSetDisplay);
+                if (p.cardSetLabel) subParts.push(p.cardSetLabel);
+                var subLine = subParts.join(' · ') || '—';
+                var id = escapeHtml(p.file.id);
+                return '<article class="' + classes + '" data-project-id="' + id + '"' + titleAttr + '>' +
+                    '<div class="spm-card-art" data-zoom-id="' + id + '" title="Click to enlarge">' +
+                        '<label class="spm-card-check">' +
+                            '<input type="checkbox" class="spm-row-check" data-spm-row-check data-project-id="' + id + '" ' + chk + ' aria-label="Select ' + escapeHtml(cardTitle) + '"/>' +
+                        '</label>' +
+                        '<img class="spm-thumb" alt="" data-id="' + id + '" decoding="async">' +
+                        '<span class="spm-card-ph">…</span>' +
+                    '</div>' +
+                    '<div class="spm-card-meta">' +
+                        '<div class="spm-card-title">' + escapeHtml(cardTitle) + dupTip + '</div>' +
+                        '<span class="spm-card-sub">' + escapeHtml(subLine) + '</span>' +
+                    '</div>' +
+                    '<div class="spm-actions">' +
+                        '<button type="button" class="spm-small-btn spm-btn-edit" data-spm-edit data-project-id="' + id + '">Edit</button>' +
                         '<a class="spm-link-btn" href="' + openHref + '" target="_blank" rel="noopener">Open</a>' +
-                        '<button type="button" class="spm-small-btn spm-danger" data-spm-delete data-project-id="' + escapeHtml(p.file.id) + '">Delete</button>' +
-                    '</td>' +
-                '</tr>';
+                        '<button type="button" class="spm-small-btn spm-danger" data-spm-delete data-project-id="' + id + '">Delete</button>' +
+                    '</div>' +
+                '</article>';
             }).join('');
+            setupLazyThumbs();
         }
 
         function applyFiltersAndRender() {
@@ -3065,46 +3077,37 @@
                 spmTypeCounts.innerHTML = '<div class="spm-muted">Loading…</div>';
                 spmSubtypeCounts.innerHTML = '<div class="spm-muted">Loading…</div>';
                 spmRarityCounts.innerHTML = '<div class="spm-muted">Loading…</div>';
-                spmStatus.textContent = 'Checking saves (' + files.length + ')…';
+                spmStatus.textContent = 'Listing saves (' + files.length + ')…';
 
                 var previousById = new Map();
                 projects.forEach(function (p) {
-                    if (p && p.file && p.file.id && !p._loading && p.state && typeof p.state === 'object') {
+                    if (p && p.file && p.file.id && !p._lite && p.state && typeof p.state === 'object') {
                         previousById.set(p.file.id, p);
                     }
                 });
 
-                projects = files.map(makePlaceholderProject);
-                spmLoadedCount.textContent = '0/' + files.length;
+                projects = files.map(function (file) {
+                    var prev = previousById.get(file.id);
+                    if (prev && driveFileMetaUnchanged(prev.file, file)) {
+                        prev.file = file;
+                        return prev;
+                    }
+                    return buildLiteProject(file, fieldsFromDriveFile(file));
+                });
+                spmLoadedCount.textContent = String(files.length);
                 spmTablePage = 0;
                 applyFiltersAndRender();
 
-                var loadedSoFar = 0;
-                var skippedUnchanged = 0;
-                await mapLimit(files, SPM_PROJECT_FETCH_CONCURRENCY, async function (file, i) {
-                    var prev = previousById.get(file.id);
-                    if (prev && driveFileMetaUnchanged(prev.file, file)) {
-                        prev.file = { id: file.id, name: file.name, modifiedTime: file.modifiedTime, size: file.size };
-                        projects[i] = prev;
-                        skippedUnchanged++;
-                    } else {
-                        var fromDisk = await spmReadSaveCache(file.id);
-                        var diskMeta = { modifiedTime: fromDisk && fromDisk.modifiedTime, size: fromDisk && fromDisk.size };
-                        if (fromDisk && fromDisk.state && driveFileMetaUnchanged(diskMeta, file)) {
-                            projects[i] = buildProjectFromState(file, fromDisk.state);
-                            skippedUnchanged++;
-                        } else {
-                            const state = await fetchDriveProjectJson(file.id);
-                            projects[i] = buildProjectFromState(file, state);
-                            await spmWriteSaveCache(file.id, file, state);
-                        }
-                    }
-                    loadedSoFar++;
-                    spmLoadedCount.textContent = String(loadedSoFar) + '/' + files.length;
-                    scheduleProjectsProgressRender();
+                var filledFromCache = 0;
+                await mapLimit(projects, SPM_PROJECT_FETCH_CONCURRENCY, async function (p, i) {
+                    if (!p || p.state) return;
+                    if (liteListMetaComplete(p.fields)) return;
+                    var fromDisk = await spmReadSaveCache(p.file.id);
+                    var diskMeta = { modifiedTime: fromDisk && fromDisk.modifiedTime, size: fromDisk && fromDisk.size };
+                    if (!fromDisk || !fromDisk.state || !driveFileMetaUnchanged(diskMeta, p.file)) return;
+                    projects[i] = buildLiteProject(p.file, getFieldsFromState(fromDisk.state));
+                    filledFromCache++;
                 });
-
-                spmLoadedCount.textContent = String(projects.length) + '/' + files.length;
 
                 const typeCounts = {};
                 const subtypeCounts = {};
@@ -3119,13 +3122,13 @@
                     rarityCounts[r || '(empty)'] = (rarityCounts[r || '(empty)'] || 0) + 1;
                 });
 
-                spmStatus.textContent = 'Loaded ' + projects.length + ' project(s).';
+                spmStatus.textContent = 'Listed ' + projects.length + ' project(s).';
                 renderCounts(typeCounts, subtypeCounts, rarityCounts, files.length, projects.length);
                 rebuildFilterSelects();
                 applyFiltersAndRender();
-                var msg = 'Loaded ' + projects.length + ' saves.';
-                if (skippedUnchanged > 0) {
-                    msg += ' ' + skippedUnchanged + ' unchanged (skipped re-download).';
+                var msg = 'Listed ' + projects.length + ' saves. Full card data loads when you Edit.';
+                if (filledFromCache > 0) {
+                    msg += ' Filled type/set info for ' + filledFromCache + ' from local cache.';
                 }
                 setMessage(msg);
                 var keepIds = new Set(files.map(function (f) { return f.id; }));
@@ -3350,44 +3353,6 @@
             recalculateSummaryFromProjects();
         }
 
-        var lastSpmPreviewClientX = 0;
-        var lastSpmPreviewClientY = 0;
-        var spmHoverPreviewReq = 0;
-        var spmHoverDebounceTimer = null;
-        var spmHoverStableRowId = null;
-
-        function hideSpmHoverPreview() {
-            var el = document.getElementById('spmHoverPreview');
-            if (!el) return;
-            el.hidden = true;
-            el.setAttribute('aria-hidden', 'true');
-            el.classList.remove('is-fallback', 'is-loading');
-            var img = el.querySelector('img');
-            if (img) {
-                img.onload = null;
-                img.onerror = null;
-                img.removeAttribute('src');
-                img.alt = '';
-            }
-            spmHoverPreviewReq++;
-        }
-
-        function positionSpmHoverPreview(clientX, clientY) {
-            var el = document.getElementById('spmHoverPreview');
-            if (!el || el.hidden) return;
-            var pad = 16;
-            var w = el.offsetWidth || 200;
-            var h = el.offsetHeight || 260;
-            var x = clientX + pad;
-            var y = clientY + pad;
-            if (x + w > window.innerWidth - 10) x = clientX - w - pad;
-            if (y + h > window.innerHeight - 10) y = clientY - h - pad;
-            x = Math.max(10, Math.min(x, window.innerWidth - w - 10));
-            y = Math.max(10, Math.min(y, window.innerHeight - h - 10));
-            el.style.left = x + 'px';
-            el.style.top = y + 'px';
-        }
-
         /** Shallow clone state for preview render; fills CardMakerSetName from named-set registry when missing (matches editor). */
         function stateForCardPreviewRender(state) {
             if (!state || typeof state !== 'object') return state;
@@ -3438,129 +3403,48 @@
             return null;
         }
 
-        async function showSpmHoverPreviewForProject(projectId) {
-            var el = document.getElementById('spmHoverPreview');
-            if (!el) return;
+        function closeSpmZoom() {
+            if (!spmZoom) return;
+            spmZoom.classList.remove('is-open');
+            spmZoom.hidden = true;
+            spmZoom.setAttribute('aria-hidden', 'true');
+            if (spmZoomImg) {
+                spmZoomImg.removeAttribute('src');
+                spmZoomImg.alt = '';
+            }
+        }
+
+        function openSpmZoom(projectId) {
+            if (!projectId || !spmZoom || !spmZoomImg) return;
             var project = projects.find(function (p) { return p.file && p.file.id === projectId; });
-            var req = ++spmHoverPreviewReq;
-            el.hidden = false;
-            el.setAttribute('aria-hidden', 'false');
-            el.classList.add('is-loading');
-            el.classList.remove('is-fallback');
-            var img = el.querySelector('img');
-            var fallback = el.querySelector('.spm-hover-preview-fallback');
-            if (img) {
-                img.onload = null;
-                img.onerror = null;
-                img.removeAttribute('src');
-                img.alt = project ? displaySaveLabel(project.file.name) : '';
-            }
-            if (!project) {
-                hideSpmHoverPreview();
-                return;
-            }
-            if (project._loading || !project.state) {
-                try {
-                    project = await ensureProjectHydrated(projectId);
-                } catch (err) {
-                    console.warn('Preview hydrate:', err);
-                    if (req !== spmHoverPreviewReq) return;
-                    el.classList.remove('is-loading');
-                    el.classList.add('is-fallback');
-                    if (fallback) fallback.textContent = 'Could not load preview.';
-                    positionSpmHoverPreview(lastSpmPreviewClientX, lastSpmPreviewClientY);
-                    return;
-                }
-            }
-            if (req !== spmHoverPreviewReq) return;
-            if (!project || !project.state) {
-                el.classList.remove('is-loading');
-                el.classList.add('is-fallback');
-                if (fallback) fallback.textContent = 'No preview available for this save.';
-                positionSpmHoverPreview(lastSpmPreviewClientX, lastSpmPreviewClientY);
-                return;
-            }
-            positionSpmHoverPreview(lastSpmPreviewClientX, lastSpmPreviewClientY);
-            var url = await resolveSpmProjectPreviewUrl(project);
-            if (req !== spmHoverPreviewReq) return;
-            el.classList.remove('is-loading');
-            if (url && img) {
-                img.onload = function () {
-                    if (req !== spmHoverPreviewReq) return;
-                    positionSpmHoverPreview(lastSpmPreviewClientX, lastSpmPreviewClientY);
-                };
-                img.onerror = function () {
-                    if (req !== spmHoverPreviewReq) return;
-                    el.classList.add('is-fallback');
-                    if (fallback) fallback.textContent = 'Could not load preview image.';
-                    img.removeAttribute('src');
-                };
-                img.src = url;
-            } else {
-                el.classList.add('is-fallback');
-                if (fallback) fallback.textContent = 'No preview available for this save.';
-            }
-            positionSpmHoverPreview(lastSpmPreviewClientX, lastSpmPreviewClientY);
+            if (!project) return;
+            var title = cardListTitle(project) || 'Card preview';
+            spmZoomImg.alt = title;
+            spmZoomImg.removeAttribute('src');
+            spmZoom.hidden = false;
+            spmZoom.classList.add('is-open');
+            spmZoom.setAttribute('aria-hidden', 'false');
+            var thumb = spmCardGrid && spmCardGrid.querySelector('img.spm-thumb[data-id="' + String(projectId).replace(/"/g, '') + '"]');
+            if (thumb && thumb.src) spmZoomImg.src = thumb.src;
         }
 
-        var spmFinePointerHover = typeof window.matchMedia !== 'function'
-            || window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-
-        if (spmTableBody && spmFinePointerHover) {
-            spmTableBody.addEventListener('mousemove', function (e) {
-                lastSpmPreviewClientX = e.clientX;
-                lastSpmPreviewClientY = e.clientY;
-                var tr = e.target.closest('tr[data-project-id]');
-                if (!tr) {
-                    spmHoverStableRowId = null;
-                    if (spmHoverDebounceTimer) {
-                        clearTimeout(spmHoverDebounceTimer);
-                        spmHoverDebounceTimer = null;
-                    }
-                    hideSpmHoverPreview();
-                    return;
-                }
-                var id = tr.getAttribute('data-project-id');
-                positionSpmHoverPreview(e.clientX, e.clientY);
-                if (id !== spmHoverStableRowId) {
-                    spmHoverStableRowId = id;
-                    if (spmHoverDebounceTimer) clearTimeout(spmHoverDebounceTimer);
-                    spmHoverDebounceTimer = setTimeout(function () {
-                        spmHoverDebounceTimer = null;
-                        showSpmHoverPreviewForProject(id);
-                    }, 140);
-                }
-            });
-            spmTableBody.addEventListener('mouseleave', function () {
-                spmHoverStableRowId = null;
-                if (spmHoverDebounceTimer) {
-                    clearTimeout(spmHoverDebounceTimer);
-                    spmHoverDebounceTimer = null;
-                }
-                hideSpmHoverPreview();
-            });
+        if (spmZoom) {
+            spmZoom.addEventListener('click', closeSpmZoom);
         }
 
-        spmTableBody.addEventListener('change', function (e) {
-            var rowChk = e.target.closest('[data-spm-row-check]');
-            if (rowChk) {
+        if (spmCardGrid) {
+            spmCardGrid.addEventListener('change', function (e) {
+                var rowChk = e.target.closest('[data-spm-row-check]');
+                if (!rowChk) return;
                 var pid = rowChk.getAttribute('data-project-id');
                 if (rowChk.checked) selectedProjectIds.add(pid);
                 else selectedProjectIds.delete(pid);
+                var tile = rowChk.closest('.spm-card');
+                if (tile) tile.classList.toggle('is-selected', rowChk.checked);
                 syncSelectAllCheckbox();
                 updateBulkUi();
-                return;
-            }
-            const sel = e.target.closest('[data-rarity-set]');
-            if (!sel) return;
-            const projectId = sel.getAttribute('data-project-id');
-            const newRarity = sel.value;
-            setMessage('Updating rarity…');
-            updateProjectRarity(projectId, newRarity).catch(function (err) {
-                console.error(err);
-                setMessage('Failed to update rarity: ' + (err && err.message ? err.message : String(err)), true);
             });
-        });
+        }
 
         var editModalProjectId = null;
         var editModalPreviewReq = 0;
@@ -3891,13 +3775,16 @@
                 project.cardSetLabel = csEdit.label;
                 project.cardMakerSetId = setIdStr;
                 project.fields = project.state.fields;
+                project._lite = false;
                 if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.writeThumbCache &&
                     typeof window.renderCardMakerProjectToDataUrl === 'function' &&
                     project.file.id && project.file.modifiedTime) {
                     try {
-                        var thumbOpts = CardMakerPerf.THUMB_RENDER_OPTS || { maxOutputSide: 400, outputMime: 'image/jpeg', outputQuality: 0.78 };
-                        var thumbUrl = await window.renderCardMakerProjectToDataUrl(stateForCardPreviewRender(project.state), thumbOpts);
-                        if (thumbUrl) CardMakerPerf.writeThumbCache(project.file.id, project.file.modifiedTime, thumbUrl);
+                        var thumbUrl = await window.renderCardMakerProjectToDataUrl(stateForCardPreviewRender(project.state), gridThumbOpts());
+                        if (thumbUrl) {
+                            CardMakerPerf.writeThumbCache(project.file.id, project.file.modifiedTime, thumbUrl, gridThumbVariant());
+                            CardMakerPerf.writeThumbCache(project.file.id, project.file.modifiedTime, thumbUrl);
+                        }
                     } catch (thumbErr) { /* ignore thumb refresh */ }
                 }
                 recalculateSummaryFromProjects();
@@ -4367,39 +4254,56 @@
                 return;
             }
             var modal = document.getElementById('spmEditModal');
-            if (modal && modal.classList.contains('is-open')) closeSpmEditModal();
+            if (modal && modal.classList.contains('is-open')) {
+                closeSpmEditModal();
+                return;
+            }
+            if (spmZoom && spmZoom.classList.contains('is-open')) {
+                closeSpmZoom();
+                e.preventDefault();
+            }
         });
         buildEditModalStaticSelects();
 
-        spmTableBody.addEventListener('click', function (e) {
-            var editBtn = e.target.closest('[data-spm-edit]');
-            if (editBtn) {
-                e.preventDefault();
-                if (editBtn.disabled) return;
-                var eid = editBtn.getAttribute('data-project-id');
-                openSpmEditModal(eid).catch(function (err) {
-                    console.error(err);
-                    setMessage('Could not open editor: ' + (err && err.message ? err.message : String(err)), true);
-                });
-                return;
-            }
-            var del = e.target.closest('[data-spm-delete]');
-            if (!del) return;
-            var id = del.getAttribute('data-project-id');
-            var proj = projects.find(function (p) { return p.file && p.file.id === id; });
-            var label = proj ? displaySaveLabel(proj.file.name) : 'this save';
-            if (!confirm('Permanently delete “' + label + '”?\n\nApp Data files cannot be moved to Trash; this remove is permanent.')) return;
-            setMessage('Deleting…');
-            (async function () {
-                try {
-                    await deleteDriveProject(id);
-                    setMessage('Deleted “' + label + '”.');
-                } catch (err) {
-                    console.error(err);
-                    setMessage('Delete failed: ' + (err && err.message ? err.message : String(err)), true);
+        if (spmCardGrid) {
+            spmCardGrid.addEventListener('click', function (e) {
+                var editBtn = e.target.closest('[data-spm-edit]');
+                if (editBtn) {
+                    e.preventDefault();
+                    if (editBtn.disabled) return;
+                    var eid = editBtn.getAttribute('data-project-id');
+                    openSpmEditModal(eid).catch(function (err) {
+                        console.error(err);
+                        setMessage('Could not open editor: ' + (err && err.message ? err.message : String(err)), true);
+                    });
+                    return;
                 }
-            })();
-        });
+                var del = e.target.closest('[data-spm-delete]');
+                if (del) {
+                    var id = del.getAttribute('data-project-id');
+                    var proj = projects.find(function (p) { return p.file && p.file.id === id; });
+                    var label = proj ? displaySaveLabel(proj.file.name) : 'this save';
+                    if (!confirm('Permanently delete “' + label + '”?\n\nApp Data files cannot be moved to Trash; this remove is permanent.')) return;
+                    setMessage('Deleting…');
+                    (async function () {
+                        try {
+                            await deleteDriveProject(id);
+                            setMessage('Deleted “' + label + '”.');
+                        } catch (err) {
+                            console.error(err);
+                            setMessage('Delete failed: ' + (err && err.message ? err.message : String(err)), true);
+                        }
+                    })();
+                    return;
+                }
+                if (e.target.closest('.spm-card-check') || e.target.closest('.spm-actions') || e.target.closest('a')) return;
+                var art = e.target.closest('.spm-card-art');
+                if (art) {
+                    e.preventDefault();
+                    openSpmZoom(art.getAttribute('data-zoom-id'));
+                }
+            });
+        }
 
         refreshNamedSetDropdowns();
 

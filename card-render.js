@@ -100,21 +100,75 @@
         });
     }
 
-    function wrapTextLines(ctx, text, maxWidth) {
-        var words = String(text || '').split(/\s+/).filter(Boolean);
-        var line = '';
-        var lines = [];
-        for (var index = 0; index < words.length; index++) {
-            var word = words[index];
-            var testLine = line + word + ' ';
-            if (ctx.measureText(testLine).width > maxWidth && line.length > 0) {
-                lines.push(line.trim());
-                line = word + ' ';
-            } else {
-                line = testLine;
-            }
+    function wrapMaxWidth(canvasW, wrapPct) {
+        var p = parseFloat(wrapPct);
+        if (!isFinite(p) || p <= 0) return canvasW - (canvasW / 4.75);
+        return canvasW * (Math.max(30, Math.min(100, p)) / 100);
+    }
+
+    function measureWrapWidth(ctx, text) {
+        var m = ctx.measureText(text || '');
+        var w = m.width;
+        if (typeof m.actualBoundingBoxLeft === 'number' && typeof m.actualBoundingBoxRight === 'number') {
+            w = Math.max(w, m.actualBoundingBoxLeft + m.actualBoundingBoxRight);
         }
-        if (line.length > 0) lines.push(line.trim());
+        return w;
+    }
+
+    function splitWordToWidth(ctx, word, maxWidth) {
+        if (!word) return [''];
+        if (measureWrapWidth(ctx, word) <= maxWidth) return [word];
+        var parts = [];
+        var rest = word;
+        while (rest.length) {
+            if (measureWrapWidth(ctx, rest) <= maxWidth) {
+                parts.push(rest);
+                break;
+            }
+            var lo = 1;
+            var hi = rest.length;
+            while (lo < hi) {
+                var mid = Math.ceil((lo + hi) / 2);
+                if (measureWrapWidth(ctx, rest.slice(0, mid)) <= maxWidth) lo = mid;
+                else hi = mid - 1;
+            }
+            if (lo < 1) lo = 1;
+            parts.push(rest.slice(0, lo));
+            rest = rest.slice(lo);
+        }
+        return parts;
+    }
+
+    function wrapTextLines(ctx, text, maxWidth) {
+        ctx.save();
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+        var limit = Math.max(8, maxWidth - 2);
+        var lines = [];
+        var paragraphs = String(text || '').replace(/\r\n/g, '\n').split('\n');
+        for (var p = 0; p < paragraphs.length; p++) {
+            var words = paragraphs[p].split(/\s+/).filter(Boolean);
+            if (!words.length) {
+                lines.push('');
+                continue;
+            }
+            var line = '';
+            for (var index = 0; index < words.length; index++) {
+                var chunks = splitWordToWidth(ctx, words[index], limit);
+                for (var c = 0; c < chunks.length; c++) {
+                    var piece = chunks[c];
+                    var testLine = line ? (line + ' ' + piece) : piece;
+                    if (line && measureWrapWidth(ctx, testLine) > limit) {
+                        lines.push(line);
+                        line = piece;
+                    } else {
+                        line = testLine;
+                    }
+                }
+            }
+            if (line) lines.push(line);
+        }
+        ctx.restore();
         return lines;
     }
 
@@ -428,21 +482,47 @@
 
         ctx.font = cardFontCss(parseInt(f.MainDisciptionFontSize, 10) || 125, f);
         ctx.textAlign = f.MainDescriptionCenterAlign ? 'center' : 'left';
-        var descriptionX = f.MainDescriptionCenterAlign ? (CANVAS_W / 2) : (CANVAS_W / 10);
-        var maxW = CANVAS_W - (CANVAS_W / 4.75);
+        ctx.textBaseline = 'alphabetic';
+        var mainOx = parseInt(f.MainDisciptionPosX, 10) || 0;
+        var mainOy = parseInt(f.MainDisciptionPosY, 10) || 0;
+        var descriptionX = (f.MainDescriptionCenterAlign ? (CANVAS_W / 2) : (CANVAS_W / 10)) + mainOx;
+        var maxW = wrapMaxWidth(CANVAS_W, f.MainDisciptionWrap);
+        var mainBoxLeft = f.MainDescriptionCenterAlign ? (descriptionX - maxW / 2) : descriptionX;
         var mainLines = wrapTextLines(ctx, f.MainDisciption || '', maxW);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(mainBoxLeft, 0, maxW, CANVAS_H);
+        ctx.clip();
+        ctx.font = cardFontCss(parseInt(f.MainDisciptionFontSize, 10) || 125, f);
+        ctx.textAlign = f.MainDescriptionCenterAlign ? 'center' : 'left';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = 'black';
         var i;
         for (i = 0; i < mainLines.length; i++) {
-            ctx.fillText(mainLines[i], descriptionX, (CANVAS_H / 1.6) + (125 * (i + 1)));
+            ctx.fillText(mainLines[i], descriptionX, (CANVAS_H / 1.6) + mainOy + (125 * (i + 1)));
         }
+        ctx.restore();
 
         ctx.font = cardFontCss(parseInt(f.SubDisciptionFontSize, 10) || 70, f);
         ctx.textAlign = f.SubDescriptionCenterAlign ? 'center' : 'left';
-        var subDescriptionX = f.SubDescriptionCenterAlign ? (CANVAS_W / 2) : (CANVAS_W / 10);
-        var subLines = wrapTextLines(ctx, f.SubDisciption || '', maxW);
+        var subOx = parseInt(f.SubDisciptionPosX, 10) || 0;
+        var subOy = parseInt(f.SubDisciptionPosY, 10) || 0;
+        var subDescriptionX = (f.SubDescriptionCenterAlign ? (CANVAS_W / 2) : (CANVAS_W / 10)) + subOx;
+        var subMaxW = wrapMaxWidth(CANVAS_W, f.SubDisciptionWrap);
+        var subBoxLeft = f.SubDescriptionCenterAlign ? (subDescriptionX - subMaxW / 2) : subDescriptionX;
+        var subLines = wrapTextLines(ctx, f.SubDisciption || '', subMaxW);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(subBoxLeft, 0, subMaxW, CANVAS_H);
+        ctx.clip();
+        ctx.font = cardFontCss(parseInt(f.SubDisciptionFontSize, 10) || 70, f);
+        ctx.textAlign = f.SubDescriptionCenterAlign ? 'center' : 'left';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = 'black';
         for (i = 0; i < subLines.length; i++) {
-            ctx.fillText(subLines[i], subDescriptionX, (CANVAS_H / 1.9) + (100 * (i + 1)));
+            ctx.fillText(subLines[i], subDescriptionX, (CANVAS_H / 1.9) + subOy + (100 * (i + 1)));
         }
+        ctx.restore();
 
         try {
             if (renderScale < 1) {

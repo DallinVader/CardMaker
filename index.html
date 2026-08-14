@@ -314,6 +314,20 @@
                                         <label class="cm-check-row" for="MainDescriptionCenterAlign"><input type="checkbox" id="MainDescriptionCenterAlign" checked onchange="redrawCanvas()"> Center text</label>
                                     </div>
                                 </div>
+                                <div class="cm-field-grid cm-field-grid-3">
+                                    <div class="input-group">
+                                        <label for="MainDisciptionPosX">Text X</label>
+                                        <input value="0" type="number" min="-2000" max="2000" id="MainDisciptionPosX" oninput="redrawCanvas()" title="Horizontal offset">
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="MainDisciptionPosY">Text Y</label>
+                                        <input value="0" type="number" min="-2000" max="2000" id="MainDisciptionPosY" oninput="redrawCanvas()" title="Vertical offset">
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="MainDisciptionWrap">Wrap % <span id="MainDisciptionWrapValue">79</span></label>
+                                        <input type="range" id="MainDisciptionWrap" min="30" max="100" value="79" oninput="redrawCanvas()" title="Line width before text wraps">
+                                    </div>
+                                </div>
                             </div>
                             <div class="cm-desc-pair-col">
                                 <p class="cm-quick-sub" id="cm-quick-sub-desc">Sub description</p>
@@ -330,10 +344,23 @@
                                         <label class="cm-check-row" for="SubDescriptionCenterAlign"><input type="checkbox" id="SubDescriptionCenterAlign" checked onchange="redrawCanvas()"> Center text</label>
                                     </div>
                                 </div>
+                                <div class="cm-field-grid cm-field-grid-3">
+                                    <div class="input-group">
+                                        <label for="SubDisciptionPosX">Text X</label>
+                                        <input value="0" type="number" min="-2000" max="2000" id="SubDisciptionPosX" oninput="redrawCanvas()" title="Horizontal offset">
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="SubDisciptionPosY">Text Y</label>
+                                        <input value="0" type="number" min="-2000" max="2000" id="SubDisciptionPosY" oninput="redrawCanvas()" title="Vertical offset">
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="SubDisciptionWrap">Wrap % <span id="SubDisciptionWrapValue">79</span></label>
+                                        <input type="range" id="SubDisciptionWrap" min="30" max="100" value="79" oninput="redrawCanvas()" title="Line width before text wraps">
+                                    </div>
+                                </div>
                             </div>
                         </div>
-
-                        <p class="cm-quick-sub" id="cm-quick-quote">Quote</p>
+                        <small class="cm-hint-compact cm-quick-hint">Drag main or secondary text on the preview to move it; drag the left or right edge of the text box to change wrap width.</small>
                         <div class="input-group">
                             <label for="QoteDiscription">Quote</label>
                             <textarea id="QoteDiscription" placeholder="Quote text" rows="1" oninput="redrawCanvas()"></textarea>
@@ -773,6 +800,12 @@
             document.getElementById("MainDisciptionFontSizeValue").textContent = DiscriptionFontSize.value;
             document.getElementById("SubDisciptionFontSizeValue").textContent = SubFontSize.value;
             document.getElementById("QoteDiscriptionFontSizeValue").textContent = QuoteFontSize.value;
+            var mainWrapEl = document.getElementById('MainDisciptionWrap');
+            var mainWrapVal = document.getElementById('MainDisciptionWrapValue');
+            if (mainWrapEl && mainWrapVal) mainWrapVal.textContent = mainWrapEl.value;
+            var subWrapEl = document.getElementById('SubDisciptionWrap');
+            var subWrapVal = document.getElementById('SubDisciptionWrapValue');
+            if (subWrapEl && subWrapVal) subWrapVal.textContent = subWrapEl.value;
         }
         
         // Add event listeners to update font size displays
@@ -783,6 +816,10 @@
         DiscriptionFontSize.addEventListener('input', updateFontSizeDisplay);
         SubFontSize.addEventListener('input', updateFontSizeDisplay);
         QuoteFontSize.addEventListener('input', updateFontSizeDisplay);
+        var mainWrapListen = document.getElementById('MainDisciptionWrap');
+        var subWrapListen = document.getElementById('SubDisciptionWrap');
+        if (mainWrapListen) mainWrapListen.addEventListener('input', updateFontSizeDisplay);
+        if (subWrapListen) subWrapListen.addEventListener('input', updateFontSizeDisplay);
         
         // Initialize font size displays
         updateFontSizeDisplay();
@@ -790,6 +827,17 @@
         // Drag and resize functionality for art image
         let isDragging = false;
         let isResizing = false;
+        let isDraggingText = false;
+        let isResizingTextWrap = false;
+        let textDragKind = '';
+        let startTextX = 0;
+        let startTextY = 0;
+        let startWrapPct = 79;
+        let startWrapAnchorX = 0;
+        let startWrapBoxLeft = 0;
+        let startWrapCentered = false;
+        let mainTextHit = null;
+        let subTextHit = null;
         let dragStartX = 0;
         let dragStartY = 0;
         let startArtX = 0;
@@ -859,42 +907,144 @@
             return (nearLeftEdge || nearRightEdge) && inVerticalRange;
         }
         
+        function pointInRect(x, y, r) {
+            return r && x >= r.left && x <= r.left + r.width && y >= r.top && y <= r.top + r.height;
+        }
+
+        function hitTextWrapHandle(x, y) {
+            var handle = Math.max(28, canvas.width * 0.018);
+            function edge(hit) {
+                if (!hit || !pointInRect(x, y, {
+                    left: hit.left - handle,
+                    top: hit.top,
+                    width: hit.width + handle * 2,
+                    height: hit.height
+                })) return null;
+                var nearRight = Math.abs(x - (hit.left + hit.width)) < handle;
+                var nearLeft = Math.abs(x - hit.left) < handle;
+                if (nearRight) return hit;
+                if (hit.center && nearLeft) return hit;
+                return null;
+            }
+            return edge(subTextHit) || edge(mainTextHit);
+        }
+
+        function hitTextBody(x, y) {
+            if (pointInRect(x, y, subTextHit)) return subTextHit;
+            if (pointInRect(x, y, mainTextHit)) return mainTextHit;
+            return null;
+        }
+
+        function textPosInput(kind, axis) {
+            var id = (kind === 'sub' ? 'SubDisciptionPos' : 'MainDisciptionPos') + axis;
+            return document.getElementById(id);
+        }
+
+        function textWrapInput(kind) {
+            return document.getElementById(kind === 'sub' ? 'SubDisciptionWrap' : 'MainDisciptionWrap');
+        }
+
         // Mouse down event
         canvas.addEventListener('mousedown', function(e) {
-            if (!ArtImage.src) return;
-            
             const mousePos = getCanvasMousePos(e);
             updateCanvasTransform();
-            
-            if (isPointNearResizeHandle(mousePos.x, mousePos.y)) {
+
+            if (ArtImage.src && isPointNearResizeHandle(mousePos.x, mousePos.y)) {
                 isResizing = true;
                 startArtSize = ArtImage.h || 116;
                 dragStartX = mousePos.x;
                 dragStartY = mousePos.y;
                 canvas.style.cursor = 'nwse-resize';
-                redrawCanvas(); // Redraw without hover border
-            } else if (isPointInArt(mousePos.x, mousePos.y) || isPointNearVerticalEdge(mousePos.x, mousePos.y)) {
+                redrawCanvas();
+                return;
+            }
+
+            var wrapHit = hitTextWrapHandle(mousePos.x, mousePos.y);
+            if (wrapHit) {
+                isResizingTextWrap = true;
+                textDragKind = wrapHit.kind;
+                dragStartX = mousePos.x;
+                var wrapEl = textWrapInput(wrapHit.kind);
+                startWrapPct = wrapEl ? (parseFloat(wrapEl.value) || 79) : 79;
+                startWrapAnchorX = wrapHit.anchorX;
+                startWrapBoxLeft = wrapHit.left;
+                startWrapCentered = !!wrapHit.center;
+                canvas.style.cursor = 'ew-resize';
+                redrawCanvas();
+                e.preventDefault();
+                return;
+            }
+            var bodyHit = hitTextBody(mousePos.x, mousePos.y);
+            if (bodyHit) {
+                isDraggingText = true;
+                textDragKind = bodyHit.kind;
+                var xEl = textPosInput(bodyHit.kind, 'X');
+                var yEl = textPosInput(bodyHit.kind, 'Y');
+                startTextX = xEl ? (parseInt(xEl.value, 10) || 0) : 0;
+                startTextY = yEl ? (parseInt(yEl.value, 10) || 0) : 0;
+                dragStartX = mousePos.x;
+                dragStartY = mousePos.y;
+                canvas.style.cursor = 'move';
+                redrawCanvas();
+                e.preventDefault();
+                return;
+            }
+
+            if (ArtImage.src && (isPointInArt(mousePos.x, mousePos.y) || isPointNearVerticalEdge(mousePos.x, mousePos.y))) {
                 isDragging = true;
                 startArtX = parseInt(document.getElementById("ArtWidthPos").value) || 0;
                 startArtY = parseInt(document.getElementById("ArtHightPos").value) || 0;
                 dragStartX = mousePos.x;
                 dragStartY = mousePos.y;
                 canvas.style.cursor = 'move';
-                redrawCanvas(); // Redraw without hover border
+                redrawCanvas();
             }
         });
         
         // Mouse move event
         canvas.addEventListener('mousemove', function(e) {
-            if (!ArtImage.src) return;
-            
             const mousePos = getCanvasMousePos(e);
+
+            if (isDraggingText && textDragKind) {
+                canvas.style.cursor = 'move';
+                const deltaX = mousePos.x - dragStartX;
+                const deltaY = mousePos.y - dragStartY;
+                var xEl = textPosInput(textDragKind, 'X');
+                var yEl = textPosInput(textDragKind, 'Y');
+                if (xEl) xEl.value = Math.round(startTextX + deltaX);
+                if (yEl) yEl.value = Math.round(startTextY + deltaY);
+                redrawCanvas();
+                return;
+            }
+            if (isResizingTextWrap && textDragKind) {
+                canvas.style.cursor = 'ew-resize';
+                var newWidth;
+                if (startWrapCentered) {
+                    newWidth = Math.abs(mousePos.x - startWrapAnchorX) * 2;
+                } else {
+                    newWidth = mousePos.x - startWrapBoxLeft;
+                }
+                var pct = Math.round((newWidth / canvas.width) * 100);
+                pct = Math.max(30, Math.min(100, pct));
+                var wrapEl = textWrapInput(textDragKind);
+                if (wrapEl) wrapEl.value = pct;
+                updateFontSizeDisplay();
+                redrawCanvas();
+                return;
+            }
+
+            if (!ArtImage.src) return;
+
             calculateArtBounds();
             
             // Update cursor
             if (isResizing) {
                 canvas.style.cursor = 'nwse-resize';
             } else if (isDragging) {
+                canvas.style.cursor = 'move';
+            } else if (hitTextWrapHandle(mousePos.x, mousePos.y)) {
+                canvas.style.cursor = 'ew-resize';
+            } else if (hitTextBody(mousePos.x, mousePos.y)) {
                 canvas.style.cursor = 'move';
             } else if (isPointNearResizeHandle(mousePos.x, mousePos.y)) {
                 canvas.style.cursor = 'nwse-resize';
@@ -945,14 +1095,22 @@
         canvas.addEventListener('mouseup', function(e) {
             isDragging = false;
             isResizing = false;
+            isDraggingText = false;
+            isResizingTextWrap = false;
+            textDragKind = '';
             canvas.style.cursor = 'default';
+            redrawCanvas();
         });
         
         // Mouse leave event
         canvas.addEventListener('mouseleave', function(e) {
             isDragging = false;
             isResizing = false;
+            isDraggingText = false;
+            isResizingTextWrap = false;
+            textDragKind = '';
             canvas.style.cursor = 'default';
+            redrawCanvas();
         });
         
         // Note: Hover border removed per user request
@@ -1090,9 +1248,15 @@
             document.getElementById("MainDisciption").value = '';
             document.getElementById("MainDisciptionFontSize").value = 125;
             document.getElementById("MainDescriptionCenterAlign").checked = true;
+            document.getElementById("MainDisciptionPosX").value = 0;
+            document.getElementById("MainDisciptionPosY").value = 0;
+            document.getElementById("MainDisciptionWrap").value = 79;
             document.getElementById("SubDisciption").value = '';
             document.getElementById("SubDisciptionFontSize").value = 70;
             document.getElementById("SubDescriptionCenterAlign").checked = true;
+            document.getElementById("SubDisciptionPosX").value = 0;
+            document.getElementById("SubDisciptionPosY").value = 0;
+            document.getElementById("SubDisciptionWrap").value = 79;
             document.getElementById("QoteDiscription").value = '';
             document.getElementById("QoteDiscriptionFontSize").value = 60;
             document.getElementById("QuoteCenterAlign").checked = true;
@@ -1521,9 +1685,15 @@
                     MainDisciption: document.getElementById('MainDisciption').value,
                     MainDisciptionFontSize: document.getElementById('MainDisciptionFontSize').value,
                     MainDescriptionCenterAlign: document.getElementById('MainDescriptionCenterAlign').checked,
+                    MainDisciptionPosX: document.getElementById('MainDisciptionPosX') ? document.getElementById('MainDisciptionPosX').value : '0',
+                    MainDisciptionPosY: document.getElementById('MainDisciptionPosY') ? document.getElementById('MainDisciptionPosY').value : '0',
+                    MainDisciptionWrap: document.getElementById('MainDisciptionWrap') ? document.getElementById('MainDisciptionWrap').value : '79',
                     SubDisciption: document.getElementById('SubDisciption').value,
                     SubDisciptionFontSize: document.getElementById('SubDisciptionFontSize').value,
                     SubDescriptionCenterAlign: document.getElementById('SubDescriptionCenterAlign').checked,
+                    SubDisciptionPosX: document.getElementById('SubDisciptionPosX') ? document.getElementById('SubDisciptionPosX').value : '0',
+                    SubDisciptionPosY: document.getElementById('SubDisciptionPosY') ? document.getElementById('SubDisciptionPosY').value : '0',
+                    SubDisciptionWrap: document.getElementById('SubDisciptionWrap') ? document.getElementById('SubDisciptionWrap').value : '79',
                     QoteDiscription: document.getElementById('QoteDiscription').value,
                     QoteDiscriptionFontSize: document.getElementById('QoteDiscriptionFontSize').value,
                     QuoteCenterAlign: document.getElementById('QuoteCenterAlign').checked,
@@ -1655,9 +1825,15 @@
             setIfExists('MainDisciption', f.MainDisciption);
             setIfExists('MainDisciptionFontSize', f.MainDisciptionFontSize);
             setIfExists('MainDescriptionCenterAlign', f.MainDescriptionCenterAlign);
+            setIfExists('MainDisciptionPosX', f.MainDisciptionPosX);
+            setIfExists('MainDisciptionPosY', f.MainDisciptionPosY);
+            setIfExists('MainDisciptionWrap', f.MainDisciptionWrap);
             setIfExists('SubDisciption', f.SubDisciption);
             setIfExists('SubDisciptionFontSize', f.SubDisciptionFontSize);
             setIfExists('SubDescriptionCenterAlign', f.SubDescriptionCenterAlign);
+            setIfExists('SubDisciptionPosX', f.SubDisciptionPosX);
+            setIfExists('SubDisciptionPosY', f.SubDisciptionPosY);
+            setIfExists('SubDisciptionWrap', f.SubDisciptionWrap);
             setIfExists('QoteDiscription', f.QoteDiscription);
             setIfExists('QoteDiscriptionFontSize', f.QoteDiscriptionFontSize);
             setIfExists('QuoteCenterAlign', f.QuoteCenterAlign);
@@ -3244,25 +3420,86 @@
                 ctx.restore();
             }
             ctx.fillStyle = 'black';
+            ctx.textBaseline = 'alphabetic';
 
             ctx.font = cmPxFont(Number(DiscriptionFontSize.value) * fs);
             ctx.textAlign = MainDescriptionCenterAlign.checked ? 'center' : 'left';
-            const descriptionX = MainDescriptionCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10);
-            i = 0;
-            WrapText(Discription.value).forEach(lin => {
-                i++;
-                ctx.fillText(lin, descriptionX, (canvas.height / 1.6) + (125 * fs * i))
-            });
+            const mainPosX = (parseInt(document.getElementById('MainDisciptionPosX') && document.getElementById('MainDisciptionPosX').value, 10) || 0) * fs;
+            const mainPosY = (parseInt(document.getElementById('MainDisciptionPosY') && document.getElementById('MainDisciptionPosY').value, 10) || 0) * fs;
+            const mainWrapPct = document.getElementById('MainDisciptionWrap') ? document.getElementById('MainDisciptionWrap').value : 79;
+            const descriptionX = (MainDescriptionCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10)) + mainPosX;
+            const mainMaxW = descWrapMaxWidth(canvas.width, mainWrapPct);
+            const mainLineH = 125 * fs;
+            const mainBoxLeft = MainDescriptionCenterAlign.checked ? (descriptionX - mainMaxW / 2) : descriptionX;
+            const mainLines = WrapText(Discription.value, mainMaxW);
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(mainBoxLeft, 0, mainMaxW, canvas.height);
+            ctx.clip();
+            ctx.font = cmPxFont(Number(DiscriptionFontSize.value) * fs);
+            ctx.textAlign = MainDescriptionCenterAlign.checked ? 'center' : 'left';
+            ctx.textBaseline = 'alphabetic';
+            ctx.fillStyle = 'black';
+            var mi;
+            for (mi = 0; mi < mainLines.length; mi++) {
+                ctx.fillText(mainLines[mi], descriptionX, (canvas.height / 1.6) + mainPosY + (mainLineH * (mi + 1)));
+            }
+            ctx.restore();
+            mainTextHit = String(Discription.value || '').trim() ? {
+                kind: 'main',
+                left: mainBoxLeft,
+                top: (canvas.height / 1.6) + mainPosY + mainLineH * 0.2,
+                width: mainMaxW,
+                height: Math.max(1, mainLines.length) * mainLineH,
+                anchorX: descriptionX,
+                center: MainDescriptionCenterAlign.checked
+            } : null;
 
 
             ctx.font = cmPxFont(Number(SubFontSize.value) * fs);
             ctx.textAlign = SubDescriptionCenterAlign.checked ? 'center' : 'left';
-            const subDescriptionX = SubDescriptionCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10);
-            i = 0;
-            WrapText(SubDisciption.value).forEach(lin => {
-                i++;
-                ctx.fillText(lin, subDescriptionX, (canvas.height / 1.9) + (100 * fs * i))
-            });
+            const subPosX = (parseInt(document.getElementById('SubDisciptionPosX') && document.getElementById('SubDisciptionPosX').value, 10) || 0) * fs;
+            const subPosY = (parseInt(document.getElementById('SubDisciptionPosY') && document.getElementById('SubDisciptionPosY').value, 10) || 0) * fs;
+            const subWrapPct = document.getElementById('SubDisciptionWrap') ? document.getElementById('SubDisciptionWrap').value : 79;
+            const subDescriptionX = (SubDescriptionCenterAlign.checked ? (canvas.width / 2) : (canvas.width / 10)) + subPosX;
+            const subMaxW = descWrapMaxWidth(canvas.width, subWrapPct);
+            const subLineH = 100 * fs;
+            const subBoxLeft = SubDescriptionCenterAlign.checked ? (subDescriptionX - subMaxW / 2) : subDescriptionX;
+            const subLines = WrapText(SubDisciption.value, subMaxW);
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(subBoxLeft, 0, subMaxW, canvas.height);
+            ctx.clip();
+            ctx.font = cmPxFont(Number(SubFontSize.value) * fs);
+            ctx.textAlign = SubDescriptionCenterAlign.checked ? 'center' : 'left';
+            ctx.textBaseline = 'alphabetic';
+            ctx.fillStyle = 'black';
+            var si;
+            for (si = 0; si < subLines.length; si++) {
+                ctx.fillText(subLines[si], subDescriptionX, (canvas.height / 1.9) + subPosY + (subLineH * (si + 1)));
+            }
+            ctx.restore();
+            subTextHit = String(SubDisciption.value || '').trim() ? {
+                kind: 'sub',
+                left: subBoxLeft,
+                top: (canvas.height / 1.9) + subPosY + subLineH * 0.2,
+                width: subMaxW,
+                height: Math.max(1, subLines.length) * subLineH,
+                anchorX: subDescriptionX,
+                center: SubDescriptionCenterAlign.checked
+            } : null;
+
+            if ((isDraggingText || isResizingTextWrap) && textDragKind) {
+                var guide = textDragKind === 'sub' ? subTextHit : mainTextHit;
+                if (guide) {
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(129,140,248,0.9)';
+                    ctx.lineWidth = Math.max(2, 4 * fs);
+                    ctx.setLineDash([12 * fs, 8 * fs]);
+                    ctx.strokeRect(guide.left, guide.top, guide.width, guide.height);
+                    ctx.restore();
+                }
+            }
             
             // Update fullscreen canvas if modal is open (with black bleed)
             const modal = document.getElementById('fullscreenModal');
@@ -3287,33 +3524,78 @@
             }
         }
 
-        function WrapText(Text) {
-            const words = Text.split(' ');
-            let line = '';
-            const lines = [];
-            const maxWidth = canvas.width - (canvas.width / 4.75); // Set max width for text wrapping (adjust as necessary)
+        function descWrapMaxWidth(canvasW, wrapPct) {
+            var p = parseFloat(wrapPct);
+            if (!isFinite(p) || p <= 0) return canvasW - (canvasW / 4.75);
+            return canvasW * (Math.max(30, Math.min(100, p)) / 100);
+        }
 
-            // Loop through words and wrap text
-            for (let index = 0; index < words.length; index++) {
-                const word = words[index];
-                const testLine = line + word + ' '; // Add the word to the current line
+        function measureWrapWidth(ctx, text) {
+            var m = ctx.measureText(text || '');
+            var w = m.width;
+            if (typeof m.actualBoundingBoxLeft === 'number' && typeof m.actualBoundingBoxRight === 'number') {
+                w = Math.max(w, m.actualBoundingBoxLeft + m.actualBoundingBoxRight);
+            }
+            return w;
+        }
 
-                // Check the width of the text to determine if it exceeds maxWidth
-                if (ctx.measureText(testLine).width > maxWidth) {
-                    if (line.length > 0) {
-                        lines.push(line.trim()); // Push the current line to the lines array
-                    }
-                    line = word + ' '; // Start a new line with the current word
-                } else {
-                    line = testLine; // Continue adding to the current line
+        function splitWordToWidth(ctx, word, maxWidth) {
+            if (!word) return [''];
+            if (measureWrapWidth(ctx, word) <= maxWidth) return [word];
+            var parts = [];
+            var rest = word;
+            while (rest.length) {
+                if (measureWrapWidth(ctx, rest) <= maxWidth) {
+                    parts.push(rest);
+                    break;
                 }
+                var lo = 1;
+                var hi = rest.length;
+                while (lo < hi) {
+                    var mid = Math.ceil((lo + hi) / 2);
+                    if (measureWrapWidth(ctx, rest.slice(0, mid)) <= maxWidth) lo = mid;
+                    else hi = mid - 1;
+                }
+                if (lo < 1) lo = 1;
+                parts.push(rest.slice(0, lo));
+                rest = rest.slice(lo);
             }
+            return parts;
+        }
 
-            // Add the remaining text as a line
-            if (line.length > 0) {
-                lines.push(line.trim());
+        function WrapText(Text, maxWidth) {
+            if (maxWidth == null || !(maxWidth > 0)) {
+                maxWidth = canvas.width - (canvas.width / 4.75);
             }
-
+            ctx.save();
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'alphabetic';
+            var limit = Math.max(8, maxWidth - 2);
+            const lines = [];
+            const paragraphs = String(Text || '').replace(/\r\n/g, '\n').split('\n');
+            for (let p = 0; p < paragraphs.length; p++) {
+                const words = paragraphs[p].split(/\s+/).filter(Boolean);
+                if (!words.length) {
+                    lines.push('');
+                    continue;
+                }
+                let line = '';
+                for (let index = 0; index < words.length; index++) {
+                    const chunks = splitWordToWidth(ctx, words[index], limit);
+                    for (let c = 0; c < chunks.length; c++) {
+                        const piece = chunks[c];
+                        const testLine = line ? (line + ' ' + piece) : piece;
+                        if (line && measureWrapWidth(ctx, testLine) > limit) {
+                            lines.push(line);
+                            line = piece;
+                        } else {
+                            line = testLine;
+                        }
+                    }
+                }
+                if (line) lines.push(line);
+            }
+            ctx.restore();
             return lines;
         }
 
