@@ -1535,7 +1535,7 @@
                     showDamageStats: IsSwitchedOn
                 },
                 images: {
-                    cardBaseSrc: MainImage && MainImage.src ? MainImage.src : '',
+                    cardBaseSrc: cardBaseSrcForSave(),
                     artSrc: ArtImage && ArtImage.src ? ArtImage.src : ''
                 }
             };
@@ -1672,7 +1672,8 @@
             if (damageCheckbox) damageCheckbox.checked = IsSwitchedOn;
 
             const images = state.images || {};
-            setImageSource(MainImage, images.cardBaseSrc, function (img) {
+            var frameSrc = cardBaseSrcForLoad(images.cardBaseSrc);
+            function applyLoadedFrame(img) {
                 if (img) MainImage = img;
                 syncCardBaseSelectFromMainImage();
                 setImageSource(ArtImage, images.artSrc, function (artImg) {
@@ -1689,7 +1690,23 @@
                     redrawCanvas();
                     if (typeof onComplete === 'function') onComplete();
                 });
-            });
+            }
+            if (!frameSrc) {
+                applyLoadedFrame(null);
+            } else {
+                setImageSource(MainImage, frameSrc, function (img) {
+                    if (img) {
+                        applyLoadedFrame(img);
+                        return;
+                    }
+                    var fallback = builtinCardBaseFilename(images.cardBaseSrc);
+                    if (fallback && fallback !== frameSrc) {
+                        setImageSource(MainImage, fallback, applyLoadedFrame);
+                        return;
+                    }
+                    applyLoadedFrame(null);
+                });
+            }
         }
 
         function showCardLoadingBar(message) {
@@ -2816,7 +2833,8 @@
 
         function getCardBaseFilenameFromSrc(src) {
             if (!src || String(src).indexOf('data:') === 0) return null;
-            var s = String(src).split('?')[0];
+            var s = String(src).split('#')[0].split('?')[0];
+            s = s.replace(/\\/g, '/');
             var parts = s.split('/');
             var fn = parts.length ? parts[parts.length - 1] : null;
             if (!fn) return null;
@@ -2831,6 +2849,25 @@
             'CardFrame Old.png': true,
             'Full Art Card Frame.png': true
         };
+
+        function builtinCardBaseFilename(src) {
+            var fn = getCardBaseFilenameFromSrc(src);
+            return fn && BUILTIN_CARD_BASES[fn] ? fn : null;
+        }
+
+        /** Persist built-in frames as repo filenames so they reload on any origin. */
+        function cardBaseSrcForSave() {
+            if (!MainImage || !MainImage.src) return '';
+            var builtin = builtinCardBaseFilename(MainImage.src);
+            return builtin || String(MainImage.src);
+        }
+
+        /** Prefer the local built-in file when a save stored an absolute URL. */
+        function cardBaseSrcForLoad(src) {
+            if (!src) return '';
+            var builtin = builtinCardBaseFilename(src);
+            return builtin || String(src);
+        }
 
         function removeCardBaseDynamicOption() {
             var dyn = document.getElementById('CardBaseDynamicOption');
