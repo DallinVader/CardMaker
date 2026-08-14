@@ -5,6 +5,8 @@
 (function () {
     var CANVAS_W = 2500;
     var CANVAS_H = 3500;
+    /** Same as index.html LIVE_CANVAS_SCALE — previews layout at this size so wrap/text match the editor. */
+    var EDITOR_LIVE_SCALE = 0.5;
 
     function cardFontFamilyName(f) {
         var fam = f && f.CardFontFamily != null ? String(f.CardFontFamily).trim() : '';
@@ -27,6 +29,12 @@
         if (v === false || v === 0 || v == null || v === '') return false;
         var s = String(v).trim().toLowerCase();
         return s === 'true' || s === '1' || s === 'on' || s === 'yes';
+    }
+
+    /** Editor checkboxes default to checked when a save omits the field. */
+    function fieldOnDefaultTrue(v) {
+        if (v === undefined || v === null || v === '') return true;
+        return fieldOn(v);
     }
 
     function fieldNum(v, fallback) {
@@ -252,20 +260,19 @@
         if (!mainImg && !artImg) return null;
 
         var maxOut = opts && typeof opts.maxOutputSide === 'number' ? opts.maxOutputSide : 0;
-        var renderScale = (maxOut > 0 && maxOut < CANVAS_W)
-            ? Math.min(maxOut / CANVAS_W, maxOut / CANVAS_H, 1)
-            : 1;
-        var outW = Math.max(1, Math.round(CANVAS_W * renderScale));
-        var outH = Math.max(1, Math.round(CANVAS_H * renderScale));
+        var useEditorLive = maxOut > 0 && maxOut < CANVAS_W;
+        var layoutW = useEditorLive ? Math.round(CANVAS_W * EDITOR_LIVE_SCALE) : CANVAS_W;
+        var layoutH = useEditorLive ? Math.round(CANVAS_H * EDITOR_LIVE_SCALE) : CANVAS_H;
+        var renderScale = layoutW / CANVAS_W;
 
         var canvas = document.createElement('canvas');
-        canvas.width = outW;
-        canvas.height = outH;
+        canvas.width = layoutW;
+        canvas.height = layoutH;
         var ctx = canvas.getContext('2d');
         if (!ctx) return null;
-        var W = outW;
-        var H = outH;
-        var fs = W / CANVAS_W;
+        var W = layoutW;
+        var H = layoutH;
+        var fs = renderScale;
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.imageSmoothingEnabled = true;
         try { ctx.imageSmoothingQuality = 'high'; } catch (eSm) { /* ignore */ }
@@ -276,7 +283,7 @@
 
         var ExtraHightP = fieldNum(f.ArtHightPos, 0) * fs;
         var ExtraWidthP = fieldNum(f.ArtWidthPos, 0) * fs;
-        var artSize = fieldNum(f.ArtHight, 100);
+        var artSize = fieldNum(f.ArtHight, 116);
 
         if (artImg) {
             var aw = artImg.width || (artImg.naturalWidth && artImg.naturalWidth);
@@ -430,7 +437,7 @@
         ctx.textBaseline = 'middle';
         ctx.fillStyle = 'black';
 
-        var titleCenter = fieldOn(f.TitleCenterAlign);
+        var titleCenter = fieldOnDefaultTrue(f.TitleCenterAlign);
         ctx.font = cardFontCss((fieldNum(f.TitleFontSize, 200)) * fs, f);
         ctx.textAlign = titleCenter ? 'center' : 'left';
         var titleX = titleCenter ? (W / 2) : (W / 10);
@@ -446,7 +453,7 @@
         ctx.font = cardFontCss((fieldNum(f.TreasureFontSize, 150)) * fs, f);
         ctx.fillText(String(f.TreasureCost != null ? f.TreasureCost : ''), W - (W / 6.9), H / 1.99);
 
-        var quoteCenter = fieldOn(f.QuoteCenterAlign);
+        var quoteCenter = fieldOnDefaultTrue(f.QuoteCenterAlign);
         var quoteFontPx = fieldNum(f.QoteDiscriptionFontSize, 60);
         ctx.font = cardFontCss(quoteFontPx * fs, f);
         ctx.textAlign = quoteCenter ? 'center' : 'left';
@@ -455,10 +462,10 @@
 
         var rawSetN = f.CardSetNumber;
         var rawSetT = f.CardSetTotal;
-        var setNum = (rawSetN === undefined || rawSetN === null)
-            ? 1 : parseInt(String(rawSetN).trim(), 10);
-        var setTot = (rawSetT === undefined || rawSetT === null)
-            ? 120 : parseInt(String(rawSetT).trim(), 10);
+        var setNum = (rawSetN === undefined || rawSetN === null || String(rawSetN).trim() === '')
+            ? NaN : parseInt(String(rawSetN).trim(), 10);
+        var setTot = (rawSetT === undefined || rawSetT === null || String(rawSetT).trim() === '')
+            ? NaN : parseInt(String(rawSetT).trim(), 10);
         var hasSetNums = setNum >= 1 && setTot >= 1;
 
         var rarShown = f.Rarity != null ? String(f.Rarity).trim() : '';
@@ -502,7 +509,7 @@
             ctx.fillStyle = 'black';
         }
 
-        var mainCenter = fieldOn(f.MainDescriptionCenterAlign);
+        var mainCenter = fieldOnDefaultTrue(f.MainDescriptionCenterAlign);
         var mainFontPx = fieldNum(f.MainDisciptionFontSize, 125);
         ctx.font = cardFontCss(mainFontPx * fs, f);
         ctx.textAlign = mainCenter ? 'center' : 'left';
@@ -528,7 +535,7 @@
         }
         ctx.restore();
 
-        var subCenter = fieldOn(f.SubDescriptionCenterAlign);
+        var subCenter = fieldOnDefaultTrue(f.SubDescriptionCenterAlign);
         var subFontPx = fieldNum(f.SubDisciptionFontSize, 70);
         ctx.font = cardFontCss(subFontPx * fs, f);
         ctx.textAlign = subCenter ? 'center' : 'left';
@@ -552,15 +559,34 @@
         }
         ctx.restore();
 
+        var exportCanvas = canvas;
+        if (useEditorLive && maxOut > 0) {
+            var fit = Math.min(maxOut / layoutW, maxOut / layoutH);
+            if (fit < 0.999) {
+                var finalW = Math.max(1, Math.round(layoutW * fit));
+                var finalH = Math.max(1, Math.round(layoutH * fit));
+                var out = document.createElement('canvas');
+                out.width = finalW;
+                out.height = finalH;
+                var octx = out.getContext('2d');
+                if (octx) {
+                    octx.imageSmoothingEnabled = true;
+                    try { octx.imageSmoothingQuality = 'high'; } catch (eFit) { /* ignore */ }
+                    octx.drawImage(canvas, 0, 0, finalW, finalH);
+                    exportCanvas = out;
+                }
+            }
+        }
+
         try {
-            if (renderScale < 1) {
+            if (maxOut > 0) {
                 var wantJpeg = !opts || !opts.outputMime || opts.outputMime === 'image/jpeg' || opts.outputMime === 'jpeg';
                 if (wantJpeg) {
                     var q = typeof opts.outputQuality === 'number' ? opts.outputQuality : 0.82;
-                    return canvas.toDataURL('image/jpeg', q);
+                    return exportCanvas.toDataURL('image/jpeg', q);
                 }
             }
-            return canvas.toDataURL('image/png');
+            return exportCanvas.toDataURL('image/png');
         } catch (e) {
             console.warn('card-render: toDataURL failed (tainted or blocked canvas)', e);
             return null;

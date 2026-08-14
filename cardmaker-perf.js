@@ -215,7 +215,7 @@
     }
 
     function thumbCacheKey(fileId, modifiedTime, variant) {
-        var k = String(fileId || '') + '|' + String(modifiedTime || '');
+        var k = String(fileId || '') + '|' + String(modifiedTime || '') + '|elive';
         if (variant) k += '|' + String(variant);
         return k;
     }

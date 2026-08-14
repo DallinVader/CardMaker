@@ -3319,13 +3319,14 @@
 
             if (IsSwitchedOn) {
                 ctx.drawImage(DamageImg, dImgX, dImgY, DimgWidth, DimgHeight);
-                document.fonts.load(cmPxFont(10)).then(() => {
-                    ctx.font = cmPxFont(175 * fs);
-                    ctx.textAlign = 'center';
-                    ctx.fillStyle = 'black';
-                    ctx.fillText(Dam.value, canvas.width / 12.5, canvas.height / 12.5)
-                    ctx.fillText(Def.value, canvas.width - (canvas.width / 12.5), canvas.height / 12.5)
-                })
+                ctx.save();
+                ctx.font = cmPxFont(175 * fs);
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = 'black';
+                ctx.fillText(Dam.value, canvas.width / 12.5, canvas.height / 12.5);
+                ctx.fillText(Def.value, canvas.width - (canvas.width / 12.5), canvas.height / 12.5);
+                ctx.restore();
             }
             if (rarityShowsGem() && RareityImg.complete && RareityImg.naturalWidth > 0) {
                 var crGem = document.getElementById('CardRarity');
