@@ -19,6 +19,14 @@
         outputQuality: 0.78
     };
 
+    /** Saved Projects / Deck Builder — same layout size as the editor live canvas. */
+    var EDITOR_PREVIEW_OPTS = {
+        maxOutputSide: 1750,
+        outputMime: 'image/jpeg',
+        outputQuality: 0.9
+    };
+    var EDITOR_PREVIEW_VARIANT = 'e1750';
+
     /** Saved Projects grid — a bit sharper than library/player thumbs. */
     var GRID_THUMB_RENDER_OPTS = {
         maxOutputSide: 640,
@@ -420,6 +428,8 @@
 
     global.CardMakerPerf = {
         THUMB_RENDER_OPTS: THUMB_RENDER_OPTS,
+        EDITOR_PREVIEW_OPTS: EDITOR_PREVIEW_OPTS,
+        EDITOR_PREVIEW_VARIANT: EDITOR_PREVIEW_VARIANT,
         GRID_THUMB_RENDER_OPTS: GRID_THUMB_RENDER_OPTS,
         GRID_THUMB_VARIANT: GRID_THUMB_VARIANT,
         PRINT_RENDER_OPTS: PRINT_RENDER_OPTS,

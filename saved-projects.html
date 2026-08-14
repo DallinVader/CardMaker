@@ -143,7 +143,8 @@
         .spm-card-art img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: contain;
+            object-position: center;
             display: block;
             opacity: 0;
             transition: opacity 0.15s ease;
@@ -2909,17 +2910,25 @@
 
         updateHeaderArrows();
 
-        function gridThumbOpts() {
-            if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.GRID_THUMB_RENDER_OPTS) {
-                return CardMakerPerf.GRID_THUMB_RENDER_OPTS;
+        function editorPreviewOpts() {
+            if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.EDITOR_PREVIEW_OPTS) {
+                return CardMakerPerf.EDITOR_PREVIEW_OPTS;
             }
-            return { maxOutputSide: 640, outputMime: 'image/jpeg', outputQuality: 0.86 };
+            return { maxOutputSide: 1750, outputMime: 'image/jpeg', outputQuality: 0.9 };
+        }
+
+        function editorPreviewVariant() {
+            return (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.EDITOR_PREVIEW_VARIANT)
+                ? CardMakerPerf.EDITOR_PREVIEW_VARIANT
+                : 'e1750';
+        }
+
+        function gridThumbOpts() {
+            return editorPreviewOpts();
         }
 
         function gridThumbVariant() {
-            return (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.GRID_THUMB_VARIANT)
-                ? CardMakerPerf.GRID_THUMB_VARIANT
-                : 'g640';
+            return editorPreviewVariant();
         }
 
         function applySpmThumbUrl(img, id, url) {
@@ -2937,23 +2946,14 @@
             var state = (project.state && typeof project.state === 'object')
                 ? project.state
                 : (saveCacheById.get(id) && saveCacheById.get(id).state);
-            var opts = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.THUMB_RENDER_OPTS)
-                ? CardMakerPerf.THUMB_RENDER_OPTS
-                : { maxOutputSide: 400, outputMime: 'image/jpeg', outputQuality: 0.78 };
+            var opts = editorPreviewOpts();
+            var variant = editorPreviewVariant();
             var fromCache = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.readThumbCache)
-                ? CardMakerPerf.readThumbCache(id, mt, gridThumbVariant())
+                ? CardMakerPerf.readThumbCache(id, mt, variant)
                 : Promise.resolve(null);
             fromCache.then(function (hit) {
                 if (hit && hit.dataUrl) {
                     applySpmThumbUrl(img, id, hit.dataUrl);
-                    return null;
-                }
-                if (typeof CardMakerPerf === 'undefined' || !CardMakerPerf.readThumbCache) return null;
-                return CardMakerPerf.readThumbCache(id, mt);
-            }).then(function (legacy) {
-                if (img.classList.contains('is-loaded')) return null;
-                if (legacy && legacy.dataUrl) {
-                    applySpmThumbUrl(img, id, legacy.dataUrl);
                     return null;
                 }
                 if (!state || typeof window.renderCardMakerProjectToDataUrl !== 'function') return null;
@@ -2961,7 +2961,7 @@
                     if (!url) return;
                     applySpmThumbUrl(img, id, url);
                     if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.writeThumbCache) {
-                        CardMakerPerf.writeThumbCache(id, mt, url);
+                        CardMakerPerf.writeThumbCache(id, mt, url, variant);
                     }
                 });
             }).catch(function () { /* ignore */ });
@@ -3565,10 +3565,7 @@
             var project = projects.find(function (p) { return p.file && p.file.id === projectId; });
             if (!project) return;
             var title = cardListTitle(project) || 'Card preview';
-            var zoomOpts = { maxOutputSide: 1750, outputMime: 'image/jpeg', outputQuality: 0.92 };
-            var thumbOpts = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.THUMB_RENDER_OPTS)
-                ? CardMakerPerf.THUMB_RENDER_OPTS
-                : { maxOutputSide: 400, outputMime: 'image/jpeg', outputQuality: 0.78 };
+            var zoomOpts = editorPreviewOpts();
             spmZoomImg.alt = title;
             spmZoomImg.setAttribute('data-zoom-id', projectId);
             spmZoomImg.removeAttribute('src');
@@ -3582,16 +3579,13 @@
                 if (!url || !spmZoomStillOpen(projectId)) return;
                 spmZoomImg.src = url;
                 var mt = fileMeta && fileMeta.modifiedTime;
-                renderSpmPreviewUrl(state, thumbOpts).then(function (thumbUrl) {
-                    if (!thumbUrl) return;
-                    updateSpmCardTile(
-                        projects.find(function (p) { return p.file && p.file.id === projectId; }) || project,
-                        thumbUrl
-                    );
-                    if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.writeThumbCache && mt) {
-                        CardMakerPerf.writeThumbCache(projectId, mt, thumbUrl);
-                    }
-                }).catch(function () { /* ignore */ });
+                updateSpmCardTile(
+                    projects.find(function (p) { return p.file && p.file.id === projectId; }) || project,
+                    url
+                );
+                if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.writeThumbCache && mt) {
+                    CardMakerPerf.writeThumbCache(projectId, mt, url, editorPreviewVariant());
+                }
             }
 
             function renderHi(state, fileMeta) {

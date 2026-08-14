@@ -104,7 +104,7 @@
             cursor: zoom-in;
         }
         .db-card-art img {
-            width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0;
+            width: 100%; height: 100%; object-fit: contain; object-position: center; display: block; opacity: 0;
             transition: opacity 0.15s ease;
         }
         .db-card-art img.is-loaded { opacity: 1; }
@@ -137,8 +137,12 @@
         }
         .db-zoom.is-open { display: flex; }
         .db-zoom img {
-            max-width: min(92vw, 720px); max-height: 92vh;
-            width: auto; height: auto; border-radius: 12px;
+            width: min(92vw, 720px);
+            max-width: min(92vw, 720px);
+            max-height: 92vh;
+            height: auto;
+            object-fit: contain;
+            border-radius: 12px;
             box-shadow: 0 18px 50px rgba(0,0,0,0.55);
             background: #0f172a;
         }
@@ -451,15 +455,27 @@
         return list;
     }
 
+    function previewRenderOpts() {
+        if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.EDITOR_PREVIEW_OPTS) {
+            return CardMakerPerf.EDITOR_PREVIEW_OPTS;
+        }
+        return { maxOutputSide: 1750, outputMime: 'image/jpeg', outputQuality: 0.9 };
+    }
+
+    function previewThumbVariant() {
+        return (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.EDITOR_PREVIEW_VARIANT)
+            ? CardMakerPerf.EDITOR_PREVIEW_VARIANT
+            : 'e1750';
+    }
+
     function loadThumb(img) {
         var id = img.getAttribute('data-id');
         var card = cards.filter(function (c) { return c.id === id; })[0];
         if (!card || !card.state) return;
-        var opts = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.THUMB_RENDER_OPTS)
-            ? CardMakerPerf.THUMB_RENDER_OPTS
-            : { maxOutputSide: 400, outputMime: 'image/jpeg', outputQuality: 0.78 };
+        var opts = previewRenderOpts();
+        var variant = previewThumbVariant();
         var fromCache = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.readThumbCache)
-            ? CardMakerPerf.readThumbCache(id, card.modifiedTime)
+            ? CardMakerPerf.readThumbCache(id, card.modifiedTime, variant)
             : Promise.resolve(null);
         fromCache.then(function (hit) {
             if (hit && hit.dataUrl) {
@@ -473,7 +489,7 @@
                 img.src = url;
                 img.classList.add('is-loaded');
                 if (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.writeThumbCache) {
-                    CardMakerPerf.writeThumbCache(id, card.modifiedTime, url);
+                    CardMakerPerf.writeThumbCache(id, card.modifiedTime, url, variant);
                 }
             });
         }).catch(function () { /* ignore */ });
@@ -779,9 +795,7 @@
 
     var zoomEl = document.getElementById('dbZoom');
     var zoomImg = document.getElementById('dbZoomImg');
-    var ZOOM_RENDER_OPTS = (typeof CardMakerPerf !== 'undefined' && CardMakerPerf.PRINT_RENDER_OPTS)
-        ? CardMakerPerf.PRINT_RENDER_OPTS
-        : { maxOutputSide: 1400, outputMime: 'image/jpeg', outputQuality: 0.9 };
+    var ZOOM_RENDER_OPTS = previewRenderOpts();
 
     function closeZoom() {
         if (!zoomEl) return;

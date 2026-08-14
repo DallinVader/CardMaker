@@ -563,8 +563,8 @@
         if (useEditorLive && maxOut > 0) {
             var fit = Math.min(maxOut / layoutW, maxOut / layoutH);
             if (fit < 0.999) {
-                var finalW = Math.max(1, Math.round(layoutW * fit));
                 var finalH = Math.max(1, Math.round(layoutH * fit));
+                var finalW = Math.max(1, Math.round(finalH * (layoutW / layoutH)));
                 var out = document.createElement('canvas');
                 out.width = finalW;
                 out.height = finalH;
