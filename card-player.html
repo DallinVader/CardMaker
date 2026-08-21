@@ -77,6 +77,16 @@
             overflow: visible;
         }
         @media (max-width: 900px) {
+            body {
+                height: auto;
+                min-height: 100dvh;
+                overflow: auto;
+                overflow-x: hidden;
+            }
+            .cp-wrap {
+                max-width: 100%;
+                padding: 12px max(12px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+            }
             .cp-main {
                 grid-template-columns: 1fr;
                 max-height: none;
@@ -97,8 +107,10 @@
             }
             .cp-panel-play {
                 min-height: min(70dvh, 560px);
-                max-height: calc(100dvh - 220px);
+                max-height: none;
             }
+            input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+            select, textarea { font-size: 16px; }
         }
         .cp-panel {
             background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);

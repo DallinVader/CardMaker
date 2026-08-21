@@ -97,6 +97,9 @@
         }
         @media (max-width: 1100px) { .spm-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
         @media (max-width: 720px) { .spm-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 420px) {
+            .spm-card-grid { grid-template-columns: 1fr; max-width: 340px; margin-inline: auto; }
+        }
         .spm-card {
             background: rgba(15, 23, 42, 0.8);
             border: 1px solid rgba(148, 163, 184, 0.2);
@@ -155,32 +158,158 @@
             display: none;
             position: fixed;
             inset: 0;
-            z-index: 80;
-            background: rgba(2, 6, 23, 0.82);
+            z-index: 9600;
+            background: rgba(2, 6, 23, 0.88);
             align-items: center;
             justify-content: center;
             padding: 16px;
             cursor: zoom-out;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            overscroll-behavior: contain;
         }
         .spm-zoom.is-open { display: flex; }
+        .spm-zoom-stage {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            max-width: 100%;
+            max-height: 100%;
+            pointer-events: none;
+        }
         .spm-zoom img {
-            width: min(92vw, 720px);
-            max-width: min(92vw, 720px);
-            max-height: 92vh;
+            width: min(86vw, 720px);
+            max-width: min(86vw, 720px);
+            max-height: min(78vh, calc(100dvh - 120px));
             height: auto;
             object-fit: contain;
             border-radius: 12px;
             box-shadow: 0 18px 50px rgba(0,0,0,0.55);
             background: #0f172a;
+            pointer-events: none;
+        }
+        .spm-zoom-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 3;
+            width: 48px;
+            height: 48px;
+            border: none;
+            border-radius: 50%;
+            background: rgba(15, 23, 42, 0.78);
+            color: #f8fafc;
+            font-size: 28px;
+            line-height: 1;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+            pointer-events: auto;
+        }
+        .spm-zoom-nav:hover { background: rgba(51, 65, 85, 0.95); }
+        .spm-zoom-nav:focus-visible,
+        .spm-zoom-close:focus-visible {
+            outline: 2px solid #a5b4fc;
+            outline-offset: 2px;
+        }
+        .spm-zoom-nav[hidden] { display: none !important; }
+        .spm-zoom-prev { left: max(10px, env(safe-area-inset-left)); }
+        .spm-zoom-next { right: max(10px, env(safe-area-inset-right)); }
+        .spm-zoom-close {
+            position: absolute;
+            top: max(10px, env(safe-area-inset-top));
+            right: max(10px, env(safe-area-inset-right));
+            z-index: 4;
+            width: 44px;
+            height: 44px;
+            border: none;
+            border-radius: 12px;
+            background: rgba(15, 23, 42, 0.78);
+            color: #e2e8f0;
+            font-size: 26px;
+            line-height: 1;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+        .spm-zoom-close:hover { background: rgba(51, 65, 85, 0.95); }
+        .spm-zoom-meta {
+            position: absolute;
+            top: max(12px, env(safe-area-inset-top));
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 3;
+            text-align: center;
+            pointer-events: none;
+            max-width: min(70vw, 520px);
+            padding: 0 8px;
+        }
+        .spm-zoom-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: #f8fafc;
+            line-height: 1.3;
+            text-shadow: 0 1px 8px rgba(0,0,0,0.7);
+        }
+        .spm-zoom-count {
+            margin-top: 4px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            color: #93c5fd;
+            font-variant-numeric: tabular-nums;
         }
         .spm-zoom-hint {
             position: absolute;
-            bottom: 14px;
+            bottom: max(14px, env(safe-area-inset-bottom));
             left: 50%;
             transform: translateX(-50%);
             color: #cbd5e1;
             font-size: 12px;
             pointer-events: none;
+            text-align: center;
+            width: min(92vw, 420px);
+            text-shadow: 0 1px 8px rgba(0,0,0,0.7);
+        }
+        .spm-pager {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin: 16px 0 4px;
+        }
+        .spm-pager[hidden] { display: none !important; }
+        .spm-pager-label {
+            font-size: 13px;
+            font-weight: 800;
+            color: #cbd5e1;
+            font-variant-numeric: tabular-nums;
+            min-width: 7ch;
+            text-align: center;
+        }
+        .spm-edit-card-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin: 0 0 14px;
+        }
+        .spm-edit-card-nav[hidden] { display: none !important; }
+        .spm-edit-card-nav-count {
+            font-size: 12px;
+            font-weight: 800;
+            color: #93c5fd;
+            font-variant-numeric: tabular-nums;
+            text-align: center;
+            flex: 1 1 auto;
+        }
+        .spm-edit-preview-frame {
+            touch-action: pan-y;
         }
         .spm-dup-mark {
             display: inline-flex;
@@ -478,7 +607,7 @@
         @media print { .spm-modal { display: none !important; } }
 
         .spm-modal {
-            position: fixed; inset: 0; z-index: 1200;
+            position: fixed; inset: 0; z-index: 9500;
             display: none; align-items: center; justify-content: center;
             padding: 16px;
         }
@@ -525,6 +654,7 @@
             gap: 10px;
             min-width: 0;
             max-height: calc(100vh - 32px);
+            touch-action: pan-y;
         }
         .spm-edit-preview-head {
             margin: 0;
@@ -692,6 +822,12 @@
 
         @media (max-width: 720px) {
             .spm-wrap { padding-top: 16px; padding-bottom: max(28px, env(safe-area-inset-bottom)); }
+            .spm-input { min-width: 0; width: 100%; }
+            .spm-filter-row { flex-direction: column; align-items: stretch; gap: 12px; }
+            .spm-filter-row .spm-select { min-width: 0; width: 100%; }
+            .spm-search-set-pair { flex-direction: column; align-items: stretch; }
+            .spm-search-set-pair .spm-search-wrap { max-width: 100%; }
+            .spm-search-set-pair .spm-set-filter-label .spm-select { min-width: 0; width: 100%; }
             .spm-card-check .spm-row-check {
                 width: 26px;
                 height: 26px;
@@ -699,8 +835,29 @@
             .spm-actions .spm-small-btn,
             .spm-actions .spm-link-btn {
                 min-height: 44px;
-                padding: 12px 14px;
+                padding: 12px 10px;
                 font-size: 13px;
+            }
+            .spm-zoom {
+                padding: 8px;
+            }
+            .spm-zoom img {
+                width: min(94vw, 100%);
+                max-width: min(94vw, 100%);
+                max-height: min(72dvh, calc(100dvh - 132px));
+            }
+            .spm-zoom-nav {
+                width: 44px;
+                height: 44px;
+                font-size: 24px;
+            }
+            .spm-zoom-title { font-size: 13px; }
+            input.spm-input, select.spm-select, textarea {
+                font-size: 16px;
+            }
+            .spm-edit-card-nav .spm-small-btn {
+                min-height: 44px;
+                min-width: 76px;
             }
             .spm-modal {
                 padding: max(8px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-right))
@@ -716,12 +873,12 @@
             }
             .spm-edit-preview-aside {
                 flex: 0 0 auto;
-                max-height: min(38vh, 280px);
-                order: 2;
+                max-height: min(42vh, 300px);
+                order: 1;
             }
             .spm-edit-preview-frame {
                 min-height: 140px;
-                max-height: min(36vh,260px);
+                max-height: min(40vh, 280px);
                 overflow: auto;
             }
             .spm-modal-panel {
@@ -731,7 +888,7 @@
                 border-radius: 18px 18px 0 0;
                 padding: 20px 16px 18px;
                 padding-bottom: max(18px, env(safe-area-inset-bottom));
-                order: 1;
+                order: 2;
             }
             .spm-modal-actions {
                 justify-content: stretch;
@@ -892,6 +1049,11 @@
                 </div>
                 <div class="spm-card-grid" id="spmCardGrid"></div>
                 <p class="spm-grid-empty" id="spmGridEmpty" hidden>No projects match the current filters (or nothing loaded yet).</p>
+                <div class="spm-pager" id="spmPagerBar" hidden>
+                    <button type="button" class="spm-small-btn" id="spmPagePrevBottom">Previous</button>
+                    <span class="spm-pager-label" id="spmPageLabel">Page 1</span>
+                    <button type="button" class="spm-small-btn" id="spmPageNextBottom">Next</button>
+                </div>
 
                 <div class="spm-message" id="spmMessage" aria-live="polite"></div>
             </div>
@@ -904,7 +1066,12 @@
         <div class="spm-modal-panel">
             <button type="button" class="spm-modal-close" data-spm-edit-close aria-label="Close">&times;</button>
             <h2 id="spmEditTitle">Edit save</h2>
-            <p class="spm-modal-hint">Rename the file on Drive and adjust card fields. The editor will see these values when you open this save.</p>
+            <div class="spm-edit-card-nav" id="spmEditCardNav" hidden>
+                <button type="button" class="spm-small-btn" id="spmEditPrevBtn" aria-label="Previous card">‹ Prev</button>
+                <span class="spm-edit-card-nav-count" id="spmEditNavCount"></span>
+                <button type="button" class="spm-small-btn" id="spmEditNextBtn" aria-label="Next card">Next ›</button>
+            </div>
+            <p class="spm-modal-hint">Rename the file on Drive and adjust card fields. The editor will see these values when you open this save. Swipe the preview or use Prev/Next to browse cards.</p>
             <div class="spm-modal-field">
                 <label for="spmEditName">Save name</label>
                 <input type="text" id="spmEditName" class="spm-input" maxlength="100" autocomplete="off" />
@@ -1079,9 +1246,18 @@
         </div>
     </div>
 
-    <div class="spm-zoom" id="spmZoom" hidden aria-hidden="true">
-        <img id="spmZoomImg" alt="Card preview">
-        <div class="spm-zoom-hint">Click or press Esc to close</div>
+    <div class="spm-zoom" id="spmZoom" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="spmZoomTitle">
+        <button type="button" class="spm-zoom-close" id="spmZoomClose" aria-label="Close">&times;</button>
+        <div class="spm-zoom-meta">
+            <div class="spm-zoom-title" id="spmZoomTitle"></div>
+            <div class="spm-zoom-count" id="spmZoomCount"></div>
+        </div>
+        <button type="button" class="spm-zoom-nav spm-zoom-prev" id="spmZoomPrev" aria-label="Previous card">‹</button>
+        <div class="spm-zoom-stage">
+            <img id="spmZoomImg" alt="Card preview">
+        </div>
+        <button type="button" class="spm-zoom-nav spm-zoom-next" id="spmZoomNext" aria-label="Next card">›</button>
+        <div class="spm-zoom-hint">Swipe or use arrows · tap outside or Esc to close</div>
     </div>
 
     <script src="cardmaker-fonts.js"></script>
@@ -1773,21 +1949,25 @@
         if (spmFilterSetEl) {
             spmFilterSetEl.addEventListener('change', function () { resetSpmPageAndRender(); });
         }
-        var spmPagePrevBtn = document.getElementById('spmPagePrev');
-        var spmPageNextBtn = document.getElementById('spmPageNext');
-        if (spmPagePrevBtn) {
-            spmPagePrevBtn.addEventListener('click', function () {
-                if (spmTablePage <= 0) return;
-                spmTablePage -= 1;
-                applyFiltersAndRender();
-            });
+        function shiftSpmTablePage(delta) {
+            var sorted = getVisibleSortedProjects();
+            var maxPage = Math.max(0, Math.ceil(sorted.length / SPM_PAGE_SIZE) - 1);
+            var next = spmTablePage + delta;
+            if (next < 0 || next > maxPage) return;
+            spmTablePage = next;
+            applyFiltersAndRender();
+            if (spmCardGrid) {
+                try { spmCardGrid.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (e) { /* ignore */ }
+            }
         }
-        if (spmPageNextBtn) {
-            spmPageNextBtn.addEventListener('click', function () {
-                spmTablePage += 1;
-                applyFiltersAndRender();
-            });
-        }
+        ['spmPagePrev', 'spmPagePrevBottom'].forEach(function (id) {
+            var btn = document.getElementById(id);
+            if (btn) btn.addEventListener('click', function () { shiftSpmTablePage(-1); });
+        });
+        ['spmPageNext', 'spmPageNextBottom'].forEach(function (id) {
+            var btn = document.getElementById(id);
+            if (btn) btn.addEventListener('click', function () { shiftSpmTablePage(1); });
+        });
         var spmActiveSetSelectEl = document.getElementById('spmActiveSetSelect');
         if (spmActiveSetSelectEl && typeof CardMakerSets !== 'undefined') {
             spmActiveSetSelectEl.addEventListener('change', function () {
@@ -3013,7 +3193,7 @@
                 var subLine = subParts.join(' · ') || '—';
                 var id = escapeHtml(p.file.id);
                 return '<article class="' + classes + '" data-project-id="' + id + '"' + titleAttr + '>' +
-                    '<div class="spm-card-art" data-zoom-id="' + id + '" title="Click to enlarge">' +
+                    '<div class="spm-card-art" data-zoom-id="' + id + '" title="Tap to enlarge — swipe or use arrows for next/previous">' +
                         '<label class="spm-card-check">' +
                             '<input type="checkbox" class="spm-row-check" data-spm-row-check data-project-id="' + id + '" ' + chk + ' aria-label="Select ' + escapeHtml(cardTitle) + '"/>' +
                         '</label>' +
@@ -3054,10 +3234,20 @@
                     spmFilteredHint.textContent = 'Showing ' + from + '–' + to + ' of ' + total;
                 }
             }
-            var prevBtn = document.getElementById('spmPagePrev');
-            var nextBtn = document.getElementById('spmPageNext');
-            if (prevBtn) prevBtn.disabled = spmTablePage <= 0 || total === 0;
-            if (nextBtn) nextBtn.disabled = spmTablePage >= maxPage || total === 0;
+            var atStart = spmTablePage <= 0 || total === 0;
+            var atEnd = spmTablePage >= maxPage || total === 0;
+            ['spmPagePrev', 'spmPagePrevBottom'].forEach(function (id) {
+                var btn = document.getElementById(id);
+                if (btn) btn.disabled = atStart;
+            });
+            ['spmPageNext', 'spmPageNextBottom'].forEach(function (id) {
+                var btn = document.getElementById(id);
+                if (btn) btn.disabled = atEnd;
+            });
+            var pagerBar = document.getElementById('spmPagerBar');
+            var pageLabel = document.getElementById('spmPageLabel');
+            if (pagerBar) pagerBar.hidden = total <= SPM_PAGE_SIZE;
+            if (pageLabel) pageLabel.textContent = 'Page ' + (spmTablePage + 1) + ' / ' + (maxPage + 1);
             if (spmExportCsvBtn) spmExportCsvBtn.disabled = total === 0;
             syncSelectAllCheckbox();
             updateBulkUi();
@@ -3458,6 +3648,80 @@
             return null;
         }
 
+        function getSpmBrowseIds() {
+            return getVisibleSortedProjects().filter(function (p) {
+                return p && p.file && p.file.id;
+            }).map(function (p) { return p.file.id; });
+        }
+
+        function spmBrowseNeighbor(projectId, delta) {
+            var ids = getSpmBrowseIds();
+            if (!ids.length) return null;
+            var i = ids.indexOf(projectId);
+            if (i < 0) i = 0;
+            var n = ids.length;
+            return ids[(i + delta % n + n) % n];
+        }
+
+        function prefersSpmReducedMotion() {
+            return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        }
+
+        function bindHorizontalSwipe(el, opts) {
+            if (!el) return { moved: false };
+            var st = { id: null, x: 0, y: 0, dx: 0, dy: 0, moved: false };
+            var threshold = (opts && opts.threshold) || 56;
+            el.addEventListener('pointerdown', function (e) {
+                if (opts.isActive && !opts.isActive()) return;
+                if (e.pointerType === 'mouse' && e.button !== 0) return;
+                if (opts.ignore && opts.ignore(e.target)) return;
+                st.id = e.pointerId;
+                st.x = e.clientX;
+                st.y = e.clientY;
+                st.dx = 0;
+                st.dy = 0;
+                st.moved = false;
+                try { el.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+            });
+            el.addEventListener('pointermove', function (e) {
+                if (st.id !== e.pointerId) return;
+                st.dx = e.clientX - st.x;
+                st.dy = e.clientY - st.y;
+                if (Math.abs(st.dx) > 8 || Math.abs(st.dy) > 8) st.moved = true;
+                if (opts.onMove) opts.onMove(st.dx, st.dy);
+            });
+            function finish(e, cancelled) {
+                if (st.id !== e.pointerId) return;
+                st.id = null;
+                if (opts.onMoveEnd) opts.onMoveEnd();
+                if (cancelled) return;
+                var absX = Math.abs(st.dx);
+                var absY = Math.abs(st.dy);
+                if (absX >= threshold && absX > absY * 1.15) {
+                    st.moved = true;
+                    opts.onSwipe(st.dx < 0 ? 1 : -1);
+                }
+            }
+            el.addEventListener('pointerup', function (e) { finish(e, false); });
+            el.addEventListener('pointercancel', function (e) { finish(e, true); });
+            return st;
+        }
+
+        function updateSpmZoomChrome(projectId) {
+            var ids = getSpmBrowseIds();
+            var i = ids.indexOf(projectId);
+            var titleEl = document.getElementById('spmZoomTitle');
+            var countEl = document.getElementById('spmZoomCount');
+            var prev = document.getElementById('spmZoomPrev');
+            var next = document.getElementById('spmZoomNext');
+            var project = projects.find(function (p) { return p.file && p.file.id === projectId; });
+            if (titleEl) titleEl.textContent = project ? (cardListTitle(project) || displaySaveLabel(project.file.name) || 'Card preview') : 'Card preview';
+            if (countEl) countEl.textContent = (i >= 0 && ids.length) ? ((i + 1) + ' / ' + ids.length) : '';
+            var many = ids.length > 1;
+            if (prev) prev.hidden = !many;
+            if (next) next.hidden = !many;
+        }
+
         function closeSpmZoom() {
             if (!spmZoom) return;
             spmZoom.classList.remove('is-open');
@@ -3467,7 +3731,11 @@
                 spmZoomImg.removeAttribute('src');
                 spmZoomImg.removeAttribute('data-zoom-id');
                 spmZoomImg.alt = '';
+                spmZoomImg.style.transform = '';
+                spmZoomImg.style.opacity = '';
+                spmZoomImg.style.transition = '';
             }
+            document.body.style.overflow = '';
         }
 
         function replaceProjectInList(file, state) {
@@ -3559,7 +3827,7 @@
             }
         }
 
-        function openSpmZoom(projectId) {
+        function openSpmZoom(projectId, slideDir) {
             if (!projectId || !spmZoom || !spmZoomImg) return;
             var project = projects.find(function (p) { return p.file && p.file.id === projectId; });
             if (!project) return;
@@ -3567,12 +3835,32 @@
             var zoomOpts = editorPreviewOpts();
             spmZoomImg.alt = title;
             spmZoomImg.setAttribute('data-zoom-id', projectId);
-            spmZoomImg.removeAttribute('src');
+            var thumb = spmCardGrid && spmCardGrid.querySelector('img.spm-thumb[data-id="' + String(projectId).replace(/"/g, '') + '"]');
+            if (thumb && thumb.src) spmZoomImg.src = thumb.src;
+            else if (!slideDir) spmZoomImg.removeAttribute('src');
             spmZoom.hidden = false;
             spmZoom.classList.add('is-open');
             spmZoom.setAttribute('aria-hidden', 'false');
-            var thumb = spmCardGrid && spmCardGrid.querySelector('img.spm-thumb[data-id="' + String(projectId).replace(/"/g, '') + '"]');
-            if (thumb && thumb.src) spmZoomImg.src = thumb.src;
+            document.body.style.overflow = 'hidden';
+            updateSpmZoomChrome(projectId);
+            if (slideDir && !prefersSpmReducedMotion()) {
+                var from = slideDir > 0 ? 48 : -48;
+                spmZoomImg.style.transition = 'none';
+                spmZoomImg.style.transform = 'translateX(' + from + 'px)';
+                spmZoomImg.style.opacity = '0.45';
+                requestAnimationFrame(function () {
+                    requestAnimationFrame(function () {
+                        if (!spmZoomStillOpen(projectId)) return;
+                        spmZoomImg.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+                        spmZoomImg.style.transform = 'translateX(0)';
+                        spmZoomImg.style.opacity = '1';
+                    });
+                });
+            } else {
+                spmZoomImg.style.transform = '';
+                spmZoomImg.style.opacity = '';
+                spmZoomImg.style.transition = '';
+            }
 
             function applyHiRes(url, state, fileMeta) {
                 if (!url || !spmZoomStillOpen(projectId)) return;
@@ -3602,6 +3890,7 @@
             refreshOneProjectFromDrive(projectId).then(function (updated) {
                 if (!updated || !updated.state || !spmZoomStillOpen(projectId)) return;
                 spmZoomImg.alt = cardListTitle(updated) || title;
+                updateSpmZoomChrome(projectId);
                 updateSpmCardTile(updated, null);
                 var localMt = project.file && project.file.modifiedTime;
                 var newMt = updated.file && updated.file.modifiedTime;
@@ -3610,8 +3899,62 @@
             }).catch(function () { /* keep current preview */ });
         }
 
+        function navigateSpmZoom(delta) {
+            if (!spmZoom || !spmZoom.classList.contains('is-open') || !spmZoomImg) return;
+            var cur = spmZoomImg.getAttribute('data-zoom-id');
+            var next = spmBrowseNeighbor(cur, delta);
+            if (!next || next === cur) return;
+            openSpmZoom(next, delta);
+        }
+
+        var spmZoomSwipe = bindHorizontalSwipe(spmZoom, {
+            threshold: 48,
+            isActive: function () { return !!(spmZoom && spmZoom.classList.contains('is-open')); },
+            ignore: function (t) { return !!(t && t.closest && t.closest('.spm-zoom-nav, .spm-zoom-close')); },
+            onMove: function (dx, dy) {
+                if (!spmZoomImg || prefersSpmReducedMotion()) return;
+                if (Math.abs(dx) < Math.abs(dy)) return;
+                spmZoomImg.style.transition = 'none';
+                spmZoomImg.style.transform = 'translateX(' + Math.max(-120, Math.min(120, dx)) + 'px)';
+            },
+            onMoveEnd: function () {
+                if (!spmZoomImg) return;
+                spmZoomImg.style.transition = 'transform 0.18s ease';
+                spmZoomImg.style.transform = '';
+            },
+            onSwipe: function (delta) { navigateSpmZoom(delta); }
+        });
+
         if (spmZoom) {
-            spmZoom.addEventListener('click', closeSpmZoom);
+            spmZoom.addEventListener('click', function (e) {
+                if (e.target.closest('.spm-zoom-nav, .spm-zoom-close, .spm-zoom-meta')) return;
+                if (spmZoomSwipe && spmZoomSwipe.moved) {
+                    spmZoomSwipe.moved = false;
+                    return;
+                }
+                closeSpmZoom();
+            });
+        }
+        var spmZoomPrevBtn = document.getElementById('spmZoomPrev');
+        var spmZoomNextBtn = document.getElementById('spmZoomNext');
+        var spmZoomCloseBtn = document.getElementById('spmZoomClose');
+        if (spmZoomPrevBtn) {
+            spmZoomPrevBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                navigateSpmZoom(-1);
+            });
+        }
+        if (spmZoomNextBtn) {
+            spmZoomNextBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                navigateSpmZoom(1);
+            });
+        }
+        if (spmZoomCloseBtn) {
+            spmZoomCloseBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                closeSpmZoom();
+            });
         }
 
         if (spmCardGrid) {
@@ -3787,6 +4130,76 @@
             sel.value = s;
         }
 
+        function updateSpmEditNavChrome() {
+            var nav = document.getElementById('spmEditCardNav');
+            var countEl = document.getElementById('spmEditNavCount');
+            var prev = document.getElementById('spmEditPrevBtn');
+            var next = document.getElementById('spmEditNextBtn');
+            var ids = getSpmBrowseIds();
+            var i = ids.indexOf(editModalProjectId);
+            var many = ids.length > 1 && i >= 0;
+            if (nav) nav.hidden = !many;
+            if (countEl) countEl.textContent = (i >= 0 && ids.length) ? ((i + 1) + ' / ' + ids.length) : '';
+            if (prev) prev.disabled = !many;
+            if (next) next.disabled = !many;
+        }
+
+        function readEditModalForm() {
+            var setEl = document.getElementById('spmEditSetMembership');
+            var snEl = document.getElementById('spmEditCardSetNumber');
+            var stEl = document.getElementById('spmEditCardSetTotal');
+            var nameEl = document.getElementById('spmEditName');
+            var typeEl = document.getElementById('spmEditType');
+            var subEl = document.getElementById('spmEditSubtype');
+            var costEl = document.getElementById('spmEditCost');
+            var rarEl = document.getElementById('spmEditRarity');
+            return {
+                name: nameEl ? String(nameEl.value || '') : '',
+                type: typeEl ? String(typeEl.value || '') : '',
+                subtype: subEl ? String(subEl.value || '') : '',
+                cost: costEl ? String(costEl.value || '') : '',
+                rarity: rarEl ? String(rarEl.value || '') : '',
+                setId: setEl ? String(setEl.value || '').trim() : '',
+                sn: snEl ? String(snEl.value || '').trim() : '',
+                st: stEl ? String(stEl.value || '').trim() : ''
+            };
+        }
+
+        function editModalBaseline() {
+            var project = projects.find(function (p) { return p.file && p.file.id === editModalProjectId; });
+            if (!project) return null;
+            var f = (project.state && project.state.fields) ? project.state.fields : {};
+            var c = project.costNumber;
+            if (!isFinite(c)) c = parseNumberSafe(f.TreasureCost);
+            return {
+                name: displaySaveLabel(project.file.name),
+                type: f.Type != null ? String(f.Type) : '',
+                subtype: f.Subtype != null ? String(f.Subtype) : '',
+                cost: isFinite(c) ? String(Math.round(c)) : '0',
+                rarity: project.rarity || '',
+                setId: f.CardMakerSetId != null ? String(f.CardMakerSetId).trim() : '',
+                sn: (f.CardSetNumber !== undefined && f.CardSetNumber !== null) ? String(f.CardSetNumber).trim() : '',
+                st: (f.CardSetTotal !== undefined && f.CardSetTotal !== null) ? String(f.CardSetTotal).trim() : ''
+            };
+        }
+
+        function editModalIsDirty() {
+            var a = readEditModalForm();
+            var b = editModalBaseline();
+            if (!a || !b) return false;
+            return a.name !== b.name || a.type !== b.type || a.subtype !== b.subtype ||
+                a.cost !== b.cost || a.rarity !== b.rarity || a.setId !== b.setId ||
+                a.sn !== b.sn || a.st !== b.st;
+        }
+
+        async function navigateSpmEdit(delta) {
+            if (!editModalProjectId) return;
+            var next = spmBrowseNeighbor(editModalProjectId, delta);
+            if (!next || next === editModalProjectId) return;
+            if (editModalIsDirty() && !confirm('Discard unsaved changes and switch cards?')) return;
+            await openSpmEditModal(next);
+        }
+
         function closeSpmEditModal() {
             editModalPreviewReq++;
             if (editModalPreviewDebounce) {
@@ -3860,6 +4273,7 @@
                 modal.setAttribute('aria-hidden', 'false');
             }
             document.body.style.overflow = 'hidden';
+            updateSpmEditNavChrome();
             var nameInput = document.getElementById('spmEditName');
             if (nameInput) nameInput.focus();
             refreshEditModalPreview();
@@ -3983,6 +4397,28 @@
 
         document.querySelectorAll('[data-spm-edit-close]').forEach(function (el) {
             el.addEventListener('click', function () { closeSpmEditModal(); });
+        });
+        var spmEditPrevBtnEl = document.getElementById('spmEditPrevBtn');
+        var spmEditNextBtnEl = document.getElementById('spmEditNextBtn');
+        if (spmEditPrevBtnEl) {
+            spmEditPrevBtnEl.addEventListener('click', function () {
+                navigateSpmEdit(-1).catch(function (err) { console.error(err); });
+            });
+        }
+        if (spmEditNextBtnEl) {
+            spmEditNextBtnEl.addEventListener('click', function () {
+                navigateSpmEdit(1).catch(function (err) { console.error(err); });
+            });
+        }
+        bindHorizontalSwipe(document.querySelector('#spmEditModal .spm-edit-preview-aside'), {
+            threshold: 56,
+            isActive: function () {
+                var modal = document.getElementById('spmEditModal');
+                return !!(modal && modal.classList.contains('is-open') && editModalProjectId);
+            },
+            onSwipe: function (delta) {
+                navigateSpmEdit(delta).catch(function (err) { console.error(err); });
+            }
         });
         var spmEditSaveBtnEl = document.getElementById('spmEditSaveBtn');
         if (spmEditSaveBtnEl) spmEditSaveBtnEl.addEventListener('click', function () { saveSpmEditModal(); });
@@ -4414,6 +4850,24 @@
         })();
 
         document.addEventListener('keydown', function (e) {
+            var zoomOpen = spmZoom && spmZoom.classList.contains('is-open');
+            var editMo = document.getElementById('spmEditModal');
+            var editOpen = editMo && editMo.classList.contains('is-open');
+            var inField = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA');
+
+            if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                if (zoomOpen) {
+                    e.preventDefault();
+                    navigateSpmZoom(e.key === 'ArrowRight' ? 1 : -1);
+                    return;
+                }
+                if (editOpen && !inField) {
+                    e.preventDefault();
+                    navigateSpmEdit(e.key === 'ArrowRight' ? 1 : -1).catch(function (err) { console.error(err); });
+                    return;
+                }
+            }
+
             if (e.key !== 'Escape') return;
             var foMo = document.getElementById('spmFieldOptionsModal');
             if (foMo && foMo.classList.contains('is-open')) {

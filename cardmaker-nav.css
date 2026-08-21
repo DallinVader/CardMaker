@@ -13,7 +13,7 @@
 .cm-app-nav-inner {
     max-width: min(1960px, 100%);
     margin: 0 auto;
-    padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+    padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
     display: flex;
     align-items: center;
     gap: 12px;
@@ -155,9 +155,29 @@
 
     .cm-app-nav-inner {
         justify-content: space-between;
+        gap: 8px;
     }
 
     .cm-app-nav-spacer {
         display: none;
+    }
+
+    .cm-app-nav-jump {
+        min-width: 0;
+        flex: 1 1 auto;
+        justify-content: flex-end;
+    }
+
+    .cm-app-nav-select {
+        min-height: 44px;
+        min-width: 0;
+        flex: 1 1 auto;
+        max-width: min(240px, calc(100vw - 132px));
+        font-size: 16px;
+    }
+
+    .cm-app-nav-brand {
+        font-size: 1.05rem;
+        padding: 8px 8px;
     }
 }

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Print cards – Card Maker</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="cardmaker-nav.css">
@@ -20,7 +20,7 @@
         .cg-wrap {
             max-width: 980px;
             margin: 0 auto;
-            padding: 20px 18px 0;
+            padding: 20px max(18px, env(safe-area-inset-right)) 0 max(18px, env(safe-area-inset-left));
         }
         .cg-toolbar {
             display: flex;
@@ -107,6 +107,13 @@
             content: 'Slot ' attr(data-index);
             color: #94a3b8;
             font-size: 0.78rem;
+        }
+
+        @media (max-width: 640px) {
+            .cg-page { padding-bottom: max(28px, env(safe-area-inset-bottom)); }
+            .cg-toolbar { gap: 8px; }
+            .cg-toolbar label.cg-upload-label { min-height: 44px; display: inline-flex; align-items: center; }
+            .cg-grid-wrap { padding: 10px; }
         }
 
         @media print {

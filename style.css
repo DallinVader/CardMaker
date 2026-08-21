@@ -1420,7 +1420,7 @@ canvas{
     display: none;
     position: fixed;
     inset: 0;
-    z-index: 1100;
+    z-index: 9400;
     align-items: center;
     justify-content: center;
     padding: 16px;
@@ -2047,6 +2047,12 @@ kbd {
 
     .controls-panel input[type="file"] {
         max-width: 100%;
+    }
+
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+    select,
+    textarea {
+        font-size: 16px;
     }
 }
 
